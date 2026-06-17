@@ -24,7 +24,7 @@ jobs:
           submodules: 'true'
         
       - name: Setup Flutter  ╰(✿˙ᗜ˙)੭━☆ﾟ.*･｡ﾟ
-        uses: subosito/flutter-action@dbf1fa04f4d2e52c33185153d06cdb5443aa189d
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
         with:
           flutter-version: '3.41.1'
           channel: 'stable'
