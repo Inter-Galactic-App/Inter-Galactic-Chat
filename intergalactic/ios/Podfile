@@ -1,0 +1,81 @@
+platform :ios, '14.0'
+
+ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+install! 'cocoapods', warn_for_unused_master_specs_repo: false
+
+project 'Runner', {
+  'Debug' => :debug,
+  'Profile' => :release,
+  'Release' => :release,
+}
+
+def flutter_root
+  generated_xcode_build_settings_path = File.expand_path(
+    File.join('..', 'Flutter', 'Generated.xcconfig'),
+    __FILE__,
+  )
+
+  unless File.exist?(generated_xcode_build_settings_path)
+    raise "#{generated_xcode_build_settings_path} must exist. Run flutter pub get first."
+  end
+
+  File.foreach(generated_xcode_build_settings_path) do |line|
+    matches = line.match(/FLUTTER_ROOT\=(.*)/)
+    return matches[1].strip if matches
+  end
+
+  raise "FLUTTER_ROOT not found in #{generated_xcode_build_settings_path}."
+end
+
+require File.expand_path(
+  File.join('packages', 'flutter_tools', 'bin', 'podhelper'),
+  flutter_root,
+)
+
+flutter_ios_podfile_setup
+
+target 'Runner' do
+  use_frameworks! :linkage => :static
+
+  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+
+  target 'InterGalactic Broadcast Extension' do
+    inherit! :search_paths
+  end
+end
+
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    flutter_additional_ios_build_settings(target)
+    if target.name == 'Pods-InterGalactic Broadcast Extension'
+      target.build_configurations.each do |config|
+        config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'chat.intergalactic.app.broadcast.pods'
+      end
+    end
+  end
+
+  # flutter_vodozemac compiles the Rust library into libvodozemac_bindings_dart.a
+  # and force-loads it into the pod's own static framework binary at the pod level.
+  # However, when the main Runner app links that static framework, the linker
+  # dead-strips every Rust symbol because no Swift/ObjC code references them at
+  # compile time — only Dart does via FFI at runtime.
+  #
+  # We force-load the raw .a (not the framework binary, which is already linked
+  # normally and would cause duplicate-symbol errors) so that all Rust symbols
+  # survive into the final binary and DynamicLibrary.process() can find them.
+  vodozemac_flag = '-force_load ${PODS_CONFIGURATION_BUILD_DIR}/flutter_vodozemac/libvodozemac_bindings_dart.a'
+  Dir.glob(File.join(installer.sandbox.root,
+                     'Target Support Files', 'Pods-Runner', '*.xcconfig')).each do |path|
+    content = File.read(path)
+    unless content.include?('libvodozemac_bindings_dart.a')
+      # Replace existing OTHER_LDFLAGS line instead of appending a duplicate
+      content = content.gsub(
+        /OTHER_LDFLAGS = \$\(inherited\)(.*?)$/,
+        "OTHER_LDFLAGS = $(inherited)\\1 #{vodozemac_flag}"
+      )
+      File.open(path, 'w') do |f|
+        f.write(content)
+      end
+    end
+  end
+end

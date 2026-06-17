@@ -1,0 +1,267 @@
+import 'package:intergalactic/client/timeline.dart';
+import 'package:intergalactic/client/timeline_events/timeline_event.dart';
+import 'package:intergalactic/client/timeline_events/timeline_event_feature_related.dart';
+import 'package:intergalactic/diagnostic/benchmark_values.dart';
+import 'package:flutter/material.dart';
+import 'package:tiamat/tiamat.dart' as tiamat;
+import 'package:flutter/material.dart' as material;
+
+class TimelineEventViewReply extends StatefulWidget {
+  const TimelineEventViewReply(
+      {super.key,
+      required this.timeline,
+      required this.index,
+      this.jumpToEvent,
+      this.bubbleMessages = false,
+      this.alignRight = false,
+      this.bubbleColor,
+      this.avatarSize = 32});
+  final Timeline timeline;
+  final Function(String eventId)? jumpToEvent;
+  final int index;
+  final bool bubbleMessages;
+  final bool alignRight;
+  final Color? bubbleColor;
+  final double avatarSize;
+
+  @override
+  State<TimelineEventViewReply> createState() => _TimelineEventViewReplyState();
+}
+
+class _TimelineEventViewReplyState extends State<TimelineEventViewReply> {
+  String? senderName;
+  String? body;
+  Color? senderColor;
+
+  bool loading = false;
+  String? replyEventId;
+
+  @override
+  void initState() {
+    getStateFromIndex(widget.index);
+    super.initState();
+  }
+
+  void getStateFromIndex(int index) {
+    var event = widget.timeline.events[index];
+    if (event is! TimelineEventFeatureRelated) {
+      return;
+    }
+
+    var e = event as TimelineEventFeatureRelated;
+    if (e.relatedEventId == null) {
+      return;
+    }
+
+    var replyEvent = widget.timeline.tryGetEvent(e.relatedEventId!);
+
+    if (replyEvent == null) {
+      loading = true;
+      widget.timeline.room.getEvent(e.relatedEventId!).then((value) {
+        if (mounted && value != null) {
+          setStateFromEvent(value);
+        }
+      });
+    } else {
+      setStateFromEvent(replyEvent);
+    }
+  }
+
+  void setStateFromEvent(TimelineEvent event) {
+    setState(() {
+      replyEventId = event.eventId;
+      var sender = widget.timeline.room.getMemberOrFallback(event.senderId);
+      senderName = sender.displayName;
+      senderColor = sender.defaultColor;
+      body = event.plainTextBody;
+      loading = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    BenchmarkValues.numTimelineReplyBodyBuilt += 1;
+    if (widget.bubbleMessages) {
+      return bubbleReply(context);
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(4),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: jumpToReply,
+          child: IntrinsicHeight(
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              SizedBox(
+                width: 45,
+                child: SizedBox.expand(
+                  child: CustomPaint(
+                    painter: ReplyLinePainter2(
+                        pathColor:
+                            material.Theme.of(context).colorScheme.secondary,
+                        avatarSize: widget.avatarSize),
+                  ),
+                ),
+              ),
+              Flexible(
+                child: RichText(
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
+                    text: TextSpan(children: [
+                      TextSpan(
+                          text: "${senderName ?? "Loading"} ",
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(
+                                  color: tiamat.Text.adjustColor(
+                                      context, senderColor ?? Colors.white))),
+                      TextSpan(
+                          text: body ?? "Unknown",
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(
+                                  color: material.Theme.of(context)
+                                      .colorScheme
+                                      .secondary)),
+                    ])),
+              )
+              // Column(
+              //   children: [
+              //     tiamat.Text(
+              //       senderName ?? "Loading",
+              //       color: senderColor,
+              //       autoAdjustBrightness: true,
+              //     ),
+              //   ],
+              // ),
+              // Flexible(
+              //   child: Padding(
+              //     padding: const EdgeInsets.fromLTRB(8, 0, 8, 0),
+              //     child: tiamat.Text(
+              //       body ?? "Unknown",
+              //       maxLines: 2,
+              //       overflow: TextOverflow.ellipsis,
+              //       color: material.Theme.of(context).colorScheme.secondary,
+              //     ),
+              //   ),
+              // ),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget bubbleReply(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final bubbleColor = widget.bubbleColor ?? scheme.surfaceContainerLow;
+    final crossAxisAlignment =
+        widget.alignRight ? CrossAxisAlignment.end : CrossAxisAlignment.start;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        widget.alignRight ? 0 : widget.avatarSize + 12,
+        0,
+        widget.alignRight ? 28 : 0,
+        4,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: jumpToReply,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: bubbleColor.withValues(alpha: 0.54),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: scheme.outlineVariant.withValues(alpha: 0.24),
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 9),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: crossAxisAlignment,
+                children: [
+                  Text(
+                    'Replying to ${senderName ?? "Loading"}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: tiamat.Text.adjustColor(
+                            context,
+                            senderColor ?? scheme.primary,
+                          ),
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    body ?? 'Unknown',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign:
+                        widget.alignRight ? TextAlign.right : TextAlign.left,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void jumpToReply() {
+    final id = replyEventId;
+    if (id == null) {
+      return;
+    }
+    widget.jumpToEvent?.call(id);
+  }
+}
+
+class ReplyLinePainter2 extends CustomPainter {
+  Color pathColor;
+  double strokeWidth;
+  double radius;
+  double padding;
+  double avatarSize;
+  ReplyLinePainter2(
+      {this.pathColor = Colors.white,
+      this.strokeWidth = 1.5,
+      this.radius = 5,
+      this.avatarSize = 32,
+      this.padding = 4}) {
+    _paint = Paint()
+      ..color = pathColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+  }
+
+  late Paint _paint;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    Path path = Path();
+    path.moveTo(avatarSize / 2, size.height - padding);
+    path.relativeLineTo(0, (-size.height + 9 + padding) + radius);
+    path.relativeArcToPoint(Offset(radius, -radius),
+        radius: Radius.circular(radius));
+    path.relativeLineTo(size.width - (avatarSize / 2) - radius - padding, 0);
+    canvas.drawPath(path, _paint);
+  }
+
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) {
+    return true;
+  }
+}

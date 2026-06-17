@@ -1,0 +1,43 @@
+name: security-review
+
+on:
+  pull_request:
+  merge_group:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  security-gates:
+    name: Security Gates
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          submodules: 'true'
+
+      - name: Run repo security review
+        run: python3 .github/scripts/security-review.py --repo-root "$GITHUB_WORKSPACE"
+
+  dependency-review:
+    name: Dependency Review
+    # Public repos default on; private/unsupported repos must opt in.
+    if: >-
+      github.event_name == 'pull_request' &&
+      vars.ENABLE_DEPENDENCY_REVIEW != 'false' &&
+      (github.event.repository.private == false || vars.ENABLE_DEPENDENCY_REVIEW == 'true')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Review dependency advisories
+        uses: actions/dependency-review-action@v5
+        with:
+          fail-on-severity: high

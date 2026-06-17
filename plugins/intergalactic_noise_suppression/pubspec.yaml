@@ -1,0 +1,21 @@
+name: intergalactic_noise_suppression
+description: Windows-first RNNoise capture post-processing for Inter Galactic.
+publish_to: none
+version: 0.0.1
+
+environment:
+  sdk: '>=3.6.0 <4.0.0'
+  flutter: '>=3.24.0'
+
+resolution: workspace
+
+dependencies:
+  ffi: ^2.1.3
+  flutter:
+    sdk: flutter
+
+flutter:
+  plugin:
+    platforms:
+      windows:
+        pluginClass: IntergalacticNoiseSuppressionPlugin

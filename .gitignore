@@ -1,0 +1,75 @@
+
+commet/coverage/lcov.info
+intergalactic/coverage/lcov.info
+commet/assets/js/package/olm.js
+intergalactic/assets/js/package/olm.js
+commet/assets/js/package/olm.wasm
+intergalactic/assets/js/package/olm.wasm
+commet/assets/js/package/olm_legacy.js
+intergalactic/assets/js/package/olm_legacy.js
+commet/.vodozemac/
+intergalactic/.vodozemac/
+commet/assets/vodozemac/vodozemac_bindings_dart_bg.wasm
+intergalactic/assets/vodozemac/vodozemac_bindings_dart_bg.wasm
+commet/assets/vodozemac/vodozemac_bindings_dart.js
+intergalactic/assets/vodozemac/vodozemac_bindings_dart.js
+intergalactic/web/pkg/
+/.dart_tool
+**/.dart_tool/
+build/.last_build_id
+**/build/
+widgets/matrix_widget_api/build/.last_build_id
+widgets/calendar/android/local.properties
+.env
+.env.*
+!.env.example
+.vscode/settings.json
+.idea/
+/build
+commet-windows.zip
+widgets/localhost.crt
+widgets/localhost.key
+commet/integration_test/synapse/runtime/
+intergalactic/integration_test/synapse/runtime/
+commet/integration_test/synapse/data/localhost.signing.key
+intergalactic/integration_test/synapse/data/localhost.signing.key
+releases/*/windows/
+releases/*/*.zip
+dist/
+artifacts/
+intergalactic/android/.kotlin/
+coderabbit/
+*.sync-conflict-*
+.sync-conflict-*
+
+# Internal planning docs — not for public consumption
+SECURITY_REVIEW_PLAN.md
+UPDATES.md
+
+# Generated build artifact — produced by release workflow, not committed
+latest.json
+
+
+# Windows installer script — used by release.bat locally; generated inline in deploy.yml CI
+windows_installer.iss
+
+# Android signing — never commit these
+commet/android/key.jks
+intergalactic/android/key.jks
+commet/android/key.properties
+intergalactic/android/key.properties
+
+# Local Firebase configuration - generated per owner/app build.
+intergalactic/android/app/google-services.json
+intergalactic/android/app/src/debug/google-services.json
+intergalactic/android/app/src/release/google-services.json
+intergalactic/lib/firebase_options.dart
+
+# Local Codex/Dart validation state
+.codex/
+.codex_appdata/
+.codex_localappdata/
+
+# Local Python bytecode caches
+__pycache__/
+**/__pycache__/

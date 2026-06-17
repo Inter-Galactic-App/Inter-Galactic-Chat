@@ -1,0 +1,27 @@
+[Desktop Entry]
+Version={{VERSION_TAG}}
+Type=Application
+Name=Inter Galactic
+Comment=Your space to connect!
+Categories=Utility;Amusement;
+Icon=chat.intergalactic.app
+Exec=intergalactic
+Terminal=false
+StartupWMClass=chat.intergalactic.app
+Actions=ToggleMute;Mute;Unmute
+X-KDE-StartupNotify=false
+StartupNotify=false
+
+[Desktop Action ToggleMute]
+Name=Toggle Mute
+Exec=intergalactic --shortcut toggle_mute
+X-KDE-Shortcuts=Alt+M
+
+[Desktop Action Mute]
+Name=Mute
+Exec=intergalactic --shortcut mute
+
+
+[Desktop Action Unmute]
+Name=Unmute
+Exec=intergalactic --shortcut unmute
