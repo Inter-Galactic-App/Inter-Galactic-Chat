@@ -109,7 +109,7 @@ dependencies:
   flutter_vodozemac: ^0.5.0
   vodozemac: ^0.5.0
   flutter_rust_bridge: 2.11.1
-  intl_translation: ^0.20.1
+  intl_translation: ^0.21.0
   flutter_secure_storage: ^9.2.4
 
 
