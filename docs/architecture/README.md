@@ -1,0 +1,101 @@
+# Architecture Docs
+
+Status: active index
+Owner: DOCUMENTATION
+Last reviewed: 2026-06-14
+
+Use this index to choose the smallest architecture document that matches a
+change. Start with the stable maps, then open feature-specific docs only when
+the change touches that feature.
+
+## Folder Map
+
+- `core/` - app-wide maps, repository orientation, and change checklists.
+- `matrix/` - Matrix protocol, room, media, E2EE, and permission behavior.
+- `features/` - product feature surfaces and settings architecture.
+- `notifications/` - push, local notification, and companion-overlay behavior.
+- `diagnostics/` - bug-report and diagnostic logging contracts.
+- `calls-streaming-audio/` - calls, LiveKit, streaming, game capture, WebRTC,
+  RNNoise, and shared-content audio.
+- `release/` - release target and distribution behavior.
+
+## Start Here
+
+- `core/overview.md` - high-level app layers, runtime flows, and architecture
+  constraints.
+- `core/codebase-map.md` - package and folder orientation before app-repo work.
+- `core/change-guide.md` - change-type checklist for cross-cutting work.
+- `core/system-overview.md` - concise subsystem map for broad architecture review.
+
+## Core System Maps
+
+- `matrix/matrix-e2ee.md` - login, Matrix restore, verification, and recovery-key
+  safety.
+- `matrix/media-pipeline.md` - Matrix media send/upload/render flow and URL-preview
+  boundaries.
+- `notifications/notifications.md` and `notifications/push-pipeline.md` -
+  pushers, platform notifiers, notification routing, and cleanup rules.
+- `features/activity-system.md` and `features/rich-presence-activity.md` -
+  local activity, presence publishing, Spotify, Steam, and status cards.
+- `features/onboarding-system.md`, `features/offline-demo-mode.md`, and
+  `features/tutorial-demo-preview.md` - first-run, demo, and tutorial behavior.
+
+## Calls, Streaming, And Audio
+
+- `calls-streaming-audio/streaming-pipeline.md` - stable map for MatrixRTC,
+  LiveKit, WebRTC, shared audio, RNNoise boundaries, and diagnostics.
+- `calls-streaming-audio/livekit-gameplay-streaming.md` - current
+  LiveKit/gameplay streaming defaults and diagnostics guidance.
+- `calls-streaming-audio/streaming-guidance-status.md` - current streaming guidance and next
+  implementation decisions.
+- `calls-streaming-audio/stream-optimization-report.md` - compact index for the split historical
+  streaming evidence archive. Open dated files under
+  `calls-streaming-audio/stream-optimization-report/` only when investigation
+  detail is needed.
+- `calls-streaming-audio/stream-diagnostic-contract.md`,
+  `calls-streaming-audio/stream-receiver-diagnostic-contract.md`, and
+  `calls-streaming-audio/stream-bottleneck-classification.md` - stream-test
+  reporting and classifier contract.
+- `calls-streaming-audio/archive/README.md` - historical milestone, gap, and
+  planning docs that were moved out of the live streaming architecture surface.
+- `calls-streaming-audio/local-stream-pipeline-harness.md`,
+  `calls-streaming-audio/game-capture-backend-architecture.md`,
+  `calls-streaming-audio/game-capture-test-target.md`, and
+  `calls-streaming-audio/windows-libwebrtc-hardware-encoding.md` - Windows game-capture and native
+  WebRTC diagnostics.
+- `calls-streaming-audio/media-and-plugins.md`,
+  `calls-streaming-audio/RNNOISE_TUNING_BASELINE.md`, and
+  `calls-streaming-audio/rnnoise-native-resampler-plan.md` - media/plugin map
+  and RNNoise follow-up docs. RNNoise behavior belongs to AUDIO.
+- `calls-streaming-audio/windows-share-session.md` and
+  `calls-streaming-audio/voip-soundboard.md` - shared-content audio and call
+  soundboard behavior.
+
+## Product Feature Areas
+
+- `features/dm-stories.md` - direct-message stories, story media, notifications, and
+  viewer routing.
+- `matrix/space-room-categories.md`, `matrix/room-settings-and-permissions.md`,
+  `features/settings-information-architecture.md`, `features/settings-ui-map.md`, and
+  `features/settings_areas.md` - space/room/settings structure and permission-aware
+  settings surfaces.
+- `diagnostics/bug-reporting-flow.md` and `diagnostics/diagnostic-logging.md` - bug-report payloads,
+  crash prompts, diagnostics, and redaction boundaries.
+- `matrix/calendar-rooms.md` - Matrix calendar-room event handling.
+- `features/desktop-small-window-mode.md` - compact desktop window behavior.
+- `release/release-targets.md` - release target, updater, and distribution behavior.
+- `core/repo-tree.md` - stable app-repo tree snapshot.
+
+## Design Docs
+
+Design-system guidance lives in `../design/`. Start with
+`../design/INTERGALACTIC_DESIGN_SYSTEM.md` before changing UI, theme, layout,
+settings surfaces, or component patterns.
+
+## Maintenance Notes
+
+- Keep stable maps concise. Move long investigation evidence into dedicated
+  reports or archives.
+- Do not put private workspace paths, private hostnames, secrets, or internal
+  agent coordination state in app-repo architecture docs.
+- License/legal evidence files are out of scope for architecture-doc cleanup.

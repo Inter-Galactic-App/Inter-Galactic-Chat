@@ -1,0 +1,406 @@
+platform :ios, '14.0'
+
+ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+install! 'cocoapods', warn_for_unused_master_specs_repo: false
+
+project 'Runner', {
+  'Debug' => :debug,
+  'Profile' => :release,
+  'Release' => :release,
+}
+
+def flutter_root
+  generated_xcode_build_settings_path = File.expand_path(
+    File.join('..', 'Flutter', 'Generated.xcconfig'),
+    __FILE__,
+  )
+
+  unless File.exist?(generated_xcode_build_settings_path)
+    raise "#{generated_xcode_build_settings_path} must exist. Run flutter pub get first."
+  end
+
+  File.foreach(generated_xcode_build_settings_path) do |line|
+    matches = line.match(/FLUTTER_ROOT\=(.*)/)
+    return matches[1].strip if matches
+  end
+
+  raise "FLUTTER_ROOT not found in #{generated_xcode_build_settings_path}."
+end
+
+require File.expand_path(
+  File.join('packages', 'flutter_tools', 'bin', 'podhelper'),
+  flutter_root,
+)
+
+flutter_ios_podfile_setup
+
+def patch_flutter_webrtc_ios_broadcast_socket_connection
+  socket_connection_path = File.join(
+    __dir__,
+    '.symlinks',
+    'plugins',
+    'flutter_webrtc',
+    'ios',
+    'Classes',
+    'Broadcast',
+    'FlutterSocketConnection.m',
+  )
+
+  return unless File.exist?(socket_connection_path)
+
+  source = File.read(socket_connection_path)
+  marker = 'Inter Galactic: guard broadcast socket stream teardown'
+  return if source.include?(marker)
+
+  replace_once = lambda do |content, before, after, description|
+    updated = content.sub(before, after)
+    if updated == content
+      raise "Failed to apply Flutter WebRTC iOS broadcast socket teardown patch: #{description}."
+    end
+    updated
+  end
+
+  source = replace_once.call(
+    source,
+    "@property(nonatomic, strong) NSOutputStream* outputStream;\n",
+    "@property(nonatomic, strong) NSOutputStream* outputStream;\n" \
+      "@property(nonatomic, strong) NSRunLoop* streamRunLoop;\n",
+    'stream run loop property',
+  )
+
+  source = replace_once.call(
+    source,
+    <<~'OBJC',
+      - (void)close {
+        if (![self.networkThread isExecuting]) {
+          return;
+        }
+
+        [self performSelector:@selector(unscheduleStreams)
+                     onThread:self.networkThread
+                   withObject:nil
+                waitUntilDone:true];
+
+        self.inputStream.delegate = nil;
+        self.outputStream.delegate = nil;
+
+        [self.inputStream close];
+        [self.outputStream close];
+
+        [self.networkThread cancel];
+
+        dispatch_source_cancel(self.listeningSource);
+        close(self.serverSocket);
+      }
+    OBJC
+    <<~'OBJC',
+      - (void)close {
+        if ([self.networkThread isExecuting]) {
+          [self performSelector:@selector(unscheduleStreams)
+                       onThread:self.networkThread
+                     withObject:nil
+                  waitUntilDone:true];
+        }
+
+        self.inputStream.delegate = nil;
+        self.outputStream.delegate = nil;
+
+        [self.inputStream close];
+        [self.outputStream close];
+        self.inputStream = nil;
+        self.outputStream = nil;
+
+        [self.networkThread cancel];
+
+        if (self.listeningSource != nil) {
+          dispatch_source_cancel(self.listeningSource);
+          self.listeningSource = nil;
+        }
+        if (self.serverSocket >= 0) {
+          close(self.serverSocket);
+          self.serverSocket = -1;
+        }
+      }
+    OBJC
+    'close teardown',
+  )
+
+  source = replace_once.call(
+    source,
+    <<~'OBJC',
+      - (void)scheduleStreams {
+        [self.inputStream scheduleInRunLoop:NSRunLoop.currentRunLoop forMode:NSRunLoopCommonModes];
+        [self.outputStream scheduleInRunLoop:NSRunLoop.currentRunLoop forMode:NSRunLoopCommonModes];
+      }
+    OBJC
+    <<~'OBJC',
+      - (void)scheduleStreams {
+        // Inter Galactic: guard broadcast socket stream teardown against startup races.
+        self.streamRunLoop = NSRunLoop.currentRunLoop;
+        if (self.inputStream != nil) {
+          [self.inputStream scheduleInRunLoop:self.streamRunLoop forMode:NSRunLoopCommonModes];
+        }
+        if (self.outputStream != nil) {
+          [self.outputStream scheduleInRunLoop:self.streamRunLoop forMode:NSRunLoopCommonModes];
+        }
+      }
+    OBJC
+    'schedule streams',
+  )
+
+  source = replace_once.call(
+    source,
+    <<~'OBJC',
+      - (void)unscheduleStreams {
+        [self.inputStream removeFromRunLoop:NSRunLoop.currentRunLoop forMode:NSRunLoopCommonModes];
+        [self.outputStream removeFromRunLoop:NSRunLoop.currentRunLoop forMode:NSRunLoopCommonModes];
+      }
+    OBJC
+    <<~'OBJC',
+      - (void)unscheduleStreams {
+        NSRunLoop* runLoop = self.streamRunLoop ?: NSRunLoop.currentRunLoop;
+        NSInputStream* inputStream = self.inputStream;
+        NSOutputStream* outputStream = self.outputStream;
+        if (inputStream != nil) {
+          [inputStream removeFromRunLoop:runLoop forMode:NSRunLoopCommonModes];
+        }
+        if (outputStream != nil) {
+          [outputStream removeFromRunLoop:runLoop forMode:NSRunLoopCommonModes];
+        }
+        self.streamRunLoop = nil;
+      }
+    OBJC
+    'unschedule streams',
+  )
+
+  unless source.include?(marker) && source.include?('NSRunLoop* streamRunLoop')
+    raise 'Failed to verify Flutter WebRTC iOS broadcast socket teardown patch.'
+  end
+
+  File.write(socket_connection_path, source)
+  Pod::UI.puts 'Flutter WebRTC iOS broadcast socket teardown patch: installed.'
+end
+
+def patch_flutter_webrtc_ios_post_event_guard
+  plugin_m_path = File.join(
+    __dir__,
+    '.symlinks',
+    'plugins',
+    'flutter_webrtc',
+    'ios',
+    'Classes',
+    'FlutterWebRTCPlugin.m',
+  )
+  plugin_h_path = File.join(
+    __dir__,
+    '.symlinks',
+    'plugins',
+    'flutter_webrtc',
+    'ios',
+    'Classes',
+    'FlutterWebRTCPlugin.h',
+  )
+
+  return unless File.exist?(plugin_m_path) && File.exist?(plugin_h_path)
+
+  source = File.read(plugin_m_path)
+  header = File.read(plugin_h_path)
+  marker = 'Inter Galactic: guard WebRTC event sink dispatch'
+  return if source.include?(marker)
+
+  source = source.sub(
+    <<~'OBJC',
+      void postEvent(FlutterEventSink _Nonnull sink, id _Nullable event) {
+          dispatch_async(dispatch_get_main_queue(), ^{
+            sink(event);
+          });
+      }
+    OBJC
+    <<~'OBJC',
+      void postEvent(FlutterEventSink _Nullable sink, id _Nullable event) {
+          // Inter Galactic: guard WebRTC event sink dispatch during iOS startup races.
+          if (sink == nil) {
+            return;
+          }
+          FlutterEventSink eventSink = [sink copy];
+          id safeEvent = event ?: [NSNull null];
+          dispatch_async(dispatch_get_main_queue(), ^{
+            eventSink(safeEvent);
+          });
+      }
+    OBJC
+  )
+
+  header = header.sub(
+    'void postEvent(FlutterEventSink _Nonnull sink, id _Nullable event);',
+    'void postEvent(FlutterEventSink _Nullable sink, id _Nullable event);',
+  )
+
+  unless source.include?(marker)
+    raise 'Failed to apply Flutter WebRTC iOS event sink dispatch patch.'
+  end
+  unless header.include?(
+    'void postEvent(FlutterEventSink _Nullable sink, id _Nullable event);'
+  )
+    raise 'Failed to apply Flutter WebRTC iOS event sink dispatch header patch.'
+  end
+
+  File.write(plugin_m_path, source)
+  File.write(plugin_h_path, header)
+  Pod::UI.puts 'Flutter WebRTC iOS event sink dispatch patch: installed.'
+end
+
+def patch_flutter_webrtc_ios_intergalactic_pip_track_bridge
+  plugin_m_path = File.join(
+    __dir__,
+    '.symlinks',
+    'plugins',
+    'flutter_webrtc',
+    'ios',
+    'Classes',
+    'FlutterWebRTCPlugin.m',
+  )
+
+  return unless File.exist?(plugin_m_path)
+
+  source = File.read(plugin_m_path)
+  marker = 'Inter Galactic: expose prepared video track for native PiP v2'
+  return if source.include?(marker)
+
+  insertion_point = <<~'OBJC'
+    } else if ([@"videoRendererSetSrcObject" isEqualToString:call.method]) {
+  OBJC
+  bridge_handler = <<~'OBJC'
+    } else if ([@"interGalacticPreparePictureInPictureTrack" isEqualToString:call.method]) {
+      // Inter Galactic: expose prepared video track for native PiP v2.
+      NSDictionary* argsMap = call.arguments;
+      NSString* sessionId = argsMap[@"sessionId"];
+      NSString* streamId = argsMap[@"mediaStreamId"];
+      NSString* ownerTag = argsMap[@"ownerTag"];
+      NSString* trackId = argsMap[@"videoTrackId"];
+      NSString* participantHash = argsMap[@"participantHash"];
+      RTCMediaStream* stream = nil;
+      RTCVideoTrack* videoTrack = nil;
+      if ([ownerTag isEqualToString:@"local"]) {
+        stream = _localStreams[streamId];
+      }
+      if (!stream) {
+        stream = [self streamForId:streamId peerConnectionId:ownerTag];
+      }
+      if (stream) {
+        NSArray* videoTracks = stream.videoTracks;
+        videoTrack = videoTracks && videoTracks.count ? videoTracks[0] : nil;
+        for (RTCVideoTrack* track in videoTracks) {
+          if ([track.trackId isEqualToString:trackId]) {
+            videoTrack = track;
+            break;
+          }
+        }
+      }
+      if (!videoTrack && trackId.length > 0) {
+        RTCMediaStreamTrack* remoteTrack = [self remoteTrackForId:trackId];
+        if ([remoteTrack isKindOfClass:[RTCVideoTrack class]]) {
+          videoTrack = (RTCVideoTrack*)remoteTrack;
+        }
+      }
+      if (!videoTrack) {
+        NSLog(@"intergalactic_ios_call_pip event=track_prepare_failed reason=track_not_found stream_hash=%@ track_hash=%@",
+              streamId.length > 0 ? [NSString stringWithFormat:@"%08lx", (unsigned long)streamId.hash] : @"",
+              trackId.length > 0 ? [NSString stringWithFormat:@"%08lx", (unsigned long)trackId.hash] : @"");
+        result(@NO);
+        return;
+      }
+
+      NSMutableDictionary* userInfo = [NSMutableDictionary dictionary];
+      userInfo[@"track"] = videoTrack;
+      if (sessionId.length > 0) {
+        userInfo[@"sessionId"] = sessionId;
+      }
+      if (trackId.length > 0) {
+        userInfo[@"trackHash"] = [NSString stringWithFormat:@"%08lx", (unsigned long)trackId.hash];
+      }
+      if (streamId.length > 0) {
+        userInfo[@"streamHash"] = [NSString stringWithFormat:@"%08lx", (unsigned long)streamId.hash];
+      }
+      if (participantHash.length > 0) {
+        userInfo[@"participantHash"] = participantHash;
+      }
+      [[NSNotificationCenter defaultCenter] postNotificationName:@"InterGalacticPreparedPiPTrack"
+                                                          object:nil
+                                                        userInfo:userInfo];
+      NSLog(@"intergalactic_ios_call_pip event=track_prepared_bridge selected_track_hash=%@",
+            userInfo[@"trackHash"] ?: @"");
+      result(@YES);
+  OBJC
+
+  unless source.include?(insertion_point)
+    raise 'Failed to find Flutter WebRTC iOS PiP track bridge insertion point.'
+  end
+
+  legacy_pattern = /
+    \s*\}\ else\ if\ \(\[@\"interGalacticPreparePictureInPictureTrack\"\ isEqualToString:call\.method\]\)\ \{.*?
+    (?=\n\}\ else\ if\ \(\[@\"videoRendererSetSrcObject\"\ isEqualToString:call\.method\]\)\ \{)
+  /mx
+  if source.match?(legacy_pattern)
+    source = source.sub(legacy_pattern, "\n#{bridge_handler}")
+  else
+    source = source.sub(insertion_point, "#{bridge_handler}\n#{insertion_point}")
+  end
+
+  unless source.include?(marker)
+    raise 'Failed to apply Flutter WebRTC iOS PiP track bridge patch.'
+  end
+
+  File.write(plugin_m_path, source)
+  Pod::UI.puts 'Flutter WebRTC iOS PiP track bridge patch: installed.'
+end
+
+target 'Runner' do
+  use_frameworks! :linkage => :static
+
+  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+
+  target 'InterGalactic Broadcast Extension' do
+    inherit! :search_paths
+  end
+end
+
+post_install do |installer|
+  patch_flutter_webrtc_ios_broadcast_socket_connection
+  patch_flutter_webrtc_ios_post_event_guard
+  patch_flutter_webrtc_ios_intergalactic_pip_track_bridge
+
+  installer.pods_project.targets.each do |target|
+    flutter_additional_ios_build_settings(target)
+    if target.name == 'Pods-InterGalactic Broadcast Extension'
+      target.build_configurations.each do |config|
+        config.build_settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'chat.intergalactic.app.broadcast.pods'
+      end
+    end
+  end
+
+  # flutter_vodozemac compiles the Rust library into libvodozemac_bindings_dart.a
+  # and force-loads it into the pod's own static framework binary at the pod level.
+  # However, when the main Runner app links that static framework, the linker
+  # dead-strips every Rust symbol because no Swift/ObjC code references them at
+  # compile time — only Dart does via FFI at runtime.
+  #
+  # We force-load the raw .a (not the framework binary, which is already linked
+  # normally and would cause duplicate-symbol errors) so that all Rust symbols
+  # survive into the final binary and DynamicLibrary.process() can find them.
+  vodozemac_flag = '-force_load ${PODS_CONFIGURATION_BUILD_DIR}/flutter_vodozemac/libvodozemac_bindings_dart.a'
+  Dir.glob(File.join(installer.sandbox.root,
+                     'Target Support Files', 'Pods-Runner', '*.xcconfig')).each do |path|
+    content = File.read(path)
+    unless content.include?('libvodozemac_bindings_dart.a')
+      # Replace existing OTHER_LDFLAGS line instead of appending a duplicate
+      content = content.gsub(
+        /OTHER_LDFLAGS = \$\(inherited\)(.*?)$/,
+        "OTHER_LDFLAGS = $(inherited)\\1 #{vodozemac_flag}"
+      )
+      File.open(path, 'w') do |f|
+        f.write(content)
+      end
+    end
+  end
+end

@@ -1,0 +1,23 @@
+flutter/ephemeral/
+
+# Visual Studio user-specific files.
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Visual Studio build-related files.
+x64/
+x86/
+
+# Visual Studio cache files
+# files ending in .cache can be ignored
+*.[Cc]ache
+# but keep track of directories ending in .cache
+!*.[Cc]ache/
+
+# Release-staged third-party desktop media tools are distributed from an
+# audited source bundle, not checked in as binaries.
+third_party/ffmpeg/bin/*.exe
+third_party/ffmpeg/bin/*.dll
+third_party/ffmpeg/bin/*.pdb
