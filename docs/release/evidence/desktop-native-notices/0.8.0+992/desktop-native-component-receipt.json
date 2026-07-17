@@ -1,0 +1,353 @@
+{
+  "schemaVersion": 1,
+  "generatedAtUtc": "2026-07-14T22:06:26.5364673+00:00",
+  "releaseVersion": "0.8.0+992",
+  "scope": "Supplemental Windows desktop native third-party notice and source-chain receipt.",
+  "legalStatus": "Engineering release evidence only; owner/counsel determines the applicable compliance route.",
+  "publicAppSource": {
+    "repository": "https://github.com/Inter-Galactic-App/Inter-Galactic-Chat",
+    "tag": "v0.8.0+992",
+    "tagObject": "78f4b98416e3dc4b3f418c5aef74871c1909a3c5",
+    "commit": "3b8ac7ad0414701da4fc53f5656d34b937caf764",
+    "pubspecVersion": "0.8.0+992",
+    "cleanCheckout": true
+  },
+  "releasedArtifacts": {
+    "installer": {
+      "file": "InterGalactic-Setup-0.8.0+992.exe",
+      "bytes": 193320048,
+      "sha256": "22C333635FA89A575D392CF141998EBF0060A50774952AEB9137989D94F5EFA9"
+    },
+    "desktopPackageZip": {
+      "file": "inter-galactic-windows-v0.8.0+992.zip",
+      "bytes": 279697326,
+      "sha256": "36599D6C848EC3C04EA2FEFF1727A31CF70921341AB7245C0F770B9635E3233A",
+      "libwebrtcDllSha256": "C96E0575C23C94F32640FBE69EC62AE05F1A13EA646E5051A832336678C97ADD"
+    },
+    "sourceArchive": {
+      "file": "intergalactic-0.8.0+992-source.zip",
+      "bytes": 188027199,
+      "sha256": "20A03923981519218CF67E8B68788AE5363ADD70A1871C31DBD733FF61F201FF"
+    },
+    "libwebrtcDll": {
+      "file": "libwebrtc.dll",
+      "bytes": 20718592,
+      "sha256": "C96E0575C23C94F32640FBE69EC62AE05F1A13EA646E5051A832336678C97ADD",
+      "matchesRetainedBuildOutput": true
+    }
+  },
+  "nativeBuild": {
+    "artifactZip": {
+      "file": "libwebrtc.zip",
+      "bytes": 39805116,
+      "sha256": "9DC72E4FA712637F432114CAD0A28755C1F4F92D576E272BFC1901A6C4FDEB7B",
+      "sourceManifest": {
+        "file": "libwebrtc.zip.manifest.json",
+        "sha256": "2FEDC18280D1F9738DF4540C21DAE808E02D9312B935318FDF4E23F3E83AD3CA",
+        "includedInPublicEvidence": false
+      },
+      "publicManifest": {
+        "file": "artifact-manifest.json",
+        "sha256": "C9F72A783B15AB0B6185A3651D37062EB27565B5EEE706D0D14942EA34B625B9",
+        "sanitizedFromSourceManifest": true,
+        "removedFields": [
+          "provenance.libwebrtcWrapper.workspacePath",
+          "provenance.libwebrtcWrapper.backupRemote",
+          "provenance.webrtcCore.workspacePath",
+          "provenance.webrtcCore.backupRemote"
+        ]
+      }
+    },
+    "webRtcCore": {
+      "repository": "https://github.com/Inter-Galactic-App/webrtc-core",
+      "commit": "6084687728c2adc049908e353a679f7d91c0d3d5"
+    },
+    "libwebrtcWrapper": {
+      "repository": "https://github.com/Inter-Galactic-App/libwebrtc",
+      "commit": "1f70ae1d5b063c51a531fe94eef6ae20d09c6c3e"
+    },
+    "buildArgs": {
+      "source": "webrtc-build/src/out-release/Windows-x64/args.gn",
+      "target_os": "win",
+      "target_cpu": "x64",
+      "is_component_build": false,
+      "is_clang": true,
+      "is_debug": false,
+      "rtc_use_h264": true,
+      "ffmpeg_branding": "Chrome",
+      "rtc_include_tests": false,
+      "rtc_build_examples": false,
+      "libwebrtc_desktop_capture": true,
+      "libwebrtc_intel_media_sdk": true
+    },
+    "buildArgsSha256": "DF7B9AA58D0AB1EA89107FF60088D4C7E68218899F08ED4DCB1C902B8C562645",
+    "dependencyPinsSha256": "381A1101F2026E67F407572E09D14DDA28B40A84D2DC546494BD9A3B06118916",
+    "dependencyPins": {
+      "src": "a4bd28d99eb9ed3bc8e41ce7b9ce7254ee7308bd",
+      "src/buildtools": "0f32cb9025766951122d4ed19aba87a94ded3f43",
+      "src/build": "01021e6c12636951a6b4e5342e16b2101b352367",
+      "src/base": "86c814633cf284bc8057a539bc722e2a672afe2f",
+      "src/testing": "a89c37d36bf80c05963727e28b9916835ae88d3a",
+      "src/tools": "ffcbc837bbb14d80d09147c2af5302ff6bd4bd69",
+      "src/third_party": "8062e0e102496ff14a8c58b586f014527424953d",
+      "src/third_party/clang-format/script": "37f6e68a107df43b7d7e044fd36a13cbae3413f2",
+      "src/third_party/colorama/src": "3de9f013df4b470069d03d250224062e8cf15c49",
+      "src/third_party/crc32c/src": "d3d60ac6e0f16780bcfcc825385e1d338801a558",
+      "src/third_party/ced/src": "ba412eaaacd3186085babcd901679a48863c7dd5",
+      "src/third_party/dav1d/libdav1d": "8d956180934f16244bdb58b39175824775125e55",
+      "src/third_party/googletest/src": "cd430b47a54841ec45d64d2377d7cabaf0eba610",
+      "src/third_party/google_benchmark/src": "761305ec3b33abf30e08d50eb829e19a802581cc",
+      "src/third_party/fuzztest/src": "b10387fdbbca18192f85eaa5323a59f44bf9c468",
+      "src/third_party/depot_tools": "fa8fc854e1766b86f10c9a15902cf3cc23adaac2",
+      "src/third_party/breakpad/breakpad": "232a723f5096ab02d53d87931efa485fa77d3b03",
+      "src/third_party/gtest-parallel": "96f4f904922f9bf66689e749c40f314845baaac8",
+      "src/third_party/libFuzzer/src": "e31b99917861f891308269c36a32363b120126bb",
+      "src/third_party/jsoncpp/source": "42e892d96e47b1f6e29844cc705e148ec4856448",
+      "src/third_party/freetype/src": "1da283b8ae6d6b94f34a5c4b8c1227adc9dbb1d8",
+      "src/third_party/flatbuffers/src": "8db59321d9f02cdffa30126654059c7d02f70c32",
+      "src/third_party/libunwind/src": "81e2cb40a70de2b6978e6d8658891ded9a77f7e3",
+      "src/third_party/libc++abi/src": "f2a7f2987f9dcdf8b04c2d8cd4dcb186641a7c3e",
+      "src/third_party/libsrtp": "a52756acb1c5e133089c798736dd171567df11f5",
+      "src/third_party/libjpeg_turbo": "e14cbfaa85529d47f9f55b0f104a579c1061f9ad",
+      "src/third_party/libyuv": "1e40e34573c3861480d107cd4a4ce290df79951f",
+      "src/third_party/libvpx/source/libvpx": "ff1d193f4b9dfa9b2ced51efbb6ec7a69e58e88c",
+      "src/third_party/libaom/source/libaom": "a23a4799ec2d7dd6e436c7b64a34553773014ed7",
+      "src/third_party/protobuf-javascript/src": "eb785a9363664a402b6336dfe96aad27fb33ffa8",
+      "src/third_party/nasm": "9f916e90e6fc34ec302573f6ce147e43e33d68ca",
+      "src/third_party/compiler-rt/src": "57213f125d03209892fed26189feb3b736e96735",
+      "src/third_party/re2/src": "c84a140c93352cdabbfb547c531be34515b12228",
+      "src/third_party/openh264/src": "652bdb7719f30b52b08e506645a7322ff1b2cc6f",
+      "src/third_party/harfbuzz-ng/src": "9f83bbbe64654b45ba5bb06927ff36c2e7588495",
+      "src/third_party/llvm-libc/src": "912274164f0877ca917c06e8484ad3be1784833a",
+      "src/third_party/boringssl/src": "34492c89a8e381e0e856a686cc71b1eb5bd728db",
+      "src/third_party/ffmpeg": "01f23648c6b84de6c0f717fa4e1816f53b9ee72e",
+      "src/third_party/icu": "4c8cc4b365a505ce35be1e0bd488476c5f79805d",
+      "src/third_party/grpc/src": "957c9f95224b1e1318c0ecb98d0e7584ea5ccff2",
+      "src/third_party/catapult": "000f47cfa393d7f9557025a252862e2a61a60d44",
+      "src/third_party/libc++/src": "917609c669e43edc850eeb192a342434a54e1dfd",
+      "src/third_party/perfetto": "a54dd38d60593129ae56d400f1a72860670abea4"
+    },
+    "ninjaGraphSha256": "32CFF7BEECBED605A452D222BD4825D9CD23C1BDE25A8ACD7BB44793810DB186",
+    "licenseGeneratorSha256": "43C3EA289656D36CEDD9C1F4A8B37B6664A3A903CB9C383AC97FD14CA100E6A3"
+  },
+  "notice": {
+    "file": "THIRD_PARTY_NOTICES.desktop-native.txt",
+    "bytes": 130968,
+    "sha256": "03A872AC0D3811DDD06BD71AC73340623B6BBAB1B0794BC9EA72247623C9FCE6",
+    "componentCount": 30,
+    "components": [
+      {
+        "name": "libwebrtc-wrapper",
+        "revision": "1f70ae1d5b063c51a531fe94eef6ae20d09c6c3e",
+        "licensePath": "libwebrtc/LICENSE",
+        "licenseSha256": "1FB8EA5C0F4077A66E7CF485802CD1D4585F51DA6A5AF5AB7ADAD0346EFF0D39",
+        "noticePath": "libwebrtc/NOTICE",
+        "noticeSha256": "70D8DAE952AD98BC07A1EB51FD4D240190DE66EA8F47AD831389D16DD090C720",
+        "sourceRepository": "https://github.com/Inter-Galactic-App/libwebrtc"
+      },
+      {
+        "name": "webrtc",
+        "revision": "6084687728c2adc049908e353a679f7d91c0d3d5",
+        "licensePath": "LICENSE",
+        "licenseSha256": "5D57F76601B87E2069605CCEF52E5CAAA5EEB7A2F76E34AA65A0102637D28376",
+        "sourceRepository": "https://github.com/Inter-Galactic-App/webrtc-core"
+      },
+      {
+        "name": "abseil-cpp",
+        "revision": "8062e0e102496ff14a8c58b586f014527424953d",
+        "licensePath": "third_party/abseil-cpp/LICENSE",
+        "licenseSha256": "F54FFF0B905DF5B3464527C652A30E903B172D6DCAB4D89B5E6F105D5E4A4603",
+        "sourceRepository": "https://chromium.googlesource.com/chromium/src/third_party"
+      },
+      {
+        "name": "boringssl",
+        "revision": "34492c89a8e381e0e856a686cc71b1eb5bd728db",
+        "licensePath": "third_party/boringssl/src/LICENSE",
+        "licenseSha256": "86F839D5FD287D9B155EF222BA39CCDA32E5515B4573A9A1F35B5DB03FF7E0A3",
+        "sourceRepository": "https://boringssl.googlesource.com/boringssl.git"
+      },
+      {
+        "name": "compiler-rt",
+        "revision": "57213f125d03209892fed26189feb3b736e96735",
+        "licensePath": "third_party/compiler-rt/src/LICENSE.TXT",
+        "licenseSha256": "815455237D89628F7B995A9E11A6E9074F7443AFDF63507D715A676F80D874A4",
+        "sourceRepository": "https://chromium.googlesource.com/external/github.com/llvm/llvm-project/compiler-rt.git"
+      },
+      {
+        "name": "crc32c",
+        "revision": "d3d60ac6e0f16780bcfcc825385e1d338801a558",
+        "licensePath": "third_party/crc32c/src/LICENSE",
+        "licenseSha256": "7014DC6FC709B9C455FE035C28323EE8B300B71BF315FF883C4051F28FFC81FE",
+        "sourceRepository": "https://chromium.googlesource.com/external/github.com/google/crc32c.git"
+      },
+      {
+        "name": "dav1d",
+        "revision": "8062e0e102496ff14a8c58b586f014527424953d",
+        "licensePath": "third_party/dav1d/LICENSE",
+        "licenseSha256": "E6D95F9BAC0B169369CDACF4FA897F403E53B759C290B9EE8EFAA44D20850CB0",
+        "sourceRepository": "https://chromium.googlesource.com/chromium/src/third_party"
+      },
+      {
+        "name": "ffmpeg",
+        "revision": "01f23648c6b84de6c0f717fa4e1816f53b9ee72e",
+        "licensePath": "third_party/ffmpeg/LICENSE.md",
+        "licenseSha256": "EDE44CB106760B85E1773DF347324D5CC29622F058F0C986AE1FA857A6FEBC3B",
+        "sourceRepository": "https://chromium.googlesource.com/chromium/third_party/ffmpeg.git"
+      },
+      {
+        "name": "fft",
+        "revision": "6084687728c2adc049908e353a679f7d91c0d3d5",
+        "licensePath": "modules/third_party/fft/LICENSE",
+        "licenseSha256": "036BE5FF1AC218B824B75B7EC02A014B909B711328E213572F1894C07CDAD109",
+        "sourceRepository": "https://github.com/Inter-Galactic-App/webrtc-core"
+      },
+      {
+        "name": "fiat",
+        "revision": "34492c89a8e381e0e856a686cc71b1eb5bd728db",
+        "licensePath": "third_party/boringssl/src/third_party/fiat/LICENSE",
+        "licenseSha256": "6DF88D7E1C97C624A9CAF73664BE4E5B9515E49B6E5E16DCB1BE77084B473347",
+        "sourceRepository": "https://boringssl.googlesource.com/boringssl.git"
+      },
+      {
+        "name": "g711",
+        "revision": "6084687728c2adc049908e353a679f7d91c0d3d5",
+        "licensePath": "modules/third_party/g711/LICENSE",
+        "licenseSha256": "098A745BF3BE2759E53D39E5CEC538546A899B5E237BC51C48CA005BFF0853A7",
+        "sourceRepository": "https://github.com/Inter-Galactic-App/webrtc-core"
+      },
+      {
+        "name": "g722",
+        "revision": "6084687728c2adc049908e353a679f7d91c0d3d5",
+        "licensePath": "modules/third_party/g722/LICENSE",
+        "licenseSha256": "82D99A2D0EA65C399A554F206842CB354A46110F6170E8FCD11AA8709DA2F9FE",
+        "sourceRepository": "https://github.com/Inter-Galactic-App/webrtc-core"
+      },
+      {
+        "name": "libaom",
+        "revision": "a23a4799ec2d7dd6e436c7b64a34553773014ed7",
+        "licensePath": "third_party/libaom/source/libaom/LICENSE",
+        "licenseSha256": "BF4A52612302050351BB2712F997BB0E2B1DC48C62D68BEF64126A8C8249FB4E",
+        "sourceRepository": "https://aomedia.googlesource.com/aom.git"
+      },
+      {
+        "name": "libc++",
+        "revision": "917609c669e43edc850eeb192a342434a54e1dfd",
+        "licensePath": "third_party/libc++/src/LICENSE.TXT",
+        "licenseSha256": "A7DE191338D328257ECEC5BA1EA971EBD67633D0B4FCE7D6272A39749547EC6B",
+        "sourceRepository": "https://chromium.googlesource.com/external/github.com/llvm/llvm-project/libcxx.git"
+      },
+      {
+        "name": "libjpeg_turbo",
+        "revision": "e14cbfaa85529d47f9f55b0f104a579c1061f9ad",
+        "licensePath": "third_party/libjpeg_turbo/LICENSE.md",
+        "licenseSha256": "BE2B2B5AB168BCE87BC3E31F2A5C5ADBA4B7F6E9E51D618E958D1D46972EBD95",
+        "sourceRepository": "https://chromium.googlesource.com/chromium/deps/libjpeg_turbo.git"
+      },
+      {
+        "name": "libsrtp",
+        "revision": "a52756acb1c5e133089c798736dd171567df11f5",
+        "licensePath": "third_party/libsrtp/LICENSE",
+        "licenseSha256": "56151B4ACF86106F0756D130187FB9C855D07B0378933CB245DED359DC39F682",
+        "sourceRepository": "https://chromium.googlesource.com/chromium/deps/libsrtp.git"
+      },
+      {
+        "name": "libvpx",
+        "revision": "ff1d193f4b9dfa9b2ced51efbb6ec7a69e58e88c",
+        "licensePath": "third_party/libvpx/source/libvpx/LICENSE",
+        "licenseSha256": "2CC37F6DF345042B32A0C99615D89B8EB079EF094C1EDCFA4F57BA8F77D9809E",
+        "sourceRepository": "https://chromium.googlesource.com/webm/libvpx.git"
+      },
+      {
+        "name": "libyuv",
+        "revision": "1e40e34573c3861480d107cd4a4ce290df79951f",
+        "licensePath": "third_party/libyuv/LICENSE",
+        "licenseSha256": "91B2BE0A4696A7F98E38EC95D53FB3C1E8A476CE7246F54390276F94D9508EC2",
+        "sourceRepository": "https://chromium.googlesource.com/libyuv/libyuv.git"
+      },
+      {
+        "name": "llvm-libc",
+        "revision": "912274164f0877ca917c06e8484ad3be1784833a",
+        "licensePath": "third_party/llvm-libc/src/LICENSE.TXT",
+        "licenseSha256": "3B6226C32E168C83B891D8D6F0D3C29C2116DC3EF93DC93C307B54F279ECF383",
+        "sourceRepository": "https://chromium.googlesource.com/external/github.com/llvm/llvm-project/libc.git"
+      },
+      {
+        "name": "nasm",
+        "revision": "9f916e90e6fc34ec302573f6ce147e43e33d68ca",
+        "licensePath": "third_party/nasm/LICENSE",
+        "licenseSha256": "7C22A2D3D099A1167C281E437F48340DFAD88634630C97AFEE927E5705626F7A",
+        "sourceRepository": "https://chromium.googlesource.com/chromium/deps/nasm.git"
+      },
+      {
+        "name": "ooura",
+        "revision": "6084687728c2adc049908e353a679f7d91c0d3d5",
+        "licensePath": "common_audio/third_party/ooura/LICENSE",
+        "licenseSha256": "87C7BCACDEC77CC2DA47E105DB9B40B88990AEC468D25035BA4E4FE624DE74A2",
+        "sourceRepository": "https://github.com/Inter-Galactic-App/webrtc-core"
+      },
+      {
+        "name": "openh264",
+        "revision": "652bdb7719f30b52b08e506645a7322ff1b2cc6f",
+        "licensePath": "third_party/openh264/src/LICENSE",
+        "licenseSha256": "1CA9A98D1B5C6D6F0411C6CB8732299670FAFBC33B92FEDECA8A86B1E4D3D72E",
+        "sourceRepository": "https://chromium.googlesource.com/external/github.com/cisco/openh264"
+      },
+      {
+        "name": "opus",
+        "revision": "8062e0e102496ff14a8c58b586f014527424953d",
+        "licensePath": "third_party/opus/src/COPYING",
+        "licenseSha256": "CBD8BD07329A234413710C02B19D22C0CF78FC451882593E817130779B5455E3",
+        "sourceRepository": "https://chromium.googlesource.com/chromium/src/third_party"
+      },
+      {
+        "name": "perfetto",
+        "revision": "a54dd38d60593129ae56d400f1a72860670abea4",
+        "licensePath": "third_party/perfetto/LICENSE",
+        "licenseSha256": "A18DDE5D299C8E32216B024C12C664A1519371A560BCDAB347689284DB8EFB41",
+        "sourceRepository": "https://chromium.googlesource.com/external/github.com/google/perfetto.git"
+      },
+      {
+        "name": "pffft",
+        "revision": "8062e0e102496ff14a8c58b586f014527424953d",
+        "licensePath": "third_party/pffft/LICENSE",
+        "licenseSha256": "F16D7F758AF476C8A9DA72B2A0FF0971A9516A798558CC4709F966EA8BD76EEC",
+        "sourceRepository": "https://chromium.googlesource.com/chromium/src/third_party"
+      },
+      {
+        "name": "protobuf",
+        "revision": "8062e0e102496ff14a8c58b586f014527424953d",
+        "licensePath": "third_party/protobuf/LICENSE",
+        "licenseSha256": "F4DF8B2457697851385D9EBB93267832C1DFA24E0E61881952F6B0C452663DC9",
+        "sourceRepository": "https://chromium.googlesource.com/chromium/src/third_party"
+      },
+      {
+        "name": "protobuf-javascript",
+        "revision": "8062e0e102496ff14a8c58b586f014527424953d",
+        "licensePath": "third_party/protobuf-javascript/LICENSE",
+        "licenseSha256": "9CE6FB07B91DFBE0A79C0D30392A64B9148752AFC345DDF4DBA7361DF89A8CB6",
+        "sourceRepository": "https://chromium.googlesource.com/chromium/src/third_party"
+      },
+      {
+        "name": "rnnoise",
+        "revision": "8062e0e102496ff14a8c58b586f014527424953d",
+        "licensePath": "third_party/rnnoise/COPYING",
+        "licenseSha256": "0BB95D752B966F69FEA022227297AD49FDB4464EB45F1C1FFF494A435BFBEAA5",
+        "sourceRepository": "https://chromium.googlesource.com/chromium/src/third_party"
+      },
+      {
+        "name": "sigslot",
+        "revision": "6084687728c2adc049908e353a679f7d91c0d3d5",
+        "licensePath": "rtc_base/third_party/sigslot/LICENSE",
+        "licenseSha256": "D195702A214B49443E35520E2CED48A60B7CD9096D5F9B17BF39E604714C4C3E",
+        "sourceRepository": "https://github.com/Inter-Galactic-App/webrtc-core"
+      },
+      {
+        "name": "spl_sqrt_floor",
+        "revision": "6084687728c2adc049908e353a679f7d91c0d3d5",
+        "licensePath": "common_audio/third_party/spl_sqrt_floor/LICENSE",
+        "licenseSha256": "6C19E8DC013B7AC1E0A9E2F0E50ED6C33E3C2C9AA9FBD3A3675D2EEDFA1EF0A2",
+        "sourceRepository": "https://github.com/Inter-Galactic-App/webrtc-core"
+      }
+    ]
+  }
+}

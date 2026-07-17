@@ -12,6 +12,11 @@ Version boundary: v0.8.0 starts after the app version advanced from
 
 ### Stability And Review Fixes
 
+- Published the v0.8.0+992 supplemental desktop-native source evidence in the
+  public source repository. The release record now marks the 992 desktop plus
+  Android website publication as complete, keeps the public repo on the 992
+  baseline, and links the desktop-native notice/source proof under
+  `docs/release/evidence/desktop-native-notices/0.8.0+992/`.
 - Hardened the PR #72 review-response batch. Android call picture-in-picture
   controls now require the active call session id and a signature-level
   receiver permission, Matrix security feedback actions route errors through

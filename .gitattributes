@@ -6,3 +6,4 @@
 *.bat text eol=crlf
 dist/source/* filter=lfs diff=lfs merge=lfs -text
 dist/source/*.zip filter=lfs diff=lfs merge=lfs -text
+docs/release/evidence/desktop-native-notices/** -text -diff

@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "artifact": {
+    "file": "libwebrtc.zip",
+    "sha256": "9DC72E4FA712637F432114CAD0A28755C1F4F92D576E272BFC1901A6C4FDEB7B",
+    "bytes": 39805116,
+    "builtUtc": "2026-07-04T02:41:08Z",
+    "contains": [
+      "libwebrtc/lib/win64/libwebrtc.dll",
+      "libwebrtc/lib/win64/libwebrtc.dll.lib",
+      "libwebrtc/include/libwebrtc.h",
+      "libwebrtc/include/rtc_desktop_capturer.h"
+    ]
+  },
+  "provenance": {
+    "note": "Every source input needed to reproduce this libwebrtc.dll. Both patch trees are published publicly (publicRepo) and mirrored internally on Forgejo (backupRemote). Commit SHAs are the same object in either, so provenance holds against whichever is reachable. The workspace copy is not a git repo and must not be treated as the source of truth.",
+    "libwebrtcWrapper": {
+      "description": "libwebrtc C++ wrapper fork (the API surface flutter_webrtc links against)",
+      "upstream": "https://github.com/webrtc-sdk/libwebrtc.git",
+      "branch": "intergalactic/windows-hardware-h264",
+      "commit": "1f70ae1d5b063c51a531fe94eef6ae20d09c6c3e",
+      "publicRepo": "https://github.com/Inter-Galactic-App/libwebrtc"
+    },
+    "webrtcCore": {
+      "description": "WebRTC core tree with the Inter Galactic Windows streaming/audio/desktop-capture patches",
+      "upstream": "https://github.com/webrtc-sdk/webrtc.git",
+      "upstreamBranch": "m137_release",
+      "upstreamSyncedRevision": "a4bd28d99eb9ed3bc8e41ce7b9ce7254ee7308bd",
+      "upstreamBaseTag": "upstream-base-m137-a4bd28d9",
+      "upstreamBaseTagNote": "m137_release is a moving branch; this tag pins the exact base commit in the backup repo so it survives upstream drift or force-push.",
+      "branch": "intergalactic/windows-streaming-m137",
+      "commit": "6084687728c2adc049908e353a679f7d91c0d3d5",
+      "publicRepo": "https://github.com/Inter-Galactic-App/webrtc-core"
+    },
+    "dependencyPins": {
+      "note": "m137_release is a moving branch, so the exact synced dependency revisions are what actually pin the tree. Full set captured in the app repo rebuild kit.",
+      "source": "webrtc-build/.gclient_previous_sync_commits"
+    },
+    "buildArgs": {
+      "source": "webrtc-build/src/out-release/Windows-x64/args.gn",
+      "target_os": "win",
+      "target_cpu": "x64",
+      "is_component_build": false,
+      "is_clang": true,
+      "is_debug": false,
+      "rtc_use_h264": true,
+      "ffmpeg_branding": "Chrome",
+      "rtc_include_tests": false,
+      "rtc_build_examples": false,
+      "libwebrtc_desktop_capture": true,
+      "libwebrtc_intel_media_sdk": true
+    },
+    "buildCommand": "gn gen out-release/Windows-x64 && ninja -C out-release/Windows-x64 libwebrtc",
+    "trustBoundary": "This manifest sits beside the zip, so it detects drift between the two (stale hash, zip rebuilt without regenerating, wrong artifact dropped in). It does NOT authenticate either file - whoever can replace the zip can replace this manifest. It is an integrity check on a local build input, not a signature."
+  },
+  "rebuildKit": "intergalactic-app/inter-galactic/docs/architecture/calls-streaming-audio/webrtc-fork/README.md"
+}

@@ -1,6 +1,6 @@
 # Inter Galactic v0.8.0 Release Record
 
-Status: release dry-run package generated; live release still blocked
+Status: v0.8.0+992 public source evidence and website update documentation published
 Owner: RELEASE PIPELINE
 Opened: 2026-07-03
 
@@ -14,9 +14,12 @@ Current intended route:
 - macOS/Linux: architecture exists, but not public release scope unless the
   user explicitly promotes either platform.
 
-A dry-run package command has now generated preliminary local release artifacts
-for `0.8.0+992`. No live publish, website copy, upload, archive, or build
-artifact deletion has been performed for this release cycle.
+The live desktop plus Android website publication completed for `0.8.0+992` on
+2026-07-07. The release copied installer, Android APK, checksums, source
+archive, changelog, feature notes, and `latest.json` to the website publication
+surface, with rollback proof created first and `latest.json` copied last. No
+build-output archive/delete cleanup was performed. iPhone upload and
+TestFlight/App Store Connect processing remain the IOS/user lane.
 
 ## Current Identity Snapshot
 
@@ -50,12 +53,20 @@ Observed on 2026-07-05:
 - Source freeze had still not been declared, so this remained preliminary
   cycle evidence only.
 
+Observed on 2026-07-07:
+
+- Public release identity: `v0.8.0+992`.
+- This public source repository intentionally remains on the `v0.8.0+992`
+  release baseline. Later internal or hotfix work is not included in this
+  public 992 evidence update.
+- Exact desktop plus Android website-publication evidence is recorded below.
+
 ## Build Ledger
 
 | Build | State | Notes | Exact-artifact evidence status |
 | --- | --- | --- | --- |
 | `0.8.0+991` | Preliminary | Current pubspec/build-note baseline. Feature-note draft exists. More bug/UI work is expected before release freeze. | Not final. Exact artifact validation, checksums, manifest, source archive, signing, desktop updater, Android APK, and iOS/TestFlight evidence must be regenerated for the final build. |
-| `0.8.0+992` | Preliminary | Current observed workspace identity after additional iOS/UI/release-cycle work. Source freeze had not been declared. | Not final. Exact artifact validation, checksums, manifest, source archive, signing or unsigned-consent proof, desktop updater, Android APK, and iOS/TestFlight evidence must be regenerated if this or a later build becomes the candidate. |
+| `0.8.0+992` | Published public baseline | Final desktop plus Android website publication completed 2026-07-07 from clean `main`/`origin/main` at `57a956908acef70a7447b636acf6d8268748c6ff`. | Final local artifact validation, checksums, manifest, source archive, signing/unsigned-consent proof, rollback proof, package hygiene, and source/security review passed. iOS upload/processing remains IOS/user handoff. |
 | `0.8.0+TBD` | Pending | Expected after remaining bug fixes, UI changes, and testing complete. | This becomes the release-candidate candidate only after REVIEW/source freeze and release owner confirmation. |
 
 ## Same-Version Build-Bump Delta Workflow
@@ -77,9 +88,9 @@ When moving from one `0.8.0+build` candidate to another:
    `latest.json`, signing or unsigned-consent trust path, updater smoke,
    rollback-proof, and artifact hygiene.
 
-For the current `0.8.0+991` to `0.8.0+992` preliminary progression, no
-carry-forward decision is final yet because release freeze has not been
-declared.
+The `0.8.0+991` to `0.8.0+992` progression started as preliminary evidence.
+The `0.8.0+992` release was later finalized through the 2026-07-07 live desktop
+plus Android website-publication pass recorded below.
 
 ## 2026-07-05 Windows Runtime Diagnostics Exclusion Proof
 
@@ -93,7 +104,7 @@ Validation:
   and zip.
 - Explicit payload and zip-entry searches found no `runtime/`,
   `game-capture-poc`, or `helper.log` entries.
-- No build, publish, archive, delete, or `Linux_Matrix_Build` copy command was
+- No build, publish, archive, delete, or website publication copy command was
   run during this evidence pass.
 
 Disposition:
@@ -177,8 +188,8 @@ Current release state:
 - Current release scope remains desktop primary, Android website APK, and
   iPhone/TestFlight handoff. macOS/Linux remain future-demand targets unless
   explicitly promoted.
-- No build, package, publish, upload, archive, delete, or
-  `Linux_Matrix_Build` copy command was run during this triage.
+- No build, package, publish, upload, archive, delete, or website publication
+  copy command was run during this triage.
 
 Closed/non-blocking queue disposition:
 
@@ -190,7 +201,7 @@ Closed/non-blocking queue disposition:
   route because macOS is not part of this public release scope.
 - Closed the historical artifact cleanup handoff as non-blocking maintenance.
   Archive-first cleanup still requires separate explicit user authorization
-  before writing to `B:\Matrix` or removing local build outputs.
+  before writing to external archive storage or removing local build outputs.
 
 Remaining release-pipeline queue gates:
 
@@ -316,8 +327,8 @@ Public validation summary:
 - The source/security review gate passed from the app repo, and owner-local
   Android signing, Google Services, Firebase options, and stream-test env
   inputs remained ignored by repository rules.
-- No live publish, upload, `release.bat` dry run, archive/delete, or
-  `Linux_Matrix_Build` copy occurred during this REVIEW pass.
+- No live publish, upload, `release.bat` dry run, archive/delete, or website
+  publication copy occurred during this REVIEW pass.
 
 Remaining Release Pipeline gates:
 
@@ -370,3 +381,97 @@ Live-release blockers:
   archive.
 - Final desktop updater smoke, Android APK smoke, and IOS/TestFlight handoff
   confirmation still need exact-candidate evidence before live publish.
+
+## 2026-07-07 Live Desktop Plus Android Website Publication
+
+Release Pipeline completed the authorized live desktop plus Android publication
+for `v0.8.0+992`.
+
+Source and command:
+
+- User confirmed GitHub was synced, packages were refreshed, the dry run had
+  passed, and S&C cleared release.
+- App repo source identity before publish:
+  `57a956908acef70a7447b636acf6d8268748c6ff`.
+- App identity: `0.8.0+992`.
+- Command: `release.bat --include-android`.
+- Successful log: `release-logs/release-20260707-131914.log`.
+
+Artifacts published to the website surface:
+
+- Windows installer:
+  `<website>/intergalactic/downloads/InterGalactic-Setup-0.8.0+992.exe`
+  SHA-256
+  `22C333635FA89A575D392CF141998EBF0060A50774952AEB9137989D94F5EFA9`.
+- Android APK:
+  `<website>/intergalactic/downloads/InterGalactic-0.8.0+992.apk`
+  SHA-256
+  `B52171C728E3BBD11877AC42A6C72B688769B0E08D1C19E33097317937BD2C0A`.
+- Source archive:
+  `<website>/intergalactic/source/intergalactic-0.8.0+992-source.zip`
+  SHA-256
+  `20A03923981519218CF67E8B68788AE5363ADD70A1871C31DBD733FF61F201FF`.
+- Checksums:
+  `<website>/intergalactic/downloads/checksums-0.8.0+992.txt`.
+- Changelog:
+  `<website>/intergalactic/updates/changelog/v0.8.0.md`.
+- Feature notes:
+  `<website>/intergalactic/updates/features/v0.8.0+992.md`.
+- Update manifest:
+  `<website>/intergalactic/updates/latest.json`.
+
+Rollback proof:
+
+- Rollback archive:
+  `release-rollback-20260707-131926.zip`
+  SHA-256
+  `1F7FC0773D28A6974158C4BB7FBD618363BE1B1E4AB3D4A7E834343E9DEE7D62`.
+- `rollback-proof.json` validates the archived previous `latest.json`,
+  checksum file, Windows installer, Android APK, source archive, and changelog
+  hashes.
+
+Validation completed:
+
+- Local and website `latest.json` strict-parse as UTF-8 JSON with no BOM.
+- Local and website manifest identity is `v0.8.0+992`, `version_name`
+  `0.8.0`, and build number `992`.
+- Website checksum file strict-decodes as UTF-8 with no BOM, parses three
+  SHA-256 entries, and matches installer, APK, and source archive.
+- Changelog extraction publishes the public `v0.8.0` release notes instead of
+  the placeholder fallback.
+- `tools/quality/Assert-ReleasePackageClean.ps1` passed against the Windows
+  release payload and desktop zip.
+- Source/security review and release docs passed.
+- The post-publication public repository sync was intentionally handled as a
+  later evidence/doc update so this public source repository stays on the
+  `v0.8.0+992` baseline.
+- IOS/user still owns App Store Connect/TestFlight upload and processing proof.
+
+## 2026-07-14 Supplemental Desktop Native Source Proof
+
+S&C approved the corrected supplemental desktop-native notice and component
+receipt. REVIEW then compared the released source archive to public tag
+`v0.8.0+992` at commit
+`3b8ac7ad0414701da4fc53f5656d34b937caf764`.
+
+- Source archive SHA-256:
+  `20A03923981519218CF67E8B68788AE5363ADD70A1871C31DBD733FF61F201FF`.
+- All 2,142 public-tag files are present: 290 match byte-for-byte and 1,852
+  match after deterministic CRLF normalization. No source-content mismatch or
+  missing public-tag file remains.
+- The archive has seven inventoried historical public release artifacts under
+  `dist/`, making it a complete source-content superset rather than a
+  byte-identical tag export.
+- The public app, WebRTC Core commit
+  `6084687728c2adc049908e353a679f7d91c0d3d5`, and libwebrtc wrapper commit
+  `1f70ae1d5b063c51a531fe94eef6ae20d09c6c3e` were reachable with their license
+  files. The public LF license contents reproduce the receipt hashes after the
+  same deterministic Windows CRLF normalization.
+- Machine-readable proof is retained in this public source repository at
+  `docs/release/evidence/desktop-native-notices/0.8.0+992/source-archive-equivalence.json`.
+
+User-accessible publication is available through the website desktop-native
+notice route, and this public repository now carries the same evidence bundle.
+Next Windows packages still need inclusion and post-package verification of the
+accepted desktop-native notice. No released installer, source archive,
+`latest.json`, or app behavior changed during this proof.

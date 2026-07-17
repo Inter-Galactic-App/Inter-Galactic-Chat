@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "generatedAtUtc": "2026-07-14T23:13:33.9336023Z",
+  "releaseVersion": "0.8.0+992",
+  "result": "pass_with_documented_archive_extras",
+  "archive": {
+    "path": "intergalactic-app/inter-galactic/dist/source/intergalactic-0.8.0+992-source.zip",
+    "sizeBytes": 188027199,
+    "sha256": "20A03923981519218CF67E8B68788AE5363ADD70A1871C31DBD733FF61F201FF",
+    "fileCount": 2149
+  },
+  "publicTag": {
+    "repository": "https://github.com/Inter-Galactic-App/Inter-Galactic-Chat",
+    "tag": "v0.8.0+992",
+    "tagObject": "78f4b98416e3dc4b3f418c5aef74871c1909a3c5",
+    "commit": "3b8ac7ad0414701da4fc53f5656d34b937caf764",
+    "tree": "e2a4475a7591573561cb565a8bb621281c883939",
+    "fileCount": 2142
+  },
+  "treeComparison": {
+    "publicTagFilesMissingFromArchive": 0,
+    "archiveFilesAbsentFromPublicTag": 7,
+    "exactByteMatches": 290,
+    "crlfNormalizedMatches": 1852,
+    "contentMismatches": 0
+  },
+  "documentedArchiveExtras": [
+    {
+      "path": "dist/checksums/checksums-0.6.0.txt",
+      "sizeBytes": 108,
+      "sha256": "96DCEDDA817AE240D10CE52F031F034A9B10741402CF962DEBE00FDFBEF8FA86"
+    },
+    {
+      "path": "dist/checksums/checksums-0.6.1.txt",
+      "sizeBytes": 313,
+      "sha256": "316146C6AF362F85167355F4814071B433D71CF7B660C1CB02E0EF26D111F223"
+    },
+    {
+      "path": "dist/installer/InterGalactic-Setup-0.5.2.exe",
+      "sizeBytes": 5498884,
+      "sha256": "A0A6B001B13D2D64728085FCF31106F12CC046AA9A1A4C908CC6DCF237A3C0B6"
+    },
+    {
+      "path": "dist/installer/InterGalactic-Setup-0.6.0.exe",
+      "sizeBytes": 53927164,
+      "sha256": "46099DB4C746DE1B491252537F2ACD230E363D226E42A041FC30E3809F6BABCC"
+    },
+    {
+      "path": "dist/installer/InterGalactic-Setup-0.6.1.exe",
+      "sizeBytes": 53920271,
+      "sha256": "720BC188661FED99F52B1AEE0CB561437D2A8E5FD0F9B5AFB430B2CC3D0F26F5"
+    },
+    {
+      "path": "dist/updates/changelog/v0.6.0.md",
+      "sizeBytes": 6622,
+      "sha256": "112B115A63D72AA1E1B315F49E8CC8712E1DD3D176A78F76042440F7BC27E343"
+    },
+    {
+      "path": "dist/updates/changelog/v0.6.1.md",
+      "sizeBytes": 962,
+      "sha256": "417C8FF06420C458FB0E83E8442EBC20FE0651314166C49540C727D28C65B439"
+    }
+  ],
+  "publicNativeSources": [
+    {
+      "component": "Inter Galactic WebRTC Core",
+      "repository": "https://github.com/Inter-Galactic-App/webrtc-core",
+      "commit": "6084687728c2adc049908e353a679f7d91c0d3d5",
+      "tree": "3c91bf13be6e0388d10229529065d0bf6dc7b281",
+      "licensePath": "LICENSE",
+      "receiptLicenseSha256": "5D57F76601B87E2069605CCEF52E5CAAA5EEB7A2F76E34AA65A0102637D28376",
+      "licenseVerification": "public LF content matches the receipt after deterministic CRLF normalization"
+    },
+    {
+      "component": "Inter Galactic libwebrtc wrapper",
+      "repository": "https://github.com/Inter-Galactic-App/libwebrtc",
+      "commit": "1f70ae1d5b063c51a531fe94eef6ae20d09c6c3e",
+      "tree": "bdefb59f14064b770144076d41f09ad425ccfe16",
+      "licensePath": "LICENSE",
+      "receiptLicenseSha256": "1FB8EA5C0F4077A66E7CF485802CD1D4585F51DA6A5AF5AB7ADAD0346EFF0D39",
+      "licenseVerification": "public LF content matches the receipt after deterministic CRLF normalization"
+    }
+  ],
+  "conclusion": "PASS: the release archive is a complete source-content superset of the public release tag. It is not byte-identical because GitHub source uses LF line endings while the Windows archive uses CRLF for 1852 files, and because the archive contains seven explicitly inventoried historical public release artifacts. No public-tag source file is missing and no source-content mismatch remains. The public app, WebRTC Core, and libwebrtc wrapper commits and license files are reachable at the recorded revisions."
+}
