@@ -1,0 +1,29 @@
+{
+  "name": "Dark Lord",
+  "base": "dark",
+  "bundled": true,
+  "colorScheme": {
+    "primary": "#ffdc2626",
+    "onPrimary": "#ffffffff",
+    "primaryContainer": "#ff7f1d1d",
+    "onPrimaryContainer": "#fffee2e2",
+    "secondary": "#ffef4444",
+    "onSecondary": "#ff1c0000",
+    "secondaryContainer": "#ff450a0a",
+    "onSecondaryContainer": "#fffca5a5",
+    "tertiary": "#fff87171",
+    "links": "#fff87171",
+    "codeHighlight": "#ffdc2626",
+    "surface": "#ff1f1f1f",
+    "onSurface": "#fff5f5f5",
+    "surfaceContainerLowest": "#ff0a0a0a",
+    "surfaceContainerLow": "#ff111111",
+    "surfaceContainer": "#ff1a1a1a",
+    "surfaceContainerHigh": "#ff252525",
+    "surfaceContainerHighest": "#ff2d2d2d",
+    "outline": "#ff2d2d2d"
+  },
+  "foundation": {
+    "color": "#ff050505"
+  }
+}

@@ -1,0 +1,13 @@
+name: _
+publish_to: none
+environment: 
+  sdk: '>=3.11.0 <4.0.0'
+workspace:
+  - intergalactic
+  - plugins/intergalactic_noise_suppression
+  - plugins/intergalactic_windows_share
+  - tiamat
+  - widgets/matrix_widget_api
+  - widgets/calendar
+dependencies:
+  iso_duration: ^0.1.1

@@ -1,0 +1,28 @@
+import 'dart:typed_data';
+
+import 'package:intergalactic/client/client.dart';
+import 'package:intergalactic/client/components/photo_album_room/photo_album_entry.dart';
+import 'package:intergalactic/client/components/photo_album_room/photo_album_timeline.dart';
+import 'package:intergalactic/client/components/room_component.dart';
+
+class PickedPhoto {
+  String? filepath;
+  String name;
+  final Future<Uint8List> Function() getBytes;
+
+  PickedPhoto({this.filepath, required this.name, required this.getBytes});
+}
+
+abstract class PhotoAlbumRoom<R extends Client, T extends Room>
+    implements RoomComponent<R, T> {
+  bool get canUpload;
+
+  Future<void> uploadPhotos(
+    List<PickedPhoto> photos, {
+    PhotoAlbumUploadMode mode = PhotoAlbumUploadMode.individual,
+    bool sendOriginal = false,
+    bool extractMetadata = true,
+  });
+
+  Future<PhotoAlbumTimeline> getTimeline();
+}

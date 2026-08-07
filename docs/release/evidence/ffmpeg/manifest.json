@@ -1,0 +1,71 @@
+{
+  "component": "FFmpeg Windows desktop story-video export tools",
+  "reviewed_at": "2026-06-13",
+  "reviewed_by": "REVIEW",
+  "provider": {
+    "name": "BtbN FFmpeg Builds",
+    "repository": "https://github.com/BtbN/FFmpeg-Builds",
+    "release_tag": "autobuild-2026-06-13-13-31",
+    "release_url": "https://github.com/BtbN/FFmpeg-Builds/releases/tag/autobuild-2026-06-13-13-31",
+    "asset_name": "ffmpeg-n8.1.1-13-g83e8541aa6-win64-lgpl-8.1.zip",
+    "asset_url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-06-13-13-31/ffmpeg-n8.1.1-13-g83e8541aa6-win64-lgpl-8.1.zip",
+    "asset_sha256": "6C1C443C762A8D8AD9C9303AF26E2144DC711B0E7277E1B03FD72CDF2DEAA9DB",
+    "asset_size_bytes": 198755840
+  },
+  "source": {
+    "project": "FFmpeg",
+    "official_download_page": "https://ffmpeg.org/download.html",
+    "repository": "https://git.ffmpeg.org/ffmpeg.git",
+    "github_mirror_commit": "https://github.com/FFmpeg/FFmpeg/commit/83e8541aa601935a610b1b8958d56e8d0331318b",
+    "revision": "83e8541aa601935a610b1b8958d56e8d0331318b",
+    "version_string": "n8.1.1-13-g83e8541aa6-20260613",
+    "commit_date": "2026-06-12T13:07:35Z"
+  },
+  "staged_files": [
+    {
+      "path": "intergalactic/windows/third_party/ffmpeg/bin/ffmpeg.exe",
+      "sha256": "C5C6E92D80884470A4D09C80A801989757DB1E80837E5018B636AF76DD826FEC",
+      "size_bytes": 173416960
+    },
+    {
+      "path": "intergalactic/windows/third_party/ffmpeg/bin/ffprobe.exe",
+      "sha256": "134B9BC17D0FE3B1F81ECA108615356F4C304C58C7750CE85592E8CFDBB3F523",
+      "size_bytes": 173210624
+    }
+  ],
+  "license": {
+    "license_id": "LGPL-3.0-or-later",
+    "license_file": "docs/release/evidence/ffmpeg/LICENSE-LGPL-3.0.txt",
+    "notes": [
+      "The selected BtbN variant is lgpl, not gpl or nonfree.",
+      "The reported FFmpeg configure line includes --enable-version3, so the bundled tool pair is treated as LGPL-3.0-or-later for release notices.",
+      "The app invokes the tools as subprocess executables and does not link FFmpeg libraries."
+    ]
+  },
+  "validation": {
+    "commands": [
+      "ffmpeg.exe -hide_banner -version",
+      "ffprobe.exe -hide_banner -version"
+    ],
+    "evidence_files": [
+      "docs/release/evidence/ffmpeg/ffmpeg-version.txt",
+      "docs/release/evidence/ffmpeg/ffprobe-version.txt"
+    ],
+    "configure_checks": {
+      "contains_enable_gpl": false,
+      "contains_enable_nonfree": false,
+      "contains_enable_version3": true,
+      "contains_enable_libx264": false,
+      "contains_enable_libx265": false,
+      "contains_enable_libxavs2": false,
+      "contains_enable_libxvid": false,
+      "observed_disabled_gpl_only_libraries": [
+        "--disable-libx264",
+        "--disable-libx265",
+        "--disable-libxavs2",
+        "--disable-libxvid"
+      ]
+    },
+    "accepted_for_windows_release_staging": true
+  }
+}

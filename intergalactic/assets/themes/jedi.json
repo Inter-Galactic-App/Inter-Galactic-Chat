@@ -1,0 +1,29 @@
+{
+  "name": "Grand Master",
+  "base": "dark",
+  "bundled": true,
+  "colorScheme": {
+    "primary": "#ff00b4d8",
+    "onPrimary": "#ffffffff",
+    "primaryContainer": "#ff0077a8",
+    "onPrimaryContainer": "#ffe0f7ff",
+    "secondary": "#ff38bdf8",
+    "onSecondary": "#ff001824",
+    "secondaryContainer": "#ff0369a1",
+    "onSecondaryContainer": "#ffe0f2fe",
+    "tertiary": "#ff67e8f9",
+    "links": "#ff38bdf8",
+    "codeHighlight": "#ff0ea5e9",
+    "surface": "#ff1b2d4f",
+    "onSurface": "#ffe8f0f8",
+    "surfaceContainerLowest": "#ff0d1626",
+    "surfaceContainerLow": "#ff111e33",
+    "surfaceContainer": "#ff162540",
+    "surfaceContainerHigh": "#ff213558",
+    "surfaceContainerHighest": "#ff274060",
+    "outline": "#ff213558"
+  },
+  "foundation": {
+    "color": "#ff080e1a"
+  }
+}

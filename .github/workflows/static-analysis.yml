@@ -1,0 +1,146 @@
+name: static-analysis
+on:
+  pull_request:
+  merge_group:
+
+permissions:
+  contents: read
+
+env:
+  PROJECT_PATH: intergalactic
+
+jobs:
+  static-analysis:
+    name: Static Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout  ┏━┓ ︵ /(^.^/)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          submodules: 'true'
+          fetch-depth: 0
+          persist-credentials: false
+        
+      - name: Setup Flutter  ╰(✿˙ᗜ˙)੭━☆ﾟ.*･｡ﾟ
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: '3.41.1'
+          channel: 'stable'
+
+      - name: Setup Tools  ᕙ|” ◉ ◡ ◉ ”|ᕗ
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y ninja-build libgtk-3-dev libmpv-dev mpv libmimalloc-dev
+
+      - name: Configure Flutter (∩｀-´)⊃━☆ﾟ.*･｡ﾟ
+        run: flutter config --enable-linux-desktop
+
+      - name: Resolve Changed Files
+        id: changed-files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if ! git rev-parse HEAD^1 >/dev/null 2>&1; then
+            echo "Unable to resolve the merge-parent commit for changed-file diff."
+            exit 1
+          fi
+          base_sha="$(git rev-parse HEAD^1)"
+          changed_file_list="${RUNNER_TEMP}/changed-files.txt"
+          changed_dart_file_list="${RUNNER_TEMP}/changed-dart-files.txt"
+
+          git diff --diff-filter=ACMRT --name-only "$base_sha"...HEAD > "$changed_file_list"
+
+          grep '\.dart$' "$changed_file_list" \
+            | grep "^${PROJECT_PATH}/" \
+            | grep -v "^${PROJECT_PATH}/lib/generated/" > "$changed_dart_file_list" || true
+
+          changed_count="$(wc -l < "$changed_file_list" | tr -d ' ')"
+          changed_dart_count="$(wc -l < "$changed_dart_file_list" | tr -d ' ')"
+          echo "all_count=$changed_count" >> "$GITHUB_OUTPUT"
+          echo "all_path=$changed_file_list" >> "$GITHUB_OUTPUT"
+          echo "dart_count=$changed_dart_count" >> "$GITHUB_OUTPUT"
+          echo "dart_path=$changed_dart_file_list" >> "$GITHUB_OUTPUT"
+
+          if [[ "$changed_count" -eq 0 ]]; then
+            echo "No changed files found."
+          else
+            echo "Changed files:"
+            cat "$changed_file_list"
+          fi
+
+          if [[ "$changed_dart_count" -eq 0 ]]; then
+            echo "No Dart files changed in ${PROJECT_PATH}."
+            exit 0
+          fi
+
+          echo "Changed Dart files:"
+          cat "$changed_dart_file_list"
+
+      - name: Check Code Style
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          pushd "$PROJECT_PATH"
+          flutter doctor
+          flutter pub get
+          rm -rf lib/generated
+          popd
+
+          mapfile -t changed_dart_files < "${{ steps.changed-files.outputs.dart_path }}"
+
+          if [[ ${#changed_dart_files[@]} -eq 0 ]]; then
+            echo "No Dart files changed in ${PROJECT_PATH}; skipping formatter gate."
+            exit 0
+          fi
+
+          printf 'Checking formatting for:\n%s\n' "${changed_dart_files[@]}"
+          printf '%s\0' "${changed_dart_files[@]}" \
+            | xargs -0 dart format -o none --show all --set-exit-if-changed
+        
+      - name: Code Generation __φ(．．;)
+        run: |
+          cd $PROJECT_PATH
+          dart run scripts/codegen.dart
+
+      - name: Check Warnings
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mapfile -t changed_dart_files < "${{ steps.changed-files.outputs.dart_path }}"
+
+          if [[ ${#changed_dart_files[@]} -eq 0 ]]; then
+            echo "No Dart files changed in ${PROJECT_PATH}; skipping analyzer gate."
+            exit 0
+          fi
+
+          pushd "$PROJECT_PATH"
+          relative_files=()
+          for file in "${changed_dart_files[@]}"; do
+            relative_files+=("${file#${PROJECT_PATH}/}")
+          done
+          dart analyze "${relative_files[@]}"
+          popd
+
+      - name: Resolve Focused Flutter Tests
+        id: focused-tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash .github/scripts/resolve-focused-tests.sh \
+            "${{ steps.changed-files.outputs.all_path }}" \
+            "${RUNNER_TEMP}/focused-flutter-tests.txt"
+
+      - name: Run Focused Flutter Tests
+        if: steps.focused-tests.outputs.count != '0'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mapfile -t focused_tests < "${{ steps.focused-tests.outputs.path }}"
+
+          pushd "$PROJECT_PATH"
+          flutter test "${focused_tests[@]}"
+          popd
