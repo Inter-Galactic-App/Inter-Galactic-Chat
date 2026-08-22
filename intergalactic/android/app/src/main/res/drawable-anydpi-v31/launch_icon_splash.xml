@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Android 12+ splash icon viewport is ~108dp with a ~66dp circular safe
+     zone. A 72dp inset left the drawable with negative bounds, so nothing was
+     drawn and the splash showed only the background color. 32dp keeps the
+     square icon fully inside the circular safe zone. -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/launch_icon"
+    android:inset="32dp" />

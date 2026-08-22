@@ -1,0 +1,16 @@
+# Preserve these bytes exactly as CocoaPods emitted them.
+#
+# This directory is a SNAPSHOT of tool output held as licence evidence, so its
+# value is that it is what the tool produced. Git's default text handling would
+# normalise the CRLF line endings in the acknowledgement files on commit and
+# re-expand them on checkout, which means the tracked copy no longer hashes to
+# the file that was captured and a digest comparison against the source becomes
+# meaningless.
+#
+# This is not hypothetical here: on 2026-08-14 the published FFmpeg
+# corresponding-source archives had to be regenerated and republished because
+# `git archive` had silently applied EOL conversion to them - 15 CR-terminated
+# shebangs in libzvbi alone. Same class of defect, same day, different tool.
+#
+# Evidence is bytes. Do not remove this file.
+* -text

@@ -1,0 +1,102 @@
+import 'dart:async';
+
+import 'package:intergalactic/client/components/component.dart';
+import 'package:intergalactic/client/components/typing_indicators/typing_indicator_component.dart';
+import 'package:intergalactic/client/matrix/components/matrix_sync_listener.dart';
+import 'package:intergalactic/client/matrix/components/user_presence/matrix_user_presence.dart';
+import 'package:intergalactic/client/matrix/matrix_client.dart';
+import 'package:intergalactic/client/matrix/matrix_member.dart';
+import 'package:intergalactic/client/matrix/matrix_room.dart';
+import 'package:intergalactic/client/member.dart';
+import 'package:matrix/matrix_api_lite/model/sync_update.dart';
+
+class MatrixTypingIndicatorsComponent
+    implements
+        TypingIndicatorComponent<MatrixClient, MatrixRoom>,
+        MatrixRoomSyncListener,
+        DisposableComponent {
+  @override
+  MatrixClient client;
+  @override
+  MatrixRoom room;
+
+  MatrixTypingIndicatorsComponent(this.client, this.room);
+
+  static const String publicTypingIndicatorKey =
+      "chat.commet.private_typing_indicator";
+
+  final StreamController<void> _controller = StreamController.broadcast();
+  bool _disposed = false;
+
+  @override
+  bool? get typingIndicatorEnabledForRoom {
+    var publicTypingIndicatorForRoom = room.matrixRoom
+        .roomAccountData[publicTypingIndicatorKey]?.content["enabled"];
+    return publicTypingIndicatorForRoom is bool
+        ? publicTypingIndicatorForRoom
+        : null;
+  }
+
+  @override
+  Future<void> setTypingIndicatorEnabledForRoom(bool? value) async =>
+      await client.matrixClient.setAccountDataPerRoom(
+        client.matrixClient.userID!,
+        room.matrixRoom.id,
+        publicTypingIndicatorKey,
+        {"enabled": value},
+      );
+
+  @override
+  onSync(JoinedRoomUpdate update) {
+    if (_disposed) {
+      return;
+    }
+
+    final ephemeral = update.ephemeral;
+
+    if (ephemeral == null) {
+      return;
+    }
+
+    if (ephemeral.any((e) => e.type == "m.typing")) {
+      if (!_controller.isClosed) {
+        _controller.add(null);
+      }
+    }
+  }
+
+  @override
+  Stream<void> get onTypingUsersUpdated => _controller.stream;
+
+  @override
+  List<Member> get typingUsers => room.matrixRoom.typingUsers
+      .where((element) => client.self?.identifier != element.id)
+      .map((e) => MatrixMember(client, e))
+      .toList();
+
+  @override
+  Future<void> setTypingStatus(bool status) async {
+    if (_disposed) {
+      return;
+    }
+
+    var typingIndicatorEnabled = client
+        .getComponent<MatrixUserPresenceComponent>()!
+        .typingIndicatorEnabled;
+    if (typingIndicatorEnabledForRoom ?? typingIndicatorEnabled) {
+      return room.matrixRoom.setTyping(status, timeout: 2000);
+    }
+  }
+
+  @override
+  Future<void> dispose() async {
+    if (_disposed) {
+      return;
+    }
+
+    _disposed = true;
+    if (!_controller.isClosed) {
+      await _controller.close();
+    }
+  }
+}

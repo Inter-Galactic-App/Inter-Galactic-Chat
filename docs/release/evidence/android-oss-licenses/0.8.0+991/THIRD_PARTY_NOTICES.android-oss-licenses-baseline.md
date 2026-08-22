@@ -1,0 +1,497 @@
+# Android Google OSS Licenses Baseline
+
+Generated: 2026-07-04T13:13:17Z
+Build mode: fcm
+Version tag: v0.8.0+991
+Status: complete
+
+This baseline temporarily applies Google's `oss-licenses-plugin` and `play-services-oss-licenses` SDK, runs the release OSS license generation task, copies the generated artifacts, and restores the Gradle files.
+Google documents that this tool scans app POM dependencies and includes the transitive open-source libraries used by Google Play services libraries compiled into the app.
+Use the companion Android Gradle evidence as the authoritative shipped runtime dependency graph. The Google OSS plugin dependency list is retained as plugin output and may include helper/plugin coordinates or versions that differ from `releaseRuntimeClasspath`.
+
+## Comparison
+
+- Gradle evidence modules: 171
+- Gradle evidence missing licenses: 2
+- Google baseline generated files: 3
+- Parsed Google baseline entry names: 228
+- Parsed Google dependency modules: 229
+- Result: google_baseline_generated_runtime_graph_not_authoritative
+- Note: Google OSS dependencies.json is retained as plugin output; Android Gradle evidence remains authoritative for shipped runtime module coordinates and versions.
+
+## Gradle Tasks
+
+- `:app:releaseOssLicensesTask`
+
+## Generated Files
+
+| Copied file | Source file | Size | SHA-256 |
+| --- | --- | ---: | --- |
+| `docs/release/evidence/android-oss-licenses/0.8.0+991/generated-files/generated__res__releaseOssLicensesTask__raw__third_party_license_metadata` | `intergalactic/build/app/generated/res/releaseOssLicensesTask/raw/third_party_license_metadata` | 7692 | `8e049dfeb64a5569bf11e5f23d585e5f34c1f2d448dc220605b9ea5a5e127430` |
+| `docs/release/evidence/android-oss-licenses/0.8.0+991/generated-files/generated__res__releaseOssLicensesTask__raw__third_party_licenses` | `intergalactic/build/app/generated/res/releaseOssLicensesTask/raw/third_party_licenses` | 446214 | `1959c3c82bf9b4d1bbfd0c66e6fb9d329bd5d73a54a6eae9f8e749146bde650d` |
+| `docs/release/evidence/android-oss-licenses/0.8.0+991/generated-files/generated__third_party_licenses__release__dependencies.json` | `intergalactic/build/app/generated/third_party_licenses/release/dependencies.json` | 27632 | `3e23cefbed25a03ca01fbe05c3a1e63f5018a31e6433d32ae23cbfed91450a07` |
+
+## Parsed Baseline Entries
+
+- Activity
+- Activity Compose
+- Activity Kotlin Extensions
+- Android App Startup Runtime
+- Android Arch-Common
+- Android Arch-Runtime
+- Android ConstraintLayout
+- Android ConstraintLayout Core
+- Android Graphics Path
+- Android Resource Inspection - Annotations
+- Android SDK
+- Android Support AnimatedVectorDrawable
+- Android Support CardView v7
+- Android Support Library Coordinator Layout
+- Android Support Library core utils
+- Android Support Library Cursor Adapter
+- Android Support Library Custom View
+- Android Support Library Document File
+- Android Support Library Drawer Layout
+- Android Support Library Interpolators
+- Android Support Library loader
+- Android Support Library Local Broadcast Manager
+- Android Support Library media compat
+- Android Support Library Print
+- Android Support Library Sliding Pane Layout
+- Android Support Library View Pager
+- Android Support RecyclerView
+- Android Support VectorDrawable
+- AndroidX activity library
+- AndroidX annotation experimental library
+- AndroidX annotation library
+- AndroidX architecture core library
+- AndroidX architecture library
+- AndroidX asynclayoutinflater library
+- AndroidX Autofill
+- AndroidX collection library
+- AndroidX concurrent futures library
+- AndroidX coordinatorlayout library
+- AndroidX core library
+- AndroidX cursoradapter library
+- AndroidX customview library
+- AndroidX documentfile library
+- AndroidX drawerlayout library
+- AndroidX fragment library
+- AndroidX Futures
+- AndroidX Futures Kotlin Extensions
+- AndroidX interpolator library
+- AndroidX legacy coreui library
+- AndroidX legacy coreutils library
+- AndroidX legacy v4 library
+- AndroidX lifecycle common library
+- AndroidX lifecycle livedatacore library
+- AndroidX lifecycle runtime library
+- AndroidX lifecycle viewmodel library
+- AndroidX lifecycle viewmodel savedstate library
+- AndroidX loader library
+- AndroidX localbroadcastmanager library
+- AndroidX media base library
+- Androidx Navigation 3 Runtime
+- Androidx Navigation 3 UI
+- AndroidX Preference
+- AndroidX print library
+- AndroidX savedstate library
+- AndroidX Security
+- AndroidX slidingpanelayout library
+- AndroidX swiperefreshlayout library
+- AndroidX tracing library
+- AndroidX versionedparcelable library
+- AndroidX viewpager library
+- AndroidX Widget ViewPager2
+- androidx.core:core-backported-fixes
+- androidx.core:core-viewtree
+- androidx.customview:poolingcontainer
+- Animal Sniffer
+- Annotation
+- apksig
+- AppCompat
+- AppCompat Resources
+- atomicfu
+- Audioswitch
+- Biometric
+- Browser
+- Camera Core
+- Camera Feature Combination Query
+- Camera Lifecycle
+- Camera Video
+- Camera2
+- Camera2 Pipe
+- Checker Framework Annotations
+- collections
+- Collections Kotlin Extensions
+- com.google.android.datatransport:transport-api
+- com.google.firebase:firebase-common
+- com.google.firebase:firebase-common-ktx
+- com.google.firebase:firebase-components
+- com.google.firebase:firebase-installations
+- com.google.firebase:firebase-installations-interop
+- com.google.firebase:firebase-messaging
+- Compose Animation
+- Compose Animation Core
+- Compose Foundation
+- Compose Geometry
+- Compose Graphics
+- Compose Layouts
+- Compose Material Icons Core
+- Compose Material Ripple
+- Compose Material3 Components
+- Compose Runtime
+- Compose Runtime Annotation
+- Compose Runtime Retain
+- Compose Saveable
+- Compose UI
+- Compose UI Text
+- Compose Unit
+- Compose Util
+- Core
+- Core Kotlin Extensions
+- Dagger
+- DataStore
+- DataStore Core
+- DataStore Core Okio
+- DynamicAnimation
+- Emoji2
+- Emoji2 Views Helper
+- Error Prone
+- error-prone annotations
+- ExifInterface
+- Experimental annotation
+- FindBugs-jsr305
+- Firebase
+- firebase-annotations
+- firebase-appindexing
+- firebase-datatransport
+- firebase-encoders
+- firebase-encoders-json
+- firebase-encoders-proto
+- firebase-iid
+- firebase-iid-interop
+- firebase-measurement-connector
+- FlatBuffers
+- fragment
+- Fragment Kotlin Extensions
+- Google Auto
+- Google Shortcuts Integration Library
+- Graphics Shapes
+- gsfclient
+- Gson
+- Guava JDK5
+- Guava JDK7
+- HighwayHash
+- J2ObjC
+- J2ObjC Annotations
+- Jakarta Dependency Injection
+- Jakarta Inject
+- java_annotations
+- javax.inject
+- JetBrains Java Annotations
+- JsInterop Annotations
+- JSpecify
+- JSpecify annotations
+- JSR 250
+- JSR 305
+- JSR 330
+- Kotlin
+- Kotlin Android Extensions Runtime
+- Kotlin coroutines
+- Kotlin Stdlib
+- Kotlin Stdlib Jdk7
+- Kotlin Stdlib Jdk8
+- kotlinx_atomicfu
+- kotlinx_serialization
+- kotlinx-coroutines-android
+- kotlinx-coroutines-core
+- kotlinx-coroutines-play-services
+- kotlinx-serialization-core
+- Lifecycle Kotlin Extensions
+- Lifecycle LiveData
+- Lifecycle LiveData Core
+- Lifecycle Process
+- Lifecycle Runtime
+- Lifecycle Runtime Compose
+- Lifecycle ViewModel
+- Lifecycle ViewModel Compose
+- Lifecycle ViewModel Kotlin Extensions
+- Lifecycle ViewModel with SavedState
+- Lifecycle-Common
+- Lifecycle-Common for Java 8
+- LiveData Core Kotlin Extensions
+- Material Adaptive
+- Material Components for Android
+- Media3 common module
+- Media3 Container module
+- Media3 Muxer module
+- Navigation Event
+- NavigationEvent Compose
+- Noise
+- okio
+- org.unifiedpush.android:connector
+- Parcelize Runtime
+- play-services-base
+- play-services-basement
+- play-services-cloud-messaging
+- play-services-oss-licenses
+- play-services-stats
+- play-services-tasks
+- Preferences DataStore
+- Preferences DataStore Core
+- Preferences DataStore Proto
+- Preferences External Protobuf
+- Profile Installer
+- Protocol Buffers for Java
+- ReLinker
+- SafeParcelable library
+- Saved State
+- Saved State Compose
+- SavedState Kotlin Extensions
+- sqlite3-native-library
+- Tink Cryptography API for Android
+- Tracing
+- Tracing Kotlin Extensions
+- Transition
+- transport-backend-cct
+- transport-runtime
+- VersionedParcelable
+- WebRTC Android SDK
+- WindowManager
+- WindowManager Core
+- WindowManager Java
+
+## Parsed Google OSS Plugin Dependency Modules
+
+These module ids come from Google's generated dependencies.json; use Android Gradle evidence for shipped runtime versions.
+
+- `androidx.activity:activity:1.12.4`
+- `androidx.activity:activity-compose:1.12.4`
+- `androidx.activity:activity-ktx:1.12.4`
+- `androidx.annotation:annotation:1.10.0`
+- `androidx.annotation:annotation-experimental:1.5.1`
+- `androidx.annotation:annotation-jvm:1.10.0`
+- `androidx.appcompat:appcompat:1.7.1`
+- `androidx.appcompat:appcompat-resources:1.7.1`
+- `androidx.arch.core:core-common:2.2.0`
+- `androidx.arch.core:core-runtime:2.2.0`
+- `androidx.autofill:autofill:1.0.0`
+- `androidx.biometric:biometric:1.1.0`
+- `androidx.browser:browser:1.9.0`
+- `androidx.camera.featurecombinationquery:featurecombinationquery:1.6.0`
+- `androidx.camera:camera-camera2:1.6.0`
+- `androidx.camera:camera-camera2-pipe:1.6.0`
+- `androidx.camera:camera-core:1.6.0`
+- `androidx.camera:camera-lifecycle:1.6.0`
+- `androidx.camera:camera-video:1.6.0`
+- `androidx.cardview:cardview:1.0.0`
+- `androidx.collection:collection:1.5.0`
+- `androidx.collection:collection-jvm:1.5.0`
+- `androidx.collection:collection-ktx:1.5.0`
+- `androidx.compose.animation:animation:1.11.0-beta02`
+- `androidx.compose.animation:animation-android:1.11.0-beta02`
+- `androidx.compose.animation:animation-core:1.11.0-beta02`
+- `androidx.compose.animation:animation-core-android:1.11.0-beta02`
+- `androidx.compose.foundation:foundation:1.11.0-beta02`
+- `androidx.compose.foundation:foundation-android:1.11.0-beta02`
+- `androidx.compose.foundation:foundation-layout:1.11.0-beta02`
+- `androidx.compose.foundation:foundation-layout-android:1.11.0-beta02`
+- `androidx.compose.material:material-icons-core:1.7.8`
+- `androidx.compose.material:material-icons-core-android:1.7.8`
+- `androidx.compose.material:material-ripple:1.11.0-beta02`
+- `androidx.compose.material:material-ripple-android:1.11.0-beta02`
+- `androidx.compose.material3.adaptive:adaptive:1.2.0`
+- `androidx.compose.material3.adaptive:adaptive-android:1.2.0`
+- `androidx.compose.material3:material3:1.5.0-alpha17`
+- `androidx.compose.material3:material3-android:1.5.0-alpha17`
+- `androidx.compose.runtime:runtime:1.11.0-beta02`
+- `androidx.compose.runtime:runtime-android:1.11.0-beta02`
+- `androidx.compose.runtime:runtime-annotation:1.11.0-beta02`
+- `androidx.compose.runtime:runtime-annotation-android:1.11.0-beta02`
+- `androidx.compose.runtime:runtime-retain:1.11.0-beta02`
+- `androidx.compose.runtime:runtime-retain-android:1.11.0-beta02`
+- `androidx.compose.runtime:runtime-saveable:1.11.0-beta02`
+- `androidx.compose.runtime:runtime-saveable-android:1.11.0-beta02`
+- `androidx.compose.ui:ui:1.11.0-beta02`
+- `androidx.compose.ui:ui-android:1.11.0-beta02`
+- `androidx.compose.ui:ui-geometry:1.11.0-beta02`
+- `androidx.compose.ui:ui-geometry-android:1.11.0-beta02`
+- `androidx.compose.ui:ui-graphics:1.11.0-beta02`
+- `androidx.compose.ui:ui-graphics-android:1.11.0-beta02`
+- `androidx.compose.ui:ui-text:1.11.0-beta02`
+- `androidx.compose.ui:ui-text-android:1.11.0-beta02`
+- `androidx.compose.ui:ui-unit:1.11.0-beta02`
+- `androidx.compose.ui:ui-unit-android:1.11.0-beta02`
+- `androidx.compose.ui:ui-util:1.11.0-beta02`
+- `androidx.compose.ui:ui-util-android:1.11.0-beta02`
+- `androidx.concurrent:concurrent-futures:1.1.0`
+- `androidx.concurrent:concurrent-futures-ktx:1.1.0`
+- `androidx.constraintlayout:constraintlayout:2.1.0`
+- `androidx.constraintlayout:constraintlayout-core:1.0.0`
+- `androidx.coordinatorlayout:coordinatorlayout:1.1.0`
+- `androidx.core:core:1.18.0`
+- `androidx.core:core-backported-fixes:1.0.0`
+- `androidx.core:core-google-shortcuts:1.1.0-alpha01`
+- `androidx.core:core-ktx:1.18.0`
+- `androidx.core:core-viewtree:1.0.0`
+- `androidx.cursoradapter:cursoradapter:1.0.0`
+- `androidx.customview:customview:1.1.0`
+- `androidx.customview:customview-poolingcontainer:1.0.0`
+- `androidx.datastore:datastore:1.1.7`
+- `androidx.datastore:datastore-android:1.1.7`
+- `androidx.datastore:datastore-core:1.1.7`
+- `androidx.datastore:datastore-core-android:1.1.7`
+- `androidx.datastore:datastore-core-okio:1.1.7`
+- `androidx.datastore:datastore-core-okio-jvm:1.1.7`
+- `androidx.datastore:datastore-preferences:1.1.7`
+- `androidx.datastore:datastore-preferences-android:1.1.7`
+- `androidx.datastore:datastore-preferences-core:1.1.7`
+- `androidx.datastore:datastore-preferences-core-android:1.1.7`
+- `androidx.datastore:datastore-preferences-external-protobuf:1.1.7`
+- `androidx.datastore:datastore-preferences-proto:1.1.7`
+- `androidx.documentfile:documentfile:1.0.0`
+- `androidx.drawerlayout:drawerlayout:1.1.1`
+- `androidx.dynamicanimation:dynamicanimation:1.1.0`
+- `androidx.emoji2:emoji2:1.4.0`
+- `androidx.emoji2:emoji2-views-helper:1.4.0`
+- `androidx.exifinterface:exifinterface:1.4.2`
+- `androidx.fragment:fragment:1.7.1`
+- `androidx.fragment:fragment-ktx:1.7.1`
+- `androidx.graphics:graphics-path:1.0.1`
+- `androidx.graphics:graphics-shapes:1.0.1`
+- `androidx.graphics:graphics-shapes-android:1.0.1`
+- `androidx.interpolator:interpolator:1.0.0`
+- `androidx.legacy:legacy-support-core-utils:1.0.0`
+- `androidx.lifecycle:lifecycle-common:2.11.0-alpha03`
+- `androidx.lifecycle:lifecycle-common-java8:2.11.0-alpha03`
+- `androidx.lifecycle:lifecycle-common-jvm:2.11.0-alpha03`
+- `androidx.lifecycle:lifecycle-livedata:2.11.0-alpha03`
+- `androidx.lifecycle:lifecycle-livedata-core:2.11.0-alpha03`
+- `androidx.lifecycle:lifecycle-livedata-core-ktx:2.11.0-alpha03`
+- `androidx.lifecycle:lifecycle-process:2.11.0-alpha03`
+- `androidx.lifecycle:lifecycle-runtime:2.11.0-alpha03`
+- `androidx.lifecycle:lifecycle-runtime-android:2.11.0-alpha03`
+- `androidx.lifecycle:lifecycle-runtime-compose:2.11.0-alpha03`
+- `androidx.lifecycle:lifecycle-runtime-compose-android:2.11.0-alpha03`
+- `androidx.lifecycle:lifecycle-runtime-ktx:2.11.0-alpha03`
+- `androidx.lifecycle:lifecycle-runtime-ktx-android:2.11.0-alpha03`
+- `androidx.lifecycle:lifecycle-viewmodel:2.11.0-alpha03`
+- `androidx.lifecycle:lifecycle-viewmodel-android:2.11.0-alpha03`
+- `androidx.lifecycle:lifecycle-viewmodel-compose:2.11.0-alpha03`
+- `androidx.lifecycle:lifecycle-viewmodel-compose-android:2.11.0-alpha03`
+- `androidx.lifecycle:lifecycle-viewmodel-ktx:2.11.0-alpha03`
+- `androidx.lifecycle:lifecycle-viewmodel-savedstate:2.11.0-alpha03`
+- `androidx.lifecycle:lifecycle-viewmodel-savedstate-android:2.11.0-alpha03`
+- `androidx.loader:loader:1.0.0`
+- `androidx.localbroadcastmanager:localbroadcastmanager:1.1.0`
+- `androidx.media:media:1.1.0`
+- `androidx.media3:media3-common:1.9.0`
+- `androidx.media3:media3-container:1.9.0`
+- `androidx.media3:media3-muxer:1.9.0`
+- `androidx.navigation3:navigation3-runtime:1.1.0`
+- `androidx.navigation3:navigation3-runtime-android:1.1.0`
+- `androidx.navigation3:navigation3-ui:1.1.0`
+- `androidx.navigation3:navigation3-ui-android:1.1.0`
+- `androidx.navigationevent:navigationevent:1.0.2`
+- `androidx.navigationevent:navigationevent-android:1.0.2`
+- `androidx.navigationevent:navigationevent-compose:1.0.2`
+- `androidx.navigationevent:navigationevent-compose-android:1.0.2`
+- `androidx.preference:preference:1.2.1`
+- `androidx.print:print:1.0.0`
+- `androidx.profileinstaller:profileinstaller:1.4.0`
+- `androidx.recyclerview:recyclerview:1.2.1`
+- `androidx.resourceinspection:resourceinspection-annotation:1.0.1`
+- `androidx.savedstate:savedstate:1.4.0`
+- `androidx.savedstate:savedstate-android:1.4.0`
+- `androidx.savedstate:savedstate-compose:1.4.0`
+- `androidx.savedstate:savedstate-compose-android:1.4.0`
+- `androidx.savedstate:savedstate-ktx:1.4.0`
+- `androidx.security:security-crypto:1.1.0-alpha06`
+- `androidx.slidingpanelayout:slidingpanelayout:1.2.0`
+- `androidx.startup:startup-runtime:1.1.1`
+- `androidx.tracing:tracing:1.3.0`
+- `androidx.tracing:tracing-android:1.3.0`
+- `androidx.tracing:tracing-ktx:1.3.0`
+- `androidx.transition:transition:1.6.0`
+- `androidx.vectordrawable:vectordrawable:1.1.0`
+- `androidx.vectordrawable:vectordrawable-animated:1.1.0`
+- `androidx.versionedparcelable:versionedparcelable:1.1.1`
+- `androidx.viewpager:viewpager:1.0.0`
+- `androidx.viewpager2:viewpager2:1.0.0`
+- `androidx.window:window:1.5.0`
+- `androidx.window:window-core:1.5.0`
+- `androidx.window:window-core-android:1.5.0`
+- `androidx.window:window-java:1.5.0`
+- `com.getkeepsafe.relinker:relinker:1.4.5`
+- `com.github.davidliu:audioswitch:89582c47c9a04c62f90aa5e57251af4800a62c9a`
+- `com.google.android.datatransport:transport-api:3.1.0`
+- `com.google.android.datatransport:transport-backend-cct:3.1.8`
+- `com.google.android.datatransport:transport-runtime:3.1.8`
+- `com.google.android.gms:play-services-base:18.8.0`
+- `com.google.android.gms:play-services-basement:18.9.0`
+- `com.google.android.gms:play-services-cloud-messaging:17.1.0`
+- `com.google.android.gms:play-services-oss-licenses:17.5.1`
+- `com.google.android.gms:play-services-stats:17.0.2`
+- `com.google.android.gms:play-services-tasks:18.4.0`
+- `com.google.android.material:material:1.13.0`
+- `com.google.auto.value:auto-value-annotations:1.6.3`
+- `com.google.code.findbugs:jsr305:3.0.2`
+- `com.google.code.gson:gson:2.12.0`
+- `com.google.crypto.tink:tink-android:1.9.0`
+- `com.google.dagger:dagger:2.59`
+- `com.google.errorprone:error_prone_annotations:2.41.0`
+- `com.google.firebase:firebase-annotations:16.2.0`
+- `com.google.firebase:firebase-appindexing:20.0.0`
+- `com.google.firebase:firebase-bom:32.8.0`
+- `com.google.firebase:firebase-common:20.4.3`
+- `com.google.firebase:firebase-common-ktx:20.4.3`
+- `com.google.firebase:firebase-components:17.1.5`
+- `com.google.firebase:firebase-datatransport:18.1.7`
+- `com.google.firebase:firebase-encoders:17.0.0`
+- `com.google.firebase:firebase-encoders-json:18.0.0`
+- `com.google.firebase:firebase-encoders-proto:16.0.0`
+- `com.google.firebase:firebase-iid:21.1.0`
+- `com.google.firebase:firebase-iid-interop:17.1.0`
+- `com.google.firebase:firebase-installations:17.2.0`
+- `com.google.firebase:firebase-installations-interop:17.1.1`
+- `com.google.firebase:firebase-measurement-connector:19.0.0`
+- `com.google.firebase:firebase-messaging:23.4.1`
+- `com.google.guava:failureaccess:1.0.3`
+- `com.google.guava:guava:33.5.0-android`
+- `com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava`
+- `com.google.j2objc:j2objc-annotations:3.1`
+- `com.squareup.okio:okio:3.4.0`
+- `com.squareup.okio:okio-jvm:3.4.0`
+- `commons-io:commons-io:2.20.0`
+- `eu.simonbinder:sqlite3-native-library:3.52.0`
+- `io.flutter:arm64_v8a_release:1.0.0-3452d735bd38224ef2db85ca763d862d6326b17f`
+- `io.flutter:armeabi_v7a_release:1.0.0-3452d735bd38224ef2db85ca763d862d6326b17f`
+- `io.flutter:flutter_embedding_release:1.0.0-3452d735bd38224ef2db85ca763d862d6326b17f`
+- `io.flutter:x86_64_release:1.0.0-3452d735bd38224ef2db85ca763d862d6326b17f`
+- `io.github.webrtc-sdk:android:137.7151.04`
+- `io.livekit:noise:2.0.0`
+- `jakarta.inject:jakarta.inject-api:2.0.1`
+- `javax.inject:javax.inject:1`
+- `org.apache.tika:tika-core:3.2.3`
+- `org.jetbrains.kotlin:kotlin-android-extensions-runtime:1.9.22`
+- `org.jetbrains.kotlin:kotlin-bom:1.8.22`
+- `org.jetbrains.kotlin:kotlin-parcelize-runtime:1.9.22`
+- `org.jetbrains.kotlin:kotlin-stdlib:2.2.10`
+- `org.jetbrains.kotlin:kotlin-stdlib-common:2.2.10`
+- `org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.0.10`
+- `org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.0.10`
+- `org.jetbrains.kotlinx:atomicfu:0.28.0`
+- `org.jetbrains.kotlinx:atomicfu-jvm:0.28.0`
+- `org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2`
+- `org.jetbrains.kotlinx:kotlinx-coroutines-bom:1.10.2`
+- `org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2`
+- `org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.10.2`
+- `org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2`
+- `org.jetbrains.kotlinx:kotlinx-serialization-bom:1.7.3`
+- `org.jetbrains.kotlinx:kotlinx-serialization-core:1.7.3`
+- `org.jetbrains.kotlinx:kotlinx-serialization-core-jvm:1.7.3`
+- `org.jetbrains:annotations:23.0.0`
+- `org.jspecify:jspecify:1.0.0`
+- `org.slf4j:slf4j-api:2.0.17`
+- `org.unifiedpush.android:connector:2.5.0`

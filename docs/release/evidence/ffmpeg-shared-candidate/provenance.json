@@ -1,0 +1,164 @@
+{
+  "_status": "SUPERSEDED 2026-08-15 - CANDIDATE ABANDONED, NOT PENDING. Marked by S&C. The swap never happened and never will: app PR #174 DELETED ffmpeg.exe on 2026-08-15 rather than swapping it, removed story video trim with it, and removed the whole intergalactic/windows/third_party/ tree. intergalactic/windows/CMakeLists.txt now raises FATAL_ERROR if anything is staged into third_party/ffmpeg/bin/, so this candidate cannot be installed even for a test. This field previously read 'CANDIDATE PROVENANCE ONLY. Nothing was swapped. intergalactic/windows/third_party/ffmpeg/bin/ is untouched; the swap is gated on a smoke gate that does not exist yet.' - present tense, and it described a directory that no longer exists and a gate that will never be built. RETAINED for the measurement it carries, which is still true and still load-bearing: BtbN's lgpl-shared variant makes FFmpeg's OWN libraries into seven DLLs and leaves the 18 obligated components STATICALLY INSIDE them, so it was never an LGPL relink closer. Do not re-scope this as a compliance route.",
+  "component": "FFmpeg Windows desktop story-video export tool - shared-variant candidate",
+  "captured_by": "RELEASE PIPELINE",
+  "captured_on": "2026-08-09",
+  "why": [
+    "The shipped static build came from BtbN release autobuild-2026-06-13-13-31, which BtbN has since pruned. Its release_url and asset_url both 404, and the pinned upstream component versions in the build scripts went with the tag.",
+    "This record captures the same information for a release that still exists, so the component versions are held before they can be lost again.",
+    "Per docs/DECISIONS.md 'Record A Third-Party Binary's Builder Commit SHA At Staging Time' (2026-08-07): the builder commit SHA below came from the tag object itself, not from a timestamp inference."
+  ],
+  "provider": {
+    "name": "BtbN FFmpeg Builds",
+    "repository": "https://github.com/BtbN/FFmpeg-Builds",
+    "release_tag": "autobuild-2026-08-09-13-03",
+    "release_url": "https://github.com/BtbN/FFmpeg-Builds/releases/tag/autobuild-2026-08-09-13-03",
+    "release_published_at": "2026-08-09T13:04:44Z",
+    "release_id": 367480496,
+    "asset_name": "ffmpeg-n8.1.2-34-g9b6c8969e0-win64-lgpl-shared-8.1.zip",
+    "asset_url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-09-13-03/ffmpeg-n8.1.2-34-g9b6c8969e0-win64-lgpl-shared-8.1.zip",
+    "asset_sha256": "2936E5449886641B4279CA3FC554B678C8E9A2D20DD0C0A34FE7208B254A0905",
+    "asset_size_bytes": 70708855,
+    "asset_sha256_cross_check": "Matches the digest GitHub itself records on the release asset (sha256:2936e544...a0905), independently of the local download.",
+    "variant": "win64-lgpl-shared",
+    "addin": "8.1",
+    "latest_url_deliberately_not_used": "BtbN also publishes a rolling 'latest' release and ffmpeg-master-latest-* asset names. Neither is recorded here: a latest URL lets upstream change the artefact under this documentation, which docs/research/ffmpeg-licensing.md calls out explicitly.",
+    "pruning_expectation": "BtbN prunes autobuild releases. This release_url and asset_url are expected to 404 eventually. That is why the builder commit SHA, the FFmpeg source revision, and the component pins are recorded here rather than referenced by URL."
+  },
+  "builder_build_definition": {
+    "builder_commit_sha": "2437e7b868da3c11872367b15f3c613b87c24819",
+    "builder_commit_date": "2026-08-05T13:37:52Z",
+    "builder_commit_subject": "Bump harfbuzz",
+    "how_established": "GET https://api.github.com/repos/BtbN/FFmpeg-Builds/git/ref/tags/autobuild-2026-08-09-13-03 -> object.sha. Proof, not inference.",
+    "source_snapshot_sha256": "F60B77676E5938A6E4767787B58F3703B6290BB9E3150FA339E218FC91C34430",
+    "source_snapshot_size_bytes": 101760,
+    "source_snapshot_url": "https://codeload.github.com/BtbN/FFmpeg-Builds/tar.gz/2437e7b868da3c11872367b15f3c613b87c24819",
+    "configure_arguments": "BUILD-CONFIGURATION.txt (this directory)",
+    "pinned_component_versions": "component-pins.json (this directory)",
+    "builder_scripts_licence": "BtbN's build scripts are MIT. That covers the scripts, not their output."
+  },
+  "source": {
+    "project": "FFmpeg",
+    "repository": "https://git.ffmpeg.org/ffmpeg.git",
+    "revision": "9b6c8969e05b4f0b29f0f85cd501be6b3e582e6b",
+    "github_mirror_commit": "https://github.com/FFmpeg/FFmpeg/commit/9b6c8969e05b4f0b29f0f85cd501be6b3e582e6b",
+    "commit_date": "2026-07-31T00:47:10Z",
+    "upstream_branch": "release/8.1",
+    "version_string": "n8.1.2-34-g9b6c8969e0-20260809",
+    "corresponding_source": {
+      "filename": "ffmpeg-n8.1.2-34-g9b6c8969e0-source.tar.gz",
+      "obtained_from": "https://codeload.github.com/FFmpeg/FFmpeg/tar.gz/9b6c8969e05b4f0b29f0f85cd501be6b3e582e6b",
+      "sha256": "7E779215EAE16AD7E93DDAD59BD82822BD3D34E4DC61F9996F9481B2C0605BC3",
+      "size_bytes": 16903934,
+      "published": "NO. Not published anywhere. This is a candidate, not a shipped artefact.",
+      "bytes_staged_at": "NOT retained at any durable path. Downloaded to a transient, gitignored staging directory on the Windows capture machine, deliberately not named here so this record does not cite disposable storage as its evidence (AGENTS.md - Durable Records Must Not Cite Disposable Storage). The sha256 above is the durable identity; re-obtain from obtained_from and compare."
+    }
+  },
+  "archive_contents": {
+    "entries": 237,
+    "executables": [
+      {
+        "name": "ffmpeg.exe",
+        "sha256": "795BF2808EE15ACB16D900DCD6D2533091BC6135737667502A734CD7391ED625",
+        "size_bytes": 542208
+      },
+      {
+        "name": "ffprobe.exe",
+        "sha256": "383CD95C1884AA34FEB70592762EE43199E9AE05C61EF06F6C3E60F6292CF4DD",
+        "size_bytes": 227840
+      },
+      {
+        "name": "ffplay.exe",
+        "sha256": "9BBB3BE8FFB1B38497F871260CA8DCCA317A793F793C2A439223126D17335BEA",
+        "size_bytes": 17902592
+      }
+    ],
+    "runtime_dlls": [
+      {
+        "name": "avcodec-62.dll",
+        "sha256": "9875527C7917979261985C893E402011F46AAB692CCE7071CB00AC9332326975",
+        "size_bytes": 70883840
+      },
+      {
+        "name": "avdevice-62.dll",
+        "sha256": "208CA6C8D17303AC0C90624583CDB8368ED1FA28F7876CD7D9D4074FDFB2544A",
+        "size_bytes": 3924992
+      },
+      {
+        "name": "avfilter-11.dll",
+        "sha256": "1BA6CDC114FF7F8D47D86FB6C9C3A76B885E1A9E655EB7F753D3374EDEF02D10",
+        "size_bytes": 29825536
+      },
+      {
+        "name": "avformat-62.dll",
+        "sha256": "E11791FDBA4FF6AD5F22538B233995EE258AA37DD29E4C48743F40B03D89FD60",
+        "size_bytes": 22077440
+      },
+      {
+        "name": "avutil-60.dll",
+        "sha256": "59503FAD7E49016A2F0753B01558DCE1C3991BEDD5C1B8F33B51F4456225C417",
+        "size_bytes": 2937856
+      },
+      {
+        "name": "swresample-6.dll",
+        "sha256": "03B8538A6834CD4442D799F7EFC727B63D446B1793B0BC2561829516DEDE9324",
+        "size_bytes": 723968
+      },
+      {
+        "name": "swscale-9.dll",
+        "sha256": "3A4B2D55520A9307EB1A5615EE994E65E04D6428CFF16AF349C40E8B9FD15667",
+        "size_bytes": 12570624
+      }
+    ],
+    "also_present": "LICENSE.txt, doc/, presets/, include/ (7 header trees), lib/ (.lib/.def/.dll.a import libraries + pkgconfig)",
+    "note": "ffplay.exe and ffprobe.exe are in the archive; this project ships neither. ffprobe.exe was removed from the payload by app PR #101 and intergalactic/windows/CMakeLists.txt now FATAL_ERRORs if it reappears in the staging directory."
+  },
+  "size_comparison": {
+    "static_lgpl_asset_same_release": {
+      "name": "ffmpeg-n8.1.2-34-g9b6c8969e0-win64-lgpl-8.1.zip",
+      "size_bytes": 145937826
+    },
+    "shared_lgpl_asset": {
+      "name": "ffmpeg-n8.1.2-34-g9b6c8969e0-win64-lgpl-shared-8.1.zip",
+      "size_bytes": 70708855
+    },
+    "note": "Archive sizes, not installed payload. The installed shared payload is ffmpeg.exe (542,208) plus the 7 DLLs; see the packaging note in README.md."
+  },
+  "variant_assertions": {
+    "source": "Embedded FFMPEG_CONFIGURATION string extracted from bin/avcodec-62.dll. The executable was NOT run.",
+    "contains_enable_gpl": false,
+    "contains_enable_nonfree": false,
+    "contains_enable_version3": true,
+    "contains_enable_shared": true,
+    "contains_disable_static": true,
+    "observed_disabled_gpl_only_libraries": [
+      "--disable-avisynth",
+      "--disable-frei0r",
+      "--disable-libdavs2",
+      "--disable-libdvdnav",
+      "--disable-libdvdread",
+      "--disable-librubberband",
+      "--disable-libvidstab",
+      "--disable-libx264",
+      "--disable-libx265",
+      "--disable-libxavs2",
+      "--disable-libxvid"
+    ],
+    "observed_disabled_nonfree_libraries": [
+      "--disable-libfdk-aac"
+    ],
+    "caveat": "These are flag-level facts. They do not settle what is inside the binary - see component-set-diff.md, which records a GPL-licensed library reaching the shipped DLL through a dependency the configure line never names."
+  },
+  "component_set": {
+    "count": 57,
+    "diff_vs_current_inventory": "component-set-diff.md (this directory)",
+    "current_inventory": "docs/release/evidence/ffmpeg-components/ (S&C-owned, NOT modified by this capture)"
+  },
+  "boundaries_observed": [
+    "intergalactic/windows/third_party/ffmpeg/bin/ was read (hashed and symbol-probed) and NOT modified.",
+    "docs/release/evidence/ffmpeg-components/ was read and NOT modified.",
+    "Nothing was published, deployed, or opened as a PR.",
+    "No downloaded executable was run."
+  ],
+  "_retention_warning": "No byte copy of the release archive, the FFmpeg source tarball or the builder snapshot is held anywhere durable. BtbN prunes autobuild releases, so the asset_url WILL 404 eventually. If this build is ever chosen for staging, retain the archive at that point - the digests here prove identity but do not preserve bytes."
+}

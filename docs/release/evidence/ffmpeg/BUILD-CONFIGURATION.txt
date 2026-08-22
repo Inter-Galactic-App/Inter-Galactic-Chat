@@ -1,0 +1,167 @@
+FFmpeg build configuration for the binaries distributed with Inter Galactic
+==========================================================================
+
+This file accompanies the Corresponding Source archive and records how the
+FFmpeg binaries shipped with Inter Galactic were compiled. It is provided in
+the form suggested by https://ffmpeg.org/legal.html ("Explain how you compiled
+FFmpeg, for example the configure line, in a text file").
+
+Inter Galactic did NOT modify FFmpeg. The source archive published alongside
+this file is upstream FFmpeg at the revision below, unmodified, so there is no
+changes.diff to accompany it.
+
+Binaries this describes
+-----------------------
+  ffmpeg.exe    SHA-256 C5C6E92D80884470A4D09C80A801989757DB1E80837E5018B636AF76DD826FEC
+  ffprobe.exe   SHA-256 134B9BC17D0FE3B1F81ECA108615356F4C304C58C7750CE85592E8CFDBB3F523
+
+Corresponding Source
+--------------------
+  Archive   ffmpeg-n8.1.1-13-g83e8541aa6-source.tar.gz
+  SHA-256   E1F42BA0646F50C7C6F8761ADCC05933F71D70FF131DA0F80CFC0E449199B4F5
+  Revision  83e8541aa601935a610b1b8958d56e8d0331318b
+  Upstream  https://git.ffmpeg.org/ffmpeg.git
+            https://github.com/FFmpeg/FFmpeg/commit/83e8541aa601935a610b1b8958d56e8d0331318b
+
+  The archive is a byte-for-byte copy of upstream's export of that revision and
+  has deliberately not been repacked, so it can be re-obtained from upstream and
+  compared hash-for-hash without trusting this server.
+
+Licence
+-------
+  LGPL-3.0-or-later. The build sets --enable-version3 and does NOT set
+  --enable-gpl; --disable-libx264 and --disable-libx265 are explicit in the
+  configure line below. FFmpeg's configure refuses to build if a GPL-only
+  EXTERNAL is enabled without --enable-gpl, so the absence of that flag is
+  evidence that no GPL-only external library is enabled.
+
+  CORRECTED 2026-08-09. This paragraph used to conclude that the absence of the
+  flag was "itself evidence that no GPL-only component is present". That
+  inference does not hold and has been disproven against this very binary. The
+  configure check covers DIRECT externals and is blind to their dependencies by
+  construction. FFTW (GPL-2.0-or-later, fftw-3.3.11) is statically compiled into
+  this ffmpeg.exe, reaching it through chromaprint, which BtbN builds with
+  -DFFT_LIB=fftw3; chromaprint is LGPL-2.1 and has no entry in
+  EXTERNAL_LIBRARY_GPL_LIST, so configure never demanded the flag. libudfread
+  (LGPL-2.1-or-later, via libbluray) surfaced the same way. Both are disclosed
+  in docs/policies/SOURCE_OFFER.md and docs/policies/THIRD_PARTY_NOTICES.md;
+  the owner decision is in workspace docs/DECISIONS.md, "2026-08-09 - Disclose
+  FFTW For What Already Shipped; Trim It From Future Builds".
+
+  DIVERGENCE FROM THE SERVED COPY, recorded rather than left silent: this file
+  is mirrored publicly as /source/ffmpeg-BUILD-CONFIGURATION.txt, and the served
+  copy still carries the uncorrected sentence. Republishing is a RELEASE
+  PIPELINE / owner action; until it happens the two differ, and this note is
+  where that is written down.
+
+Who built it
+------------
+  Built by BtbN's FFmpeg-Builds project, variant "win64-lgpl".
+  Build definition:  https://github.com/BtbN/FFmpeg-Builds  at commit a9410e4be2b3
+  The BtbN build scripts are MIT licensed; that licence covers the scripts, not
+  their output, which remains FFmpeg under the terms above.
+
+Version string
+--------------
+  ffmpeg version n8.1.1-13-g83e8541aa6-20260613 Copyright (c) 2000-2026 the FFmpeg developers
+  built with gcc 15.2.0 (crosstool-NG 1.28.0.23_185f348)
+
+Configure line
+--------------
+  --prefix=/ffbuild/prefix
+  --pkg-config-flags=--static
+  --pkg-config=pkg-config
+  --cross-prefix=x86_64-w64-mingw32-
+  --arch=x86_64
+  --target-os=mingw32
+  --enable-version3
+  --disable-debug
+  --disable-w32threads
+  --enable-pthreads
+  --enable-iconv
+  --enable-zlib
+  --enable-libxml2
+  --enable-libvmaf
+  --enable-fontconfig
+  --enable-libharfbuzz
+  --enable-libfreetype
+  --enable-libfribidi
+  --enable-vulkan
+  --enable-libshaderc
+  --enable-libvorbis
+  --disable-libxcb
+  --disable-xlib
+  --disable-libpulse
+  --enable-opencl
+  --enable-gmp
+  --enable-lzma
+  --enable-liblcevc-dec
+  --enable-amf
+  --enable-libaom
+  --enable-libaribb24
+  --disable-avisynth
+  --enable-chromaprint
+  --enable-libdav1d
+  --disable-libdavs2
+  --disable-libdvdread
+  --disable-libdvdnav
+  --disable-libfdk-aac
+  --enable-ffnvcodec
+  --enable-cuda-llvm
+  --disable-frei0r
+  --enable-libgme
+  --enable-libkvazaar
+  --enable-libaribcaption
+  --enable-libass
+  --enable-libbluray
+  --enable-libjxl
+  --enable-libmp3lame
+  --enable-libopus
+  --enable-libplacebo
+  --enable-librist
+  --enable-libssh
+  --enable-libtheora
+  --enable-libvpx
+  --enable-libwebp
+  --enable-libzmq
+  --enable-lv2
+  --enable-libvpl
+  --enable-openal
+  --enable-liboapv
+  --enable-libopencore-amrnb
+  --enable-libopencore-amrwb
+  --enable-libopenh264
+  --enable-libopenjpeg
+  --enable-libopenmpt
+  --enable-librav1e
+  --disable-librubberband
+  --enable-schannel
+  --enable-sdl2
+  --enable-libsnappy
+  --enable-libsoxr
+  --enable-libsrt
+  --enable-libsvtav1
+  --enable-libtwolame
+  --enable-libuavs3d
+  --disable-libdrm
+  --enable-vaapi
+  --disable-libvidstab
+  --enable-libvvenc
+  --enable-whisper
+  --disable-libx264
+  --disable-libx265
+  --disable-libxavs2
+  --disable-libxvid
+  --enable-libzimg
+  --enable-libzvbi
+  --extra-cflags=-DLIBTWOLAME_STATIC
+  --extra-cxxflags=
+  --extra-libs=-lgomp
+  --extra-ldflags=-pthread
+  --extra-ldexeflags=
+  --cc=x86_64-w64-mingw32-gcc
+  --cxx=x86_64-w64-mingw32-g++
+  --ar=x86_64-w64-mingw32-gcc-ar
+  --ranlib=x86_64-w64-mingw32-gcc-ranlib
+  --nm=x86_64-w64-mingw32-gcc-nm
+  --extra-version=20260613

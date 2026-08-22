@@ -1,0 +1,80 @@
+
+name: deploy
+
+# Triggered when release.bat pushes a version tag.
+# The installer, manifest, and source archive were built locally and are
+# committed in the same commit as the tag — this job just SCPs them to
+# app.ourgalaxy.space. No Flutter build or Inno Setup needed here.
+#
+# Required repository secrets:
+#   DEPLOY_SSH_KEY   — private key (public half in server authorized_keys)
+#   DEPLOY_HOST      — server hostname
+#   DEPLOY_PORT      — SSH port (defaults to 22)
+#   DEPLOY_USER      — SSH username
+#   DEPLOY_PATH      — remote base path (e.g. /srv/www/intergalactic)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version_tag:
+        description: 'Version tag to deploy (e.g. v0.5.1)'
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: ver
+        run: |
+          TAG="${{ inputs.version_tag || github.ref_name }}"
+          [[ "$TAG" == v* ]] || TAG="v$TAG"
+          VERSION="${TAG#v}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "ERROR: '$VERSION' is not a valid version number."
+            echo "  Tag push: make sure release.bat pushed a vX.Y.Z tag."
+            echo "  Manual:   provide version_tag input (e.g. v0.5.1)."
+            exit 1
+          fi
+          echo "version=$VERSION"                             >> "$GITHUB_OUTPUT"
+          echo "version_tag=$TAG"                            >> "$GITHUB_OUTPUT"
+          echo "installer=InterGalactic-Setup-$VERSION.exe"  >> "$GITHUB_OUTPUT"
+
+      - name: Configure SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST:    ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT:    ${{ secrets.DEPLOY_PORT || '22' }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${DEPLOY_SSH_KEY}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p "${DEPLOY_PORT}" "${DEPLOY_HOST}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Deploy to app.ourgalaxy.space
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          VERSION:     ${{ steps.ver.outputs.version }}
+          VERSION_TAG: ${{ steps.ver.outputs.version_tag }}
+          INSTALLER:   ${{ steps.ver.outputs.installer }}
+        run: |
+          SCP_OPTS=( -i ~/.ssh/deploy_key -P "${DEPLOY_PORT}" -o StrictHostKeyChecking=yes )
+          DEST="${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}"
+
+          scp "${SCP_OPTS[@]}" "dist/installer/${INSTALLER}"  "${DEST}/downloads/${INSTALLER}"
+          scp "${SCP_OPTS[@]}" dist/updates/latest.json       "${DEST}/updates/latest.json"
+
+          SOURCE="dist/source/intergalactic-${VERSION}-source.zip"
+          [ -f "$SOURCE" ] && scp "${SCP_OPTS[@]}" "$SOURCE"  "${DEST}/source/intergalactic-${VERSION}-source.zip"
+
+          echo "Deployed ${VERSION_TAG} to ${DEPLOY_HOST}"
