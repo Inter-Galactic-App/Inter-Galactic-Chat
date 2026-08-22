@@ -1,0 +1,164 @@
+plugins {
+    id "com.android.application"
+    id "com.google.android.gms.oss-licenses-plugin"
+    // START: FlutterFire Configuration
+    // id 'com.google.gms.google-services'
+    // END: FlutterFire Configuration
+    id "kotlin-android"
+    id "dev.flutter.flutter-gradle-plugin"
+}
+
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withReader('UTF-8') { reader ->
+        localProperties.load(reader)
+    }
+}
+
+def flutterVersionCode = localProperties.getProperty('flutter.versionCode')
+if (flutterVersionCode == null) {
+    flutterVersionCode = '1'
+}
+
+def flutterVersionName = localProperties.getProperty('flutter.versionName')
+if (flutterVersionName == null) {
+    flutterVersionName = '1.0'
+}
+
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file('key.properties')
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
+android {
+    compileSdkVersion flutter.compileSdkVersion
+    namespace = "chat.intergalactic.app"
+    ndkVersion = "28.2.13676358"
+
+    compileOptions {
+        coreLibraryDesugaringEnabled true
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+
+    sourceSets {
+        main.java.srcDirs += 'src/main/kotlin'
+    }
+
+    defaultConfig {
+        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
+        applicationId "chat.intergalactic.app"
+        // You can update the following values to match your application needs.
+        // For more information, see: https://docs.flutter.dev/deployment/android#reviewing-the-gradle-build-configuration.
+        minSdkVersion 24
+        targetSdkVersion 35
+        versionCode flutterVersionCode.toInteger()
+        versionName flutterVersionName
+    }
+
+    signingConfigs {
+        release {
+            if (keystorePropertiesFile.exists()) {
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+                storeFile keystoreProperties['storeFile'] ? file(keystoreProperties['storeFile']) : null
+                storePassword keystoreProperties['storePassword']
+            }
+        }
+    }
+    buildTypes {
+        // BOTH build types declare abiFilters explicitly, and that is required
+        // rather than tidy. See docs/DECISIONS.md 2026-08-05.
+        //
+        // `flutter build apk --target-platform=...` controls only the ABIs
+        // FLUTTER builds its own engine and AOT artifacts for. Every
+        // third-party .so - libwebrtc, mpv, DeepFilterNet, vodozemac, sqlite3 -
+        // arrives through AARs and jniLibs, and AGP packages those for whatever
+        // ABIs they ship. Measured: --target-platform alone took lib/x86_64
+        // from 94.9 MB (15 .so) to 53.1 MB (13 .so) - only libapp.so and
+        // libflutter.so left, the other thirteen stayed.
+        //
+        // A release-only ndk.abiFilters block does NOT fix that on its own, and
+        // this is the trap. FlutterPlugin.kt (~line 170) runs
+        // `buildType.ndk.abiFilters.clear()` and then adds its own
+        // DEFAULT_PLATFORMS (arm, arm64, x86_64) to EVERY build type, at
+        // plugin-apply time - which is before this android {} block is
+        // evaluated. A block here therefore UNIONS with Flutter's set instead
+        // of replacing it, and x86_64 survives. The plugin's own comment says
+        // user abiFilters "take precedence"; measured against Flutter 3.41.1,
+        // they do not. That is why `disable-abi-filtering` is set in
+        // android/gradle.properties - it makes the plugin skip that block
+        // entirely so the filters below are the only ones in play.
+        //
+        // Consequence: if that property is ever removed, Flutter's filters come
+        // back, x86_64 returns to the release APK, and NOTHING FAILS - the
+        // build stays green and the APK just grows by ~53 MB. The only check
+        // that catches it is listing lib/ in the produced APK.
+        debug {
+            signingConfig signingConfigs.debug
+            applicationIdSuffix ".debug"
+            // Exactly Flutter's DEFAULT_PLATFORMS, restated because the plugin
+            // no longer supplies them. Debug keeps x86_64 deliberately: it is
+            // what an emulator installs, and docs/release/test-matrix.md names
+            // an emulator as the preferred extra Android target.
+            ndk {
+                abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86_64'
+            }
+        }
+        release {
+            signingConfig signingConfigs.release
+            // The distributed release APK ships ARM only.
+            ndk {
+                abiFilters 'arm64-v8a', 'armeabi-v7a'
+            }
+        }
+    }
+
+
+    packagingOptions {
+        pickFirst 'lib/arm64-v8a/libc++_shared.so'
+        pickFirst 'lib/armeabi-v7a/libc++_shared.so'
+        pickFirst 'lib/x86/libc++_shared.so'
+        pickFirst 'lib/x86_64/libc++_shared.so'
+    }
+}
+
+flutter {
+    source '../..'
+}
+
+dependencies {
+    implementation 'com.google.android.gms:play-services-oss-licenses:17.5.1'
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
+    implementation "androidx.biometric:biometric:1.1.0"
+    implementation "com.google.android.gms:play-services-mlkit-subject-segmentation:16.0.0-beta1"
+}
+
+tasks.matching { it.name == "compileReleaseJavaWithJavac" }.configureEach {
+    doFirst {
+        def registrant = file("src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java")
+        if (!registrant.exists()) {
+            return
+        }
+
+        def text = registrant.getText("UTF-8")
+        def updated = text.replaceAll(/(?s)\n\s*try \{\s*\n\s*flutterEngine\.getPlugins\(\)\.add\(new dev\.flutter\.plugins\.integration_test\.IntegrationTestPlugin\(\)\);\s*\n\s*\} catch \(Exception e\) \{\s*\n\s*Log\.e\(TAG, "Error registering plugin integration_test, dev\.flutter\.plugins\.integration_test\.IntegrationTestPlugin", e\);\s*\n\s*\}/, "")
+
+        if (updated == text && (text.contains("IntegrationTestPlugin") || text.contains("integration_test"))) {
+            throw new GradleException("Release registrant still references the dev-only integration_test plugin; update the release strip pattern before building.")
+        }
+
+        if (updated != text) {
+            // Flutter can generate the dev-only integration_test plugin into
+            // the release registrant even though release Java does not compile
+            // that plugin. Strip it at the last safe Gradle boundary.
+            registrant.write(updated, "UTF-8")
+        }
+    }
+}

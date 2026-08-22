@@ -1,0 +1,12 @@
+# These files are byte-exact copies of a PUBLISHED surface. Git's end-of-line
+# normalisation would rewrite them on commit and checkout, so the repo copy
+# would no longer hash to the served file — which is the one thing this
+# directory exists to prove.
+#
+# Caught on import 2026-08-16: LICENSE has 661 CRLF lines, and staging it under
+# the default settings produced blob 8486a10c… against the served file's
+# 6f1e622c…. Every file here was CRLF.
+#
+# -text disables all eol conversion. Do not remove it, and do not "fix" the
+# line endings of anything in this directory: these bytes are the record.
+* -text

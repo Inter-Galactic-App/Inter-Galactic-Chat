@@ -1,0 +1,188 @@
+# Android compile gate, split out of build.yml on 2026-08-03 by REVIEW.
+#
+# WHY IT IS ITS OWN FILE: the same reason build-web.yml is. build.yml's
+# paths filter is tuned for native C++ and does not list *.kt at all, so a
+# Kotlin-only change never triggered it. Adding Kotlin paths there would have
+# dragged the ~15-minute Windows job (billed at 2x) along for every Kotlin
+# change. Separate files mean each gate gets the filter and the cost profile
+# that suits it, and an Android failure can never red the native gate - the
+# coupling that took build-windows down for three months.
+#
+# WHAT IT COVERS, and this is the point: intergalactic/pubspec.yaml depends on
+# plugins/intergalactic_noise_suppression by path, so `flutter build apk`
+# compiles that plugin's Kotlin. That Kotlin previously had NO compile gate
+# anywhere on any forge - no gradle step, no test surface, no src/test. Static
+# review was the ceiling for every change that landed in it.
+#
+# WHY THE HEAP OVERRIDE BELOW EXISTS. This job had never actually run: it was
+# `if: workflow_dispatch` inside build.yml and was skipped on every PR. REVIEW
+# dispatched it on 2026-08-03 (run 30864696923) and it FAILED - not on Kotlin,
+# but on `Java heap space` inside JetifyTransform while resolving
+# :app:debugCompileClasspath. The Kotlin never got to compile.
+#
+# The cause is a config tuned for a memory-constrained developer machine:
+# android/gradle.properties sets -Xmx3072m with workers.max=2 and
+# parallel=false. Those are sensible locally and wrong for a 16 GB runner,
+# especially with android.enableJetifier=true, which rewrites every dependency
+# jar and is memory-hungry. GRADLE_OPTS is set here rather than editing
+# gradle.properties so LOCAL builds keep the settings that suit the machines
+# they run on.
+#
+# FOLLOW-UP, NOW DONE: `./gradlew checkJetifier` was run against this exact
+# dependency set on 2026-08-03. 12 projects checked, every one reported "does
+# not use any legacy support libraries", none dissented - so jetifier was doing
+# real work on every build for no benefit, and it is now disabled in
+# android/gradle.properties. That is the primary fix for the OOM above; the
+# GRADLE_OPTS override below is retained as headroom rather than as the remedy,
+# because it costs nothing on a 16 GB runner and the first green run was
+# measured WITH it.
+
+name: build-android
+
+on:
+  workflow_dispatch:
+  # Deliberately narrow. Measured over the last 60 commits on main, only 3
+  # touch these paths, so this gate is close to free on a limited-minutes plan.
+  # Notably NOT intergalactic/lib/** - a Dart error is already caught by Static
+  # Analysis and the Forgejo Dart gates in minutes, and adding app sources here
+  # would fire a ~15-minute Android build on nearly every PR to re-catch what
+  # two faster gates already catch. Same reasoning as build.yml's filter.
+  pull_request:
+    # DRAFT GUARD, added 2026-08-03 by REVIEW. `ready_for_review` must be listed
+    # explicitly: the default set is opened/synchronize/reopened, so without it a
+    # PR opened as a draft would never run this gate when marked ready.
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - '**/*.kt'
+      - '**/*.java'
+      - '**/*.gradle'
+      - '**/*.gradle.kts'
+      - '**/gradle.properties'
+      - '**/gradle-wrapper.properties'
+      - 'intergalactic/android/**'
+      - 'plugins/*/android/**'
+      # Plugin Dart APIs are the platform-channel surface: a signature change
+      # compiles cleanly as Dart while no longer matching the Kotlin side.
+      - 'plugins/*/lib/**'
+      # Dependency changes add, remove or re-version plugins, and the plugin
+      # set is what Android's generated plugin registration is built from.
+      - 'intergalactic/pubspec.yaml'
+      - 'intergalactic/pubspec.lock'
+      - 'pubspec.yaml'
+      # Changing the gate itself must re-run the gate.
+      - '.github/workflows/build-android.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-android-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PROJECT_PATH: intergalactic
+  # See the heap note in the header. 6 GB on a 16 GB runner, with the Kotlin
+  # daemon raised to match, so JetifyTransform has room to work.
+  GRADLE_OPTS: >-
+    -Dorg.gradle.jvmargs=-Xmx6144m
+    -Dkotlin.daemon.jvmargs=-Xmx3072m
+    -Dfile.encoding=UTF-8
+
+jobs:
+  build-android-debug:
+    # Skipped while the PR is a draft. GitHub evaluates a pull_request `paths:`
+    # filter against the PR's WHOLE DIFF, not the individual push - so on a sync
+    # batch, which contains native, Kotlin and Dart files by definition, every
+    # gate matches on every push and the filters cannot help. Measured on PR #94:
+    # six pushes re-ran every heavy gate six times, ~636 billed minutes on one PR,
+    # about a third of a monthly allowance.
+    #
+    # Work the review rounds with the PR as a DRAFT, then mark it ready once. The
+    # gate then runs on the final state, which is the state that actually matters.
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
+    name: Android debug smoke build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      # we were having issues running out of disk space on workers, so...
+      - name: Aggressive cleanup
+        run: |
+          # Remove .NET SDKs
+          sudo rm -rf /usr/share/dotnet
+
+          # Remove Haskell (GHC)
+          sudo rm -rf /usr/local/.ghcup
+
+          # Remove Julia
+          sudo rm -rf /usr/local/julia*
+
+          # Remove Chromium (optional if not using for browser tests)
+          sudo rm -rf /usr/local/share/chromium
+
+          # Remove Microsoft/Edge and Google Chrome builds
+          sudo rm -rf /opt/microsoft /opt/google
+
+          # Remove Azure CLI
+          sudo rm -rf /opt/az
+
+          # Remove CodeQL and other toolcaches
+          sudo rm -rf /opt/hostedtoolcache
+
+          docker system prune -af || true
+          docker builder prune -af || true
+          df -h
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: 'true'
+          persist-credentials: false
+
+      - name: Verify the Flutter pin matches .flutter-version
+        shell: bash
+        run: bash scripts/ci/check-flutter-pin.sh
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: '3.41.1'
+          channel: 'stable'
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: 17
+
+      - name: Setup Tools
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y ninja-build libgtk-3-dev libmpv-dev mpv ffmpeg
+
+      - name: Code Generation
+        run: |
+          cd $PROJECT_PATH
+          dart run scripts/codegen.dart
+
+      - name: Build debug APK smoke artifact
+        run: |
+          cd $PROJECT_PATH
+          # This workflow is a manual CI smoke build, not the public Android
+          # beta distribution path. Signed release APKs are produced by the
+          # maintainer release pipeline with local signing and Firebase config.
+          flutter build apk --debug --dart-define PLATFORM=android
+
+      - name: Gate coverage notice
+        if: always()
+        shell: bash
+        run: |
+          echo "This job compiles the Android Kotlin and Dart for the intergalactic"
+          echo "app in DEBUG configuration, including the Kotlin in"
+          echo "plugins/intergalactic_noise_suppression, which has no other compile"
+          echo "gate and no test surface anywhere in the repo."
+          echo "NOT COVERED: iOS/Swift, which is validated on-device by the maintainer"
+          echo "rather than in CI - a deliberate choice, not a gap. Hosted macOS"
+          echo "minutes bill at 10x and a simulator compile would prove strictly less"
+          echo "than a direct device install with logs."
+          echo "NOT COVERED: Release-only optimization or shrinking, signing, or"
+          echo "anything requiring Firebase configuration."

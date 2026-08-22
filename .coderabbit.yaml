@@ -1,0 +1,375 @@
+language: "en-US"
+
+reviews:
+  profile: "assertive"
+  request_changes_workflow: true
+  high_level_summary: true
+  review_status: true
+  collapse_walkthrough: false
+  poem: false
+  auto_review:
+    enabled: false
+    auto_incremental_review: false
+  auto_title_placeholder: "@coderabbitai"
+  path_instructions:
+    - path: "intergalactic/lib/**"
+      instructions: |
+        This is a Matrix client fork derived from Commet and evolving into Inter Galactic.
+        Preserve Matrix protocol semantics, Synapse compatibility, and end-to-end encryption behavior.
+        Do not recommend architectural changes that turn this into a non-Matrix app.
+        Prioritize:
+        - security
+        - null safety
+        - async/state correctness
+        - E2EE/session/device integrity
+        - message reliability
+        - cross-platform correctness for Android, Web, and Desktop
+        - minimal, high-impact fixes over broad rewrites
+
+        Pay special attention to:
+        - login/session restore flows
+        - crypto store persistence
+        - device ID reuse logic
+        - verification/trust flows
+        - notification handling
+        - media sending/rendering
+        - platform conditionals causing web/desktop/mobile drift
+        - fork/rename leftovers from Commet that may cause runtime or maintenance risk
+
+    - path: "intergalactic/android/**"
+      instructions: |
+        Review for Android release stability and security.
+        Focus on:
+        - manifest correctness
+        - notification integration
+        - background/foreground behavior
+        - native plugin configuration
+        - release build readiness
+        - permissions
+        - token leakage
+        - crash risks from configuration mismatch
+        - web/desktop assumptions accidentally leaking into Android code
+
+    - path: "intergalactic/web/**"
+      instructions: |
+        Review for Web/PWA stability and security.
+        Focus on:
+        - secure auth persistence
+        - storage/session persistence risks
+        - service worker and caching correctness
+        - push/notification limitations
+        - XSS/content rendering risks
+        - media/embed safety
+        - E2EE persistence edge cases in browser storage
+        - logout/session invalidation risks
+
+    - path: "intergalactic/windows/**"
+      instructions: |
+        Review for Desktop Windows release stability.
+        Focus on:
+        - packaging correctness
+        - startup crash risks
+        - path separator/path handling issues
+        - file access and local persistence
+        - platform-specific plugin/runtime issues
+        - config assumptions that may break release builds
+
+    - path: "intergalactic/linux/**"
+      instructions: |
+        Review for Desktop Linux stability.
+        Focus on:
+        - packaging/runtime assumptions
+        - filesystem/path issues
+        - plugin compatibility
+        - release stability
+        - local persistence/security
+
+    - path: "intergalactic/macos/**"
+      instructions: |
+        Review for Desktop macOS stability.
+        Focus on:
+        - packaging/runtime assumptions
+        - local persistence/security
+        - plugin compatibility
+        - release stability
+        - platform-specific native integration issues
+
+    - path: "intergalactic/ios/**"
+      instructions: |
+        Review for iOS release stability and safe native integration.
+        Focus on:
+        - launch screen and asset configuration
+        - background audio/call behavior
+        - permissions and Info.plist drift
+        - native plugin compatibility
+        - release build readiness
+        - platform-specific assumptions that can break iPhone or TestFlight builds
+
+    - path: "intergalactic/scripts/**"
+      instructions: |
+        Review build and release scripts for reliability and portability.
+        Focus on:
+        - fragile assumptions
+        - hardcoded paths
+        - environment drift
+        - release configuration safety
+        - accidental debug behavior in release flows
+        - Windows/WSL/Linux compatibility problems
+
+    - path: "tools/stream-lab/**"
+      instructions: |
+        Review stream-lab tooling as part of the streaming validation surface.
+        Focus on:
+        - reproducible capture/stream diagnostics
+        - stale path, helper, or artifact assumptions
+        - privacy-safe logs and reports
+        - failures that can hide degraded streaming behavior
+        - Windows shell/PowerShell portability
+
+    - path: "tools/stream-receiver-probe/**"
+      instructions: |
+        Review receiver-probe tooling as part of the streaming validation
+        surface. Focus on reproducible receiver diagnostics, privacy-safe
+        artifacts, local path redaction, robust PowerShell behavior, and
+        failures that can hide degraded streaming behavior.
+
+    - path: "tools/game-capture-target/**"
+      instructions: |
+        Review the game-capture target as part of the native streaming test
+        boundary. Focus on deterministic rendering, safe process behavior,
+        reliable diagnostics, and avoiding generated build-output drift.
+
+    - path: "windows_installer.iss"
+      instructions: |
+        Review the Windows installer script for packaging correctness, upgrade safety,
+        install path assumptions, and fork/rename leftovers from Commet.
+
+    - path: "intergalactic/pubspec.yaml"
+      instructions: |
+        Review dependencies for outdated or risky patterns, unnecessary bloat, plugin mismatches,
+        and cross-platform compatibility concerns. Flag packages that are likely to cause instability
+        or platform-specific release issues.
+
+    - path: "intergalactic/test/**"
+      instructions: |
+        Review tests for meaningful coverage of the changed behavior.
+        Flag stale expectations, brittle timing assumptions, missing regression assertions,
+        and tests that no longer exercise the security, Matrix, notification, calendar,
+        call/streaming, or cross-platform behavior they claim to cover.
+
+    - path: "plugins/intergalactic_game_capture/**"
+      instructions: |
+        Review this as shipped Windows native game-capture code, not as a sample
+        or optional reference. This plugin can affect screen/game streaming,
+        helper process launch, DLL loading, injected hook lifecycle, shared
+        texture handling, diagnostics, and release packaging.
+
+        Prioritize:
+        - crash risk and native resource lifetime
+        - helper/hook attach and teardown safety
+        - explicit developer/diagnostic gating before injection or hook behavior
+        - privacy boundaries around window titles, process IDs, paths, and logs
+        - fallback behavior when capture, helper, hook, or shared texture setup fails
+        - Windows release packaging of helper and hook binaries
+        - avoiding diagnostic-only behavior becoming the default user path
+
+    - path: "plugins/intergalactic_game_capture/lib/**"
+      instructions: |
+        Review the Dart plugin API as shipped app integration code. Confirm
+        that method-channel contracts, error handling, and capability reporting
+        stay synchronized with the Windows helper/hook implementation.
+
+    - path: "plugins/intergalactic_noise_suppression/**"
+      instructions: |
+        Review this as shipped native microphone-processing code. This plugin can
+        affect call audio, RNNoise gating, WebRTC capture callbacks, replay
+        tooling, diagnostics, and Windows release stability.
+
+        Prioritize:
+        - speech preservation, plosive handling, and fail-open behavior
+        - frame-size/sample-rate assumptions and resampler safety
+        - native buffer bounds, pointer lifetime, and thread safety
+        - init/shutdown lifecycle and preference/preset drift
+        - diagnostics privacy and redaction of local paths or captured samples
+        - replay fixture accuracy and tooling that can catch regressions
+
+    - path: "plugins/intergalactic_noise_suppression/lib/**"
+      instructions: |
+        Review the Dart plugin API and app-facing audio configuration bridge.
+        Confirm preset/preference updates, native lifecycle calls, fail-open
+        behavior, and platform gating remain synchronized with the native
+        RNNoise implementation.
+
+    - path: "plugins/**/windows/**"
+      instructions: |
+        Review Windows plugin native code for release stability, resource
+        cleanup, thread/process safety, DLL/runtime packaging, and platform
+        fallback behavior. Treat C++, CMake, PowerShell, and runner integration
+        files as part of the shipped app boundary.
+
+    - path: "plugins/**/tools/**"
+      instructions: |
+        Review plugin tools and replay/diagnostic helpers for correctness,
+        reproducibility, privacy-safe output, hardcoded local paths, and whether
+        tool failures can hide regressions in the native plugin.
+
+    - path: "plugins/**/test/**"
+      instructions: |
+        Review plugin tests for meaningful native/API regression coverage,
+        realistic fixtures, deterministic assertions, and protection against
+        silent audio, streaming, or platform-channel drift.
+
+    - path: "widgets/**"
+      instructions: |
+        Review in-repo widget packages as shipped app code.
+        Focus on Matrix widget protocol compatibility, event/state reconciliation,
+        public API stability, web compatibility, log/privacy safety, and test coverage.
+        These packages are consumed by the app and should not be treated as external examples.
+
+    - path: "tiamat/**"
+      instructions: |
+        Review the in-repo Tiamat UI package as shipped app UI infrastructure.
+        Focus on reusable component API stability, accessibility, layout
+        regressions, theme compatibility, and changes that can affect multiple
+        app surfaces.
+
+    - path: "plugins/**"
+      instructions: |
+        Review in-repo native/plugin packages as shipped app code.
+        Focus on Windows desktop release stability, native resource lifecycle,
+        audio/video safety, crash risk, privacy/logging boundaries, build-script
+        compatibility, and keeping diagnostic-only behavior out of default
+        release paths.
+
+    - path: ".github/**"
+      instructions: |
+        Review GitHub automation for release-readiness risk.
+        Focus on:
+        - least-privilege workflow permissions
+        - stale or local-only commands and paths
+        - accidental debug artifacts in release-facing jobs
+        - secret handling and log redaction
+        - platform coverage for Windows desktop, Android APK, iPhone TestFlight, and web beta
+        - PR and issue templates that ask for useful validation without exposing private data
+
+    - path: "README.md"
+      instructions: |
+        Review as a public beta landing document.
+        Flag:
+        - private infrastructure details or local developer paths
+        - stale platform claims
+        - overpromises about stability, privacy, security, stores, or release maturity
+        - missing beta caveats for Windows desktop, Android APK downloads, and iPhone TestFlight
+        - instructions that cannot work from a fresh clone
+
+    - path: "SECURITY.md"
+      instructions: |
+        Review for a safe public vulnerability-reporting process.
+        Flag:
+        - public disclosure paths for sensitive issues
+        - missing guidance to avoid tokens, recovery codes, private keys, private room IDs, or private infrastructure details
+        - unsupported claims about guarantees or response timelines
+        - gaps around update manifests, release artifacts, auth, account recovery, and E2EE handling
+
+    - path: "CONTRIBUTING.md"
+      instructions: |
+        Review for contributor clarity and release-safety.
+        Flag:
+        - setup commands that rely on machine-specific paths
+        - missing security-reporting routing
+        - missing testing and release-risk expectations
+        - guidance that conflicts with beta platform support or security-sensitive review expectations
+
+    - path: "*.md"
+      instructions: |
+        Review root-level Markdown docs as public-facing repository material.
+        Flag stale planning docs, private/local workspace references, obsolete
+        setup instructions, overbroad release/security/privacy claims, and
+        documents that should be archived rather than shipped in the public app repo.
+
+    - path: "docs/**"
+      instructions: |
+        Review docs for release-readiness and public-safety drift.
+        Distinguish internal coordination docs from public release notes.
+        Flag private infrastructure leakage, stale release claims, missing beta caveats,
+        and release instructions that omit update manifest, checksum, signing, rollback, or artifact validation where relevant.
+
+  path_filters:
+    - ".github/**"
+    - ".coderabbit.yaml"
+    - "README.md"
+    - "SECURITY.md"
+    - "CONTRIBUTING.md"
+    - "LICENSE"
+    - "FORK_NOTICE.md"
+    - "CODE_OF_CONDUCT.md"
+    - "*.md"
+    - "docs/architecture/**"
+    - "docs/design/**"
+    - "docs/policies/**"
+    - "docs/release/*.md"
+    - "docs/release/*.json"
+    - "intergalactic/lib/**"
+    - "intergalactic/android/**"
+    - "intergalactic/web/**"
+    - "intergalactic/windows/**"
+    - "intergalactic/linux/**"
+    - "intergalactic/macos/**"
+    - "intergalactic/ios/**"
+    - "intergalactic/scripts/**"
+    - "intergalactic/tool/**"
+    - "intergalactic/test/**"
+    - "intergalactic/pubspec.yaml"
+    - "intergalactic/analysis_options.yaml"
+    - "intergalactic/assets/**"
+    - "widgets/**"
+    - "tiamat/**"
+    - "plugins/**/lib/**"
+    - "plugins/**/test/**"
+    - "plugins/**/src/**"
+    - "plugins/**/include/**"
+    - "plugins/intergalactic_game_capture/**"
+    - "plugins/intergalactic_noise_suppression/**"
+    - "plugins/**/windows/**"
+    - "plugins/**/android/**"
+    - "plugins/**/ios/**"
+    - "plugins/**/linux/**"
+    - "plugins/**/macos/**"
+    - "plugins/**/web/**"
+    - "plugins/**/tools/**"
+    - "plugins/**/pubspec.yaml"
+    - "plugins/**"
+    - "tools/stream-lab/**"
+    - "tools/stream-receiver-probe/**"
+    - "tools/game-capture-target/**"
+    - "windows_installer.iss"
+    - "CHANGE_LOG.md"
+    - "!docs/release/evidence/**"
+    - "!plugins/intergalactic_noise_suppression/third_party/deepfilternet/models/**"
+    - "!plugins/intergalactic_noise_suppression/third_party/deepfilternet/windows/**/*.dll"
+    - "!plugins/intergalactic_noise_suppression/third_party/deepfilternet/windows/**/*.lib"
+    - "!plugins/intergalactic_noise_suppression/third_party/hush/**/*.tar.gz"
+    - "!intergalactic/build/**"
+    - "!intergalactic/dist/**"
+    - "!widgets/**/build/**"
+    - "!widgets/**/.dart_tool/**"
+    - "!plugins/**/build/**"
+    - "!plugins/**/windows/build/**"
+    - "!plugins/**/.dart_tool/**"
+    - "!tools/**/build/**"
+    - "!node_modules/**"
+    - "!intergalactic/.dart_tool/**"
+    - "!coverage/**"
+    - "!**/*.g.dart"
+    - "!**/*.freezed.dart"
+    - "!**/*.mocks.dart"
+    - "!**/generated_plugin_registrant.*"
+    - "!**/*.lock"
+
+chat:
+  auto_reply: false
+
+knowledge_base:
+  opt_out: false
+
+early_access: false

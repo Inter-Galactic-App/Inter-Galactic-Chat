@@ -1,0 +1,143 @@
+{
+  "schemaVersion": 1,
+  "generated_at": "2026-08-07T00:00:00Z",
+  "generated_by": "S&C",
+  "status": "DRAFT - NOT PUBLISHED. REVIEW owns placement and publication.",
+  "component": "Third-party components compiled into the Windows media playback library libmpv-2.dll",
+  "premise_correction": {
+    "task_premise": "libmpv-2.dll is a GPL build; produce GPL compliance materials for shipped releases 0.8.0+992 and 0.8.0+993.",
+    "finding": "The premise does not hold. The shipped DLL was built with -Dgpl=false and is LGPLv2.1-or-later.",
+    "authority": "The meson configure line embedded in the shipped binary itself; see evidence/mpv-meson-configure-line.txt and LICENCE-DETERMINATION.md.",
+    "effect": "No GPL obligation arises from libmpv for any shipped build. An LGPL obligation does arise, for all builds, and is currently unmet."
+  },
+  "applies_to": {
+    "binary": "libmpv-2.dll",
+    "sha256": "D5F0694B08C124E785D858D00082F3E3B158DD9138BFC48C0382BF1EB443A5FC",
+    "size_bytes": 29764622,
+    "mpv_version": "v0.36.0-403-g652a1dd907",
+    "mpv_licence": "LGPL-2.1-or-later",
+    "inner_ffmpeg_version": "n6.0",
+    "inner_ffmpeg_licence": "LGPL-3.0-or-later",
+    "provider": "media-kit/libmpv-win32-video-build, release 2023-09-24, mpv-dev-x86_64-20230924-git-652a1dd.7z",
+    "source_archive_md5": "a832ef24b3a6ff97cd2560b5b9d04cd8",
+    "source_archive_sha256": "DCE982222D7A23E4A1C6F0FB6CC39F6E899A6714624B95EA49CFF6558EE97572",
+    "dart_package": "media_kit_libs_windows_video 1.0.11",
+    "linkage": "mpv, FFmpeg and their dependencies are statically compiled into the DLL; the app dynamically loads the DLL",
+    "identical_across_releases": "Byte-identical in all 19 sampled Windows builds, 0.7.2+980 through 0.8.1+1001"
+  },
+  "derivation": {
+    "method": "Parsed the two configure lines recovered from the shipped binary itself: FFmpeg's configuration string and mpv's meson command line. Corroborated per component against distinctive data strings in the same binary.",
+    "evidence_paths": [
+      "evidence/ffmpeg-configure-line.txt",
+      "evidence/mpv-meson-configure-line.txt"
+    ],
+    "explicitly_not_used": "The build repository's packages/ directory. It catalogues 100+ package definitions including GPL-only ones (libdvdnav, libdvdread, x264, x265, avisynth-headers, libbluray) and others plainly not in this artefact (aom, libvpx, lame, opus, flac, curl, luajit). Membership of that directory is not evidence of presence in the binary.",
+    "flag_order_resolution": "The FFmpeg configure line contains both --enable-libmfx and, later, --disable-libmfx. FFmpeg's configure applies flags in order, so the later flag wins and libmfx is NOT enabled. Intel hardware support in this build comes from libvpl (oneVPL) instead. --disable-libuavs3d likewise excludes libuavs3d.",
+    "method_limits": "This build uses -Db_lto=true, -Wl,--gc-sections, --prefer-static and --enable-stripping. Internal symbol names do not survive; only data strings do. Presence of a distinctive data string is good evidence a component is in. Absence of a symbol name is NOT evidence a component is out. Absence of a data string is evidence only where a comparable control string is present. Confidence values below reflect this."
+  },
+  "licence_election": {
+    "ffmpeg_gpl": "disabled (--disable-gpl)",
+    "ffmpeg_nonfree": "disabled (--disable-nonfree)",
+    "ffmpeg_version3": "enabled (--enable-version3), elected to LGPLv3-or-later",
+    "version3_rationale": "mbedtls is Apache-2.0, incompatible with GPLv2 but compatible with the v3 family. The version3 election is what makes this component set coherent.",
+    "mpv_gpl": "false (-Dgpl=false)",
+    "mpv_gpl_gated_features_excluded": ["direct3d", "cdda", "dvbin", "dvdnav", "jack", "oss-audio", "caca", "x11"],
+    "gpl_only_components_enabled": 0,
+    "nonfree_components_enabled": 0
+  },
+  "ffmpeg_external_components": [
+    { "name": "libdav1d", "flag": "--enable-libdav1d", "licence": "BSD-2-Clause", "source_obligation": false, "confidence": "high", "evidence": "configure flag; binary strings 'libdav1d %s', 'src/libavcodec/libdav1d.c'" },
+    { "name": "libfreetype", "flag": "--enable-libfreetype", "licence": "FTL OR GPL-2.0-or-later", "source_obligation": false, "credit_required": true, "confidence": "high", "evidence": "configure flag; binary strings 'FT_Init_FreeType', 'Raster: FreeType %d.%d.%d'" },
+    { "name": "libfribidi", "flag": "--enable-libfribidi", "licence": "LGPL-2.1-or-later", "source_obligation": true, "confidence": "high", "evidence": "configure flag; binary string 'Shaper: FriBidi 1.0.13 (SIMPLE) HarfBuzz-ng %s (COMPLEX)'", "version_observed": "1.0.13" },
+    { "name": "libsoxr", "flag": "--enable-libsoxr", "licence": "LGPL-2.1-or-later", "source_obligation": true, "confidence": "high", "evidence": "configure flag; binary strings 'soxr_create', soxr option help text" },
+    { "name": "libspeex", "flag": "--enable-libspeex", "licence": "BSD-3-Clause", "source_obligation": false, "confidence": "high", "evidence": "configure flag; binary strings 'speex packet too small', 'Speex must be mono or stereo'" },
+    { "name": "libxml2", "flag": "--enable-libxml2", "licence": "MIT", "source_obligation": false, "confidence": "high", "evidence": "configure flag; 24 xmlParse* diagnostic strings in binary" },
+    { "name": "libzimg", "flag": "--enable-libzimg", "licence": "WTFPL", "source_obligation": false, "confidence": "high", "licence_confidence": "needs-verification", "evidence": "configure flag; binary strings 'zimg_filter_graph_build: %s'; build path src_packages/libzimg" },
+    { "name": "libwebp", "flag": "--enable-libwebp", "licence": "BSD-3-Clause", "source_obligation": false, "confidence": "high", "evidence": "configure flag; binary string 'libwebp'" },
+    { "name": "libvpl", "flag": "--enable-libvpl", "licence": "MIT", "source_obligation": false, "confidence": "high", "evidence": "configure flag; 84 oneVPL/MFX strings in binary, e.g. 'Use Intel(R) oneVPL to create MFX session'" },
+    { "name": "libshaderc", "flag": "--enable-libshaderc", "licence": "Apache-2.0", "source_obligation": false, "confidence": "high", "evidence": "configure flag; binary strings 'shaderc', 'shaderc output:'; build path src_packages/shaderc" },
+    { "name": "mbedtls", "flag": "--enable-mbedtls", "licence": "Apache-2.0", "source_obligation": false, "confidence": "high", "forces_version3": true, "evidence": "configure flag; 139 mbedtls_* strings in binary" },
+    { "name": "libjxl", "flag": "--enable-libjxl", "licence": "BSD-3-Clause", "source_obligation": false, "confidence": "medium", "evidence": "configure flag present; no distinctive data string recovered. Transitively pulls brotli (MIT) and highway (Apache-2.0), neither corroborated in the binary. Include unless a rebuild shows the jpegxl decoder was dropped by --disable-decoders." },
+    { "name": "libmysofa", "flag": "--enable-libmysofa", "licence": "BSD-3-Clause", "source_obligation": false, "confidence": "medium", "evidence": "configure flag present; no data string recovered. Its consumer is the sofalizer filter and the build uses --disable-filters, so it may be dead-stripped." },
+    { "name": "libbs2b", "flag": "--enable-libbs2b", "licence": "MIT", "source_obligation": false, "confidence": "medium", "evidence": "configure flag present; no data string recovered. Consumer is the bs2b filter and the build uses --disable-filters, so it may be dead-stripped." },
+    { "name": "zlib", "flag": "autodetected (not disabled)", "licence": "Zlib", "source_obligation": false, "confidence": "high", "version_observed": "1.2.13", "evidence": "binary strings 'inflate 1.2.13 Copyright 1995-2022 Mark Adler' and 'deflate 1.2.13 Copyright 1995-2022 Jean-loup Gailly and Mark Adler'" }
+  ],
+  "ffmpeg_header_only_components": [
+    { "name": "nv-codec-headers (ffnvcodec)", "flags": ["--enable-ffnvcodec", "--enable-cuda", "--enable-nvdec", "--enable-nvenc", "--enable-cuvid"], "licence": "MIT", "note": "Headers for NVIDIA runtimes loaded dynamically at run time; no NVIDIA binary is redistributed.", "confidence": "high", "evidence": "78 cuvid/NVENC call-site strings in binary" },
+    { "name": "AMF headers", "flag": "--enable-amf", "licence": "MIT", "note": "Headers for the AMD AMF runtime loaded dynamically; no AMD binary is redistributed.", "confidence": "medium", "evidence": "configure flag; no distinctive data string recovered" }
+  ],
+  "ffmpeg_excluded": [
+    { "name": "libmfx", "reason": "--enable-libmfx is overridden by a later --disable-libmfx on the same line; last flag wins" },
+    { "name": "libuavs3d", "reason": "--disable-libuavs3d" },
+    { "name": "bzip2", "reason": "--disable-bzlib" },
+    { "name": "iconv", "reason": "--disable-iconv (for FFmpeg; mpv may still use libiconv separately, see unresolved)" },
+    { "name": "vulkan", "reason": "--disable-vulkan" },
+    { "name": "vaapi / vdpau / videotoolbox / audiotoolbox", "reason": "explicitly disabled; not applicable to this target" }
+  ],
+  "system_apis_not_third_party_source": ["dxva2", "d3d11va"],
+  "mpv_components": [
+    { "name": "libass", "licence": "ISC", "source_obligation": false, "confidence": "high", "evidence": "binary strings 'libass', 'libass-version'; build path src_packages/libass" },
+    { "name": "harfbuzz", "licence": "MIT", "source_obligation": false, "confidence": "high", "evidence": "build path src_packages/harfbuzz/src/hb-*; 68 related strings" },
+    { "name": "libunibreak", "licence": "Zlib", "source_obligation": false, "confidence": "high", "evidence": "build path src_packages/libunibreak in binary" },
+    { "name": "lcms2", "licence": "MIT", "source_obligation": false, "confidence": "high", "meson": "-Dlcms2=enabled", "evidence": "build path src_packages/lcms2/src; binary string 'lcms2: %s'" },
+    { "name": "uchardet", "licence": "MPL-1.1 OR GPL-2.0-or-later OR LGPL-2.1-or-later", "source_obligation": true, "confidence": "high", "meson": "-Duchardet=enabled", "evidence": "binary strings 'uchardet', 'libuchardet detected charset as %s'", "note": "Tri-licensed. The project should elect and record which arm it relies on; MPL-1.1 or LGPL keeps the artefact consistent with its LGPL position." },
+    { "name": "libarchive", "licence": "BSD-2-Clause", "source_obligation": false, "confidence": "high", "evidence": "148 archive_* diagnostic strings in binary" },
+    { "name": "mujs", "licence": "ISC", "source_obligation": false, "credit_required": true, "confidence": "high", "licence_confidence": "high", "meson": "-Djavascript=enabled", "evidence": "binary strings 'javascript', 'Cannot initialize JavaScript'", "version_bound": "<= 1.3.3 (57e3f01d5f29, tagged 2023-01-10)", "version_bound_basis": "Build date of this artefact is on or about 2023-09-24, from its own 'libjpeg-turbo version 3.0.1 (build 20230924)' string. MuJS 1.3.4 (a76d157bdaa9) is dated 2023-11-21, after the build, so 1.3.3 is the highest tag that could be present.", "licence_verified_on": "2026-08-08", "licence_verified_by": "S&C", "licence_evidence": "COPYING at tag 1.3.3 is the ISC Licence, 'Copyright (c) 2013-2020 Artifex Software, Inc.', in both ccxvii/mujs and ArtifexSoftware/mujs. Every tag from 1.0.0 through 1.3.3 was checked and is likewise ISC, so an untagged snapshot between them does not change the answer.", "note": "SUPERSEDES an earlier 'FLAG AS AN OPEN LEGAL QUESTION / possibly AGPL-3.0' classification, which rested on an unbounded claim about modern MuJS and was not pinned to this artefact. The bound above cannot move with future upstream relicensing. Not claimed here: that MuJS is ISC-only as a project today - Artifex dual-licenses commercially, and that is an open legal question separate from this artefact." },
+    { "name": "libjpeg-turbo", "licence": "IJG AND BSD-3-Clause AND Zlib", "source_obligation": false, "credit_required": true, "confidence": "high", "version_observed": "3.0.1 (build 20230924)", "evidence": "binary string 'libjpeg-turbo version 3.0.1 (build 20230924)' with copyright line" },
+    { "name": "libpng", "licence": "libpng-2.0", "source_obligation": false, "credit_required": true, "confidence": "high", "version_observed": "1.6.41.git", "evidence": "binary strings 'libpng version 1.6.41.git' plus full copyright roster" },
+    { "name": "spirv-cross", "licence": "Apache-2.0", "source_obligation": false, "confidence": "high", "meson": "-Dspirv-cross=enabled", "evidence": "98 SPIRV_Cross_* strings in binary" },
+    { "name": "mingw-w64 runtime", "licence": "Zope Public Licence / public-domain-ish, per-file", "source_obligation": false, "confidence": "high", "evidence": "build path src_packages/mingw-w64 in binary", "note": "Toolchain runtime linked into the DLL. Named for completeness; commonly treated as a system/toolchain library rather than a redistributed component. Whether it belongs in the notice is an open question." }
+  ],
+  "mpv_excluded_by_meson": [
+    { "name": "lua / luajit", "reason": "-Dlua=disabled" },
+    { "name": "openal-soft", "reason": "-Dopenal=disabled" },
+    { "name": "vulkan", "reason": "-Dvulkan=disabled" },
+    { "name": "libplacebo", "reason": "-Dlibplacebo=disabled" },
+    { "name": "libdvdnav / libdvdread", "reason": "gpl-gated in mpv meson.build; excluded by -Dgpl=false" },
+    { "name": "vo_direct3d", "reason": "gpl-gated; excluded by -Dgpl=false. Confirmed absent: its description strings are missing while sibling VO description strings are present." }
+  ],
+  "unresolved": [
+    {
+      "item": "Build-definition commit does not match the artefact",
+      "detail": "packages/mpv.cmake at media-kit/libmpv-win32-video-build 0837d6b2eb declares -Dlua=enabled -Dopenal=enabled -Dvulkan=enabled -Dlibplacebo=enabled and contains no -Dgpl flag. The shipped binary says the opposite on all four and adds -Dgpl=false. That commit therefore did not produce this artefact, or overrides were applied outside the file.",
+      "impact": "Blocks citing a build definition in the Corresponding Source offer. Does not affect the licence determination, which rests on the binary.",
+      "needed": "Identify the commit or workflow run that produced release 2023-09-24, or reproduce the build and compare."
+    },
+    {
+      "item": "MuJS licence arm - RESOLVED 2026-08-08, retained so it is not re-opened",
+      "detail": "This entry previously read: 'JavaScript support is enabled and MuJS is present, but the MuJS version is not recoverable from the binary and MuJS changed from ISC to AGPL-3.0.' That is withdrawn. The version does not need to be read from the build definition, because it can be bounded by date: this artefact's own 'libjpeg-turbo version 3.0.1 (build 20230924)' string puts the build on or about 2023-09-24, and MuJS 1.3.4 is dated 2023-11-21, so 1.3.3 (2023-01-10) is the highest tag that could be present. Every tag from 1.0.0 through 1.3.3 is ISC. See the mujs component entry above for the full basis.",
+      "impact": "None. libmpv does not contain an AGPL component, and it does not depend on the build-definition gap.",
+      "needed": "Nothing for this artefact. Separately, and not blocking: a legal review may want a view on Artifex's commercial dual-licensing of MuJS as a project today."
+    },
+    {
+      "item": "libbluray presence",
+      "detail": "Not named on the recovered mpv meson line and not gpl-gated, so autodetection could have enabled it. The only 'bluray' string in the binary is 'pcm_bluray', which is an FFmpeg codec name and not libbluray.",
+      "impact": "Minor. Affects completeness of the component list.",
+      "needed": "Resolve with the build definition."
+    },
+    {
+      "item": "libiconv in mpv",
+      "detail": "FFmpeg has --disable-iconv, but mpv may link libiconv separately. One weak string hit ('iconv_open failed').",
+      "impact": "Minor. libiconv is LGPL-2.1 and would carry a source obligation.",
+      "needed": "Resolve with the build definition."
+    },
+    {
+      "item": "Per-component licence texts not yet collected",
+      "detail": "Licence identifiers above are stated from upstream knowledge, not from LICENSE files pulled at the exact shipped revisions. Entries marked licence_confidence needs-verification are the ones most worth checking first.",
+      "impact": "The notice cannot be published as final until the texts are collected.",
+      "needed": "Collect LICENSE files at the pinned revisions as part of assembling the corresponding-source archive."
+    }
+  ],
+  "counts": {
+    "ffmpeg_external_components": 15,
+    "ffmpeg_header_only": 2,
+    "mpv_components": 11,
+    "carrying_source_obligation": ["libfribidi", "libsoxr", "uchardet"],
+    "carrying_source_obligation_note": "Corrected 2026-08-08: 'mujs (if AGPL)' was removed from this list. MuJS is bounded to <= 1.3.3, which is ISC, so it is credit-required and carries no source obligation. See the mujs component entry and the resolved MuJS open_question.",
+    "credit_obligations": ["FreeType", "Independent JPEG Group / libjpeg-turbo", "libpng", "zlib"],
+    "gpl_only_enabled": 0,
+    "nonfree_enabled": 0,
+    "licence_texts_missing": 0,
+    "licence_texts_completeness_note": "Derived and recorded 2026-08-14 by S&C (the 'state the number, and if zero say so explicitly' item). Every libmpv component carrying a source/licence-text obligation has its licence document held: libfribidi (LGPL-2.1-or-later) and libsoxr (LGPL-2.1-or-later) have their COPYING captured under docs/release/evidence/license-sources/ and in the FFmpeg corresponding-source HOLDING; uchardet is tri-licensed (MPL-1.1 OR GPL-2.0-or-later OR LGPL-2.1-or-later) and is elected LGPL-2.1-or-later per docs/DECISIONS.md (2026-08-09 owner-decision on the five licence questions), so the 'supply a copy of this License' limb is satisfied by the LGPL-2.1 document already held via libfribidi/libsoxr. Missing set therefore = 0. Full derivation: docs/security/findings/FFMPEG_LIBMPV_LICENCE_TEXTS_COMPLETENESS_2026-08-14.md (workspace)."
+  }
+}

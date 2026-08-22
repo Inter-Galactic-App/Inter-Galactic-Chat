@@ -1,0 +1,254 @@
+
+# Native/platform build gate.
+#
+# WHY THIS RUNS ON pull_request AGAIN (2026-08-01, CI):
+# Every other check that runs automatically on a PR - static-analysis,
+# pr-validation, security-review, docs-secret-scan - is ubuntu-latest and
+# Dart-only, so for three months NO pipeline step compiled the Windows C++.
+# PR #56 merged ~600 lines of native code on 2026-07-31 with zero compile
+# validation.
+#
+# It was not always like this. build-windows used to run on pull_request and
+# SUCCEEDED on every one of its last runs (2026-05-03). The workflow went red
+# because the unrelated build-web job failed, and demoting the WHOLE workflow to
+# workflow_dispatch took the working native gate down with it. The gate was
+# collateral damage.
+#
+# So build-web now lives in its own file (build-web.yml). A web failure can
+# never again disable the native gate, because they are no longer the same
+# workflow run.
+#
+# build-android-debug moved out to build-android.yml on 2026-08-03 for the same
+# reason plus a second one: this file's paths filter is tuned for native C++ and
+# never listed *.kt, so the Android job could not have gated Kotlin from here
+# even after its dispatch-only guard was removed. Adding Kotlin paths here would
+# have fired this ~15-minute Windows job (billed at 2x) on every Kotlin change.
+# One workflow per gate, each with the filter and cost profile that suits it.
+#
+# NOTE ON FORGEJO: Forgejo Actions also reads .github/workflows/, and no Forgejo
+# runner matches `windows-2022`, so a native PR also creates a Forgejo run that
+# waits forever. That is deliberately NOT worked around here with a
+# forge-detection `if:` guard - a mis-evaluating guard would silently skip the
+# native gate on GitHub, which is the exact false-green this file exists to
+# prevent. Waiting Forgejo runs are proven harmless: they create no commit
+# status (verified 2026-08-01 - PR #60 carried exactly one status context while
+# three runs sat waiting) and the repo has no branch protections. Run-list
+# hygiene is tracked separately in the integration queue.
+
+name: build
+
+on:
+  workflow_dispatch:
+  # Paths filter: the Windows job is ~15 minutes, so it runs only when code it
+  # actually compiles changes. Deliberately broad - a false trigger costs 15
+  # minutes, a missed trigger costs an unvalidated native merge, which is the
+  # failure this gate exists to catch.
+  pull_request:
+    # DRAFT GUARD, added 2026-08-03 by REVIEW. `ready_for_review` must be listed
+    # explicitly: the default set is opened/synchronize/reopened, so without it a
+    # PR opened as a draft would never run this gate when marked ready.
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - '**/*.c'
+      - '**/*.cc'
+      - '**/*.cpp'
+      - '**/*.h'
+      - '**/*.hpp'
+      - '**/*.rc'
+      - '**/CMakeLists.txt'
+      - '**/*.cmake'
+      - 'intergalactic/windows/**'
+      - 'plugins/*/windows/**'
+      - 'plugins/*/macos/**'
+      - 'plugins/*/android/src/main/cpp/**'
+      # Plugin Dart APIs are the FFI surface. A signature change here compiles
+      # cleanly as Dart while no longer matching the native side, which is
+      # exactly the class of break the Dart gates cannot see.
+      - 'plugins/*/lib/**'
+      # Dependency changes add, remove or re-version plugins, and plugin set is
+      # what CMake generated-plugin registration is built from.
+      - 'intergalactic/pubspec.yaml'
+      - 'intergalactic/pubspec.lock'
+      - 'pubspec.yaml'
+      # DELIBERATELY NOT 'intergalactic/lib/**', though the external review
+      # asked for it. `flutter build windows` does compile app Dart, but a Dart
+      # compile error is already caught by Static Analysis and the Forgejo Dart
+      # gates, both of which run on every PR in minutes. Adding app sources here
+      # would fire a ~15-minute native job on nearly every pull request to
+      # re-catch what two faster gates already catch. The paths above are the
+      # ones that can break the NATIVE build while staying Dart-clean.
+      #
+      # Changing the gate itself must re-run the gate.
+      - '.github/workflows/build.yml'
+      # EXCLUDED ON PURPOSE, and this is not a nit. intergalactic_game_capture
+      # is NOT a dependency of the intergalactic app - it is a workspace package
+      # built only by tools/stream-lab/*.ps1. Verified 2026-08-01 by a clean
+      # local build: no plugins/intergalactic_game_capture directory appears
+      # under build/windows/x64/plugins, and no game-capture DLL is produced.
+      # Triggering this job on those files would spend 15 minutes compiling code
+      # unrelated to the change and then report a green "Windows native build"
+      # that never touched it - a false green, which is the exact failure this
+      # workflow exists to prevent. Negative patterns are evaluated last, so a PR
+      # touching game capture AND real app native code still runs.
+      # Game-capture native code is covered by the separate compile-only
+      # game-capture-native.yml workflow. Keep it out of this app build so each
+      # gate compiles exactly the native tree it claims.
+      - '!plugins/intergalactic_game_capture/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PROJECT_PATH: intergalactic
+
+jobs:
+  build-windows:
+    # Skipped while the PR is a draft. GitHub evaluates a pull_request `paths:`
+    # filter against the PR's WHOLE DIFF, not the individual push - so on a sync
+    # batch, which contains native, Kotlin and Dart files by definition, every
+    # gate matches on every push and the filters cannot help. Measured on PR #94:
+    # six pushes re-ran every heavy gate six times, ~636 billed minutes on one PR,
+    # about a third of a monthly allowance.
+    #
+    # Work the review rounds with the PR as a DRAFT, then mark it ready once. The
+    # gate then runs on the final state, which is the state that actually matters.
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
+    name: Windows native build
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: 'true'
+          persist-credentials: false
+
+      - name: Verify the Flutter pin matches .flutter-version
+        shell: bash
+        run: bash scripts/ci/check-flutter-pin.sh
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: '3.41.1'
+          channel: 'stable'
+
+      - name: Configure Flutter
+        run: flutter config --enable-windows-desktop --enable-windowing
+
+      - name: Code Generation
+        run: |
+          cd .\intergalactic
+          git config --global core.longpaths true
+          dart run scripts/codegen.dart
+
+      - name: Build Windows App
+        # --release. This step was --profile from 2026-08-01 to 2026-08-15. The
+        # constraint that forced it is gone, and the comment justifying it
+        # outlived its subject by two weeks while being wrong on every
+        # particular. Both are recorded here because the second failure is the
+        # one likely to repeat.
+        #
+        # WHAT THE OLD COMMENT CLAIMED, AND WHAT IS IN THE FILE NOW.
+        # It described intergalactic/windows/CMakeLists.txt as refusing a
+        # Release without ffmpeg.exe staged in windows/third_party/ffmpeg/bin,
+        # via a FATAL_ERROR when CMAKE_BUILD_TYPE is Release, a second one from
+        # an install(CODE) block when CMAKE_INSTALL_CONFIG_NAME is Release, and
+        # an ffprobe-specific EXISTS check - and it quoted the file as
+        # sanctioning non-Release builds because they "can use PATH fallback at
+        # runtime". Every word of that was accurate when written. None of it
+        # survived app PR #174 (`74058971`), which deleted the bundled FFmpeg
+        # and the whole guard with it. What stands in its place, at
+        # CMakeLists.txt:102-111, is ONE guard and it is the inverse:
+        #
+        #   set(INTERGALACTIC_WINDOWS_FFMPEG_DIR ".../third_party/ffmpeg/bin")
+        #   if(EXISTS "${INTERGALACTIC_WINDOWS_FFMPEG_DIR}")
+        #     file(GLOB INTERGALACTIC_WINDOWS_STALE_FFMPEG "${...}/*")
+        #     if(INTERGALACTIC_WINDOWS_STALE_FFMPEG)
+        #       message(FATAL_ERROR "FFmpeg binaries are staged in ... but
+        #         FFmpeg is no longer part of this app. Delete that directory;
+        #         shipping it would re-introduce the GPL obligation that
+        #         removing FFmpeg discharged.")
+        #
+        # Single, not two. Negative, not positive - it fires when the directory
+        # is NON-EMPTY, never when ffmpeg.exe is absent. Any file, not
+        # ffprobe.exe specifically. And it names neither CMAKE_BUILD_TYPE nor
+        # CMAKE_INSTALL_CONFIG_NAME, so it behaves identically for every build
+        # type. The PATH-fallback sentence exists nowhere in the file. The cited
+        # line numbers had drifted too: 114 is a comment about flutter_assets,
+        # and 135 is past the end of a 125-line file.
+        #
+        # A CI checkout does not contain that staging directory at all - the
+        # tracked tree under intergalactic/windows/ is .gitignore,
+        # CMakeLists.txt, flutter/ and runner/ - so EXISTS is false and the
+        # guard never evaluates its inner test.
+        #
+        # WHY A HOSTED RUNNER CAN DO THIS, from measurement rather than hope:
+        #  - Nothing Release-conditional is left to hit. Swept 2026-08-15 across
+        #    every tracked CMakeLists.txt and *.cmake in the repo: the only
+        #    config-conditional logic on the Windows side is
+        #    `$<$<CONFIG:Debug>:_DEBUG>` (line 45) and
+        #    `CONFIGURATIONS Profile;Release` on the AOT install rule (123-125),
+        #    which covers both. No plugin CMakeLists has any.
+        #  - The runner has already done the hard part. PR #90's --release run
+        #    on windows-2022 compiled for 506s with zero compile errors and only
+        #    then failed at INSTALL.vcxproj (MSB3073), at 14m44s against a
+        #    45-minute timeout. That run is itself the evidence that time and
+        #    disk suffice; the single step it could not finish is the one whose
+        #    cause has since been deleted.
+        #  - The Release install rules are the rules --profile has been running
+        #    green since 2026-08-01. The AOT rule is `CONFIGURATIONS
+        #    Profile;Release`; every other install() in the file is
+        #    unconditional.
+        #  - Nothing here is signing- or secret-gated. `flutter build windows`
+        #    does not sign, MSIX packaging is a separate msix:create step this
+        #    job never runs, and the only --dart-define is PLATFORM=windows.
+        #  - Run, not just reasoned - but NOT reproducibly from this file. The
+        #    supporting 2026-08-15 result came from a maintainer workstation
+        #    checkout, and a machine-local path cannot back a CI claim: nobody
+        #    reading this workflow can re-run it. The result itself (exit 0,
+        #    INSTALL.vcxproj completing where PR #90 hit MSB3073, and no
+        #    staged ffmpeg directory in the output) is recorded in
+        #    docs/release/release-record-v0.8.1.md, which is where dated
+        #    workstation evidence belongs. Treat that run's wall time as a
+        #    lower bound only; PR #90's own 506s of Release compilation is the
+        #    runner figure.
+        #
+        # WHAT RELEASE ADDS - and a correction to the old comment's stated cost.
+        # It said --profile gave up "a defect that only manifests under Release
+        # optimization flags". It never did: CMakeLists.txt:27-30 assign
+        # CMAKE_{C,CXX,EXE_LINKER,SHARED_LINKER}_FLAGS_PROFILE the value of
+        # their _RELEASE counterparts, so the native compile is flag-for-flag
+        # identical in the two configurations. The real delta is on the Dart
+        # side: the release AOT snapshot and release engine DLL rather than the
+        # profile ones, and release-only icon tree-shaking / font subsetting -
+        # a genuine failure class (a non-const IconData) that profile cannot
+        # see. That, plus the Release install path, is the coverage recovered.
+        #
+        # If a Release-only break appears here, that is the gate working. Do not
+        # revert this to --profile without first establishing that the cause is
+        # real and current in the file it names. Writing down a plausible reason
+        # and never re-reading it is exactly how the last one survived the
+        # deletion of its own subject.
+        run: |
+          cd .\intergalactic
+          flutter build windows --release --dart-define PLATFORM=windows
+
+      - name: Gate coverage notice
+        if: always()
+        shell: bash
+        run: |
+          echo "This job compiles the Windows C++ and Dart AOT for the intergalactic"
+          echo "app only, in RELEASE configuration, and runs the Release install"
+          echo "rules. It does NOT run integration tests, package or sign an"
+          echo "installer (MSIX/signtool are a separate release step), and does not"
+          echo "validate macOS/iOS/Linux native code."
+          echo "The patched libwebrtc overlay is NOT applied here: it lives outside"
+          echo "this repository and is a runtime concern, not a compile-time one."
+          echo "NOT COVERED BY THIS JOB: plugins/intergalactic_game_capture."
+          echo "It is not an app dependency, so this app build does not compile it."
+          echo "Use .github/workflows/game-capture-native.yml for that compile gate."

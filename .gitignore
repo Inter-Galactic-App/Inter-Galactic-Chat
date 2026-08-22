@@ -1,0 +1,135 @@
+
+commet/coverage/lcov.info
+intergalactic/coverage/lcov.info
+commet/assets/js/package/olm.js
+intergalactic/assets/js/package/olm.js
+commet/assets/js/package/olm.wasm
+intergalactic/assets/js/package/olm.wasm
+commet/assets/js/package/olm_legacy.js
+intergalactic/assets/js/package/olm_legacy.js
+commet/.vodozemac/
+intergalactic/.vodozemac/
+commet/assets/vodozemac/vodozemac_bindings_dart_bg.wasm
+intergalactic/assets/vodozemac/vodozemac_bindings_dart_bg.wasm
+commet/assets/vodozemac/vodozemac_bindings_dart.js
+intergalactic/assets/vodozemac/vodozemac_bindings_dart.js
+intergalactic/web/pkg/
+/.dart_tool
+**/.dart_tool/
+build/.last_build_id
+**/build/
+# Local build backups from recovery/migration (kept on disk, never tracked)
+**/build.bak-*/
+widgets/matrix_widget_api/build/.last_build_id
+widgets/calendar/android/local.properties
+.env
+.env.*
+!.env.example
+.vscode/settings.json
+.idea/
+/build
+commet-windows.zip
+widgets/localhost.crt
+widgets/localhost.key
+commet/integration_test/synapse/runtime/
+intergalactic/integration_test/synapse/runtime/
+commet/integration_test/synapse/data/localhost.signing.key
+intergalactic/integration_test/synapse/data/localhost.signing.key
+releases/*/windows/
+releases/*/*.zip
+dist/
+artifacts/
+intergalactic/android/.kotlin/
+coderabbit/
+*.sync-conflict-*
+.sync-conflict-*
+
+# Internal planning docs — not for public consumption
+SECURITY_REVIEW_PLAN.md
+UPDATES.md
+
+# Generated build artifact — produced by release workflow, not committed
+latest.json
+
+
+# Windows installer script — used by release.bat locally; generated inline in deploy.yml CI
+windows_installer.iss
+
+# Android signing — never commit these
+commet/android/key.jks
+intergalactic/android/key.jks
+commet/android/key.properties
+intergalactic/android/key.properties
+
+# Local Firebase configuration - generated per owner/app build.
+intergalactic/android/app/google-services.json
+intergalactic/android/app/src/debug/google-services.json
+intergalactic/android/app/src/release/google-services.json
+intergalactic/lib/firebase_options.dart
+
+# Generated local runtime output belongs under the workspace runtime folder.
+/runtime/
+
+# Local Codex/Dart validation state
+.codex/
+.codex_appdata/
+.codex_localappdata/
+
+# Machine-local Compound Engineering preferences
+.compound-engineering/*.local.yaml
+
+# Local Python bytecode caches
+__pycache__/
+**/__pycache__/
+
+# Operating-system metadata
+.DS_Store
+._*
+.AppleDouble
+.LSOverride
+Thumbs.db
+Desktop.ini
+
+# Editor and local workspace state
+*.swp
+*.swo
+*~
+.fleet/
+/.worktrees/
+
+# Syncthing local state and transient files
+.stfolder
+.stignore
+.syncthing.*.tmp
+
+# Native and platform build caches
+.cxx/
+.externalNativeBuild/
+.gradle/
+local.properties
+DerivedData/
+xcuserdata/
+*.xcuserstate
+Pods/
+.symlinks/
+Flutter/ephemeral/
+target/
+
+# Language and package-manager caches
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+node_modules/
+.npm/
+
+# Generated knowledge-graph output (graphify).
+# Regenerable from source with `graphify update .`, ~161 MB in this repo, and
+# this repository has a public mirror. It is a local navigation aid, not a
+# deliverable, so it stays untracked. AGENTS.md points agents at
+# intergalactic-app/inter-galactic/graphify-out/graph.json for app-code
+# questions - that still works, the file is simply not versioned.
+graphify-out/

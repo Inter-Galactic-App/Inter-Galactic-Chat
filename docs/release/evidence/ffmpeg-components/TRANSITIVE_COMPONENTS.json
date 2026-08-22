@@ -1,0 +1,685 @@
+{
+  "schemaVersion": 1,
+  "generated_at": "2026-08-09",
+  "generated_by": "S&C / REVIEW",
+  "status": "Tracked release evidence. Engineering licence/provenance evidence, not legal advice. Makes no claim about legal sufficiency.",
+  "what_this_is": [
+    "The layer BENEATH the 58-component inventory in this directory.",
+    "",
+    "`THIRD_PARTY_LICENSES.ffmpeg-components.json` enumerates what FFmpeg's",
+    "configure line names. It is complete for that scope and blind below it by",
+    "construction: a component that arrives as a dependency of an enabled",
+    "component has no --enable- flag of its own, so no configure-line parse and",
+    "no cross-check against FFmpeg configure's own EXTERNAL_LIBRARY_GPL_LIST can",
+    "ever see it.",
+    "",
+    "Two components had already surfaced that way - FFTW (GPL-2.0-or-later, via",
+    "chromaprint's FFT backend) and libudfread (LGPL-2.1-or-later, via libbluray).",
+    "Two instances is a class, not an incident. This file is the systematic pass."
+  ],
+  "applies_to": {
+    "binary": "intergalactic/windows/third_party/ffmpeg/bin/ffmpeg.exe",
+    "sha256": "C5C6E92D80884470A4D09C80A801989757DB1E80837E5018B636AF76DD826FEC",
+    "size_bytes": 173416960,
+    "ffmpeg_version": "n8.1.1-13-g83e8541aa6-20260613",
+    "provider": "BtbN FFmpeg Builds, autobuild-2026-06-13-13-31, win64-lgpl (static)",
+    "also_applies_to_ffprobe": "ffprobe.exe from the same release shares provider, revision and configure line. It was removed from the desktop payload by app PR #101 but shipped through 0.8.0+993, so the same component list runs to those recipients. See the inventory's applies_to.binaries_note."
+  },
+
+  "derivation": {
+    "route_1_name": "builder dependency graph",
+    "route_1_method": [
+      "BtbN's build is a graph of shell stages under `scripts.d/`. Each stage",
+      "declares `ffbuild_depends` (what it needs) and `ffbuild_enabled` (whether",
+      "it applies to this target/variant/FFmpeg version). `generate.sh` walks that",
+      "graph from the entry stage `scripts.d/zz-final.sh` and builds every enabled",
+      "stage it reaches. A stage that emits an `ffbuild_configure` flag becomes a",
+      "component on the FFmpeg configure line; a stage that emits none is built",
+      "into the same prefix and linked, but is invisible to the configure line.",
+      "",
+      "This pass reproduces that walk for TARGET=win64 VARIANT=lgpl ADDIN=8.1",
+      "(FFVER 801) at the builder commit recovered for the shipped build, and",
+      "reports the reached-and-enabled stages that emit no configure flag.",
+      "",
+      "The scripts are PARSED, never sourced or executed."
+    ],
+    "route_1_source": {
+      "repository": "https://github.com/BtbN/FFmpeg-Builds",
+      "commit": "a9410e4be2b332e535000004a8ebf304d9b46689",
+      "commit_confidence": "TIGHT INFERENCE, NOT PROOF. Last builder commit before the 2026-06-13T13:31Z build with zero commits in between. The artefact that would prove it - the release tag - was pruned by BtbN. Recovered and recorded by RELEASE PIPELINE; see docs/release/evidence/ffmpeg-shared-candidate/component-pins-SHIPPED-BUILD.json on branch agent/ffmpeg-shared-prov.",
+      "snapshot_url": "https://codeload.github.com/BtbN/FFmpeg-Builds/tar.gz/a9410e4be2b3",
+      "snapshot_sha256": "FB1B5ADCE1E50FFF727D3C4773C1238DCA58E40A1BE5C1E21337BD5D0B19EC43"
+    },
+    "route_2_name": "artefact string probe",
+    "route_2_method": [
+      "Search the shipped binary's bytes for markers that only that component's",
+      "own code would emit: vendor banners, assert source-file names, format",
+      "strings, mangled C++ symbol names. This is the route that caught FFTW, via",
+      "its wisdom-export format string `(fftw-3.3.11 fftw_wisdom `.",
+      "",
+      "Every marker used is recorded per component in `detection_markers` so the",
+      "probe is repeatable and so a gate has something concrete to test."
+    ],
+    "reproduce_with": "workspace:tools/release/Get-FfmpegTransitiveComponents.ps1",
+    "routes_disagree_policy": "Where the two routes disagree, BOTH are recorded and neither overrides the other. See `limits`."
+  },
+
+  "limits": [
+    "NEITHER ROUTE IS COMPLETE. This file names what was found, not everything that is there.",
+    "",
+    "Route 1 reports what the build scripts DECLARED at an inferred commit. It does",
+    "not observe the build container, and it cannot know what the linker kept: with",
+    "--gc-sections, LTO and stripping, an archive can be built into the prefix and",
+    "contribute nothing to the final image.",
+    "",
+    "Route 1 is also only one level deep in the way that matters. BtbN declares",
+    "dependencies at STAGE level; sub-scripts inside a directory stage all declare",
+    "only `base`, so the grouping is the dependency information. Below that, five",
+    "scripts fetch git submodules recursively and the vendored code they pull is",
+    "named nowhere in the pins - see `level_3_vendored_dependencies`.",
+    "",
+    "Route 2 cannot prove absence. Absence of a string is not absence of code: a",
+    "stripped C library with no diagnostics (serd, sord, zix, sratom) leaves no",
+    "marker even when fully linked, and a header-only dependency leaves none by",
+    "definition.",
+    "",
+    "Route 2 also cannot prove presence on its own. ffmpeg.exe embeds its entire",
+    "configure line and FFmpeg's own help text, so substrings such as `libdrm`,",
+    "`openssl` and `vorbis` occur as TEXT about components rather than as code from",
+    "them. Every `present` verdict below rests on a marker that FFmpeg's own text",
+    "does not contain; the raw substring counts are kept beside it so the",
+    "distinction stays auditable.",
+    "",
+    "Licence identifiers were read from the upstream licence file at the pinned",
+    "revision where one exists, which is a higher bar than the surrounding evidence",
+    "(the 58-component inventory is largely `classification_confidence: low`). It is",
+    "still an engineering reading of a licence file, not a legal determination."
+  ],
+
+  "summary": {
+    "transitive_components_found": 20,
+    "previously_recorded_by_bundle_generator": 9,
+    "newly_found_by_this_pass": 12,
+    "previously_recorded_but_not_in_this_build": 1,
+    "previously_recorded_but_not_in_this_build_components": ["xorg-macros"],
+    "with_source_availability_obligation": 2,
+    "with_source_availability_obligation_components": ["fftw3", "libudfread"],
+    "gpl_family": 2,
+    "gpl_family_components": ["fftw3", "mbedtls"],
+    "gpl_only": 1,
+    "gpl_only_components": ["fftw3"],
+    "new_source_obligations_introduced_by_this_pass": 0,
+    "headline_effect": [
+      "The inventory headline - 58 components / 42 attribution-only / 16 with a",
+      "source obligation / 0 GPL-only - DOES NOT CHANGE, and that is a real result",
+      "rather than a null one. All 12 newly found components are attribution-only,",
+      "so the obligation count does not move.",
+      "",
+      "What changes is the completeness claim underneath it. The transitive layer is",
+      "20 components, not 9; one of the 9 (xorg-macros) is linux-only and is not in",
+      "this build at all; and the two components that DO carry an obligation",
+      "(fftw3, libudfread) were already known before this pass.",
+      "",
+      "Stated plainly: the method was blind, the blindness was real and is now",
+      "measured, and on this particular build it happened to hide nothing new that",
+      "carries an obligation."
+    ]
+  },
+
+  "components": [
+    {
+      "name": "fftw3",
+      "upstream_project": "FFTW",
+      "upstream_url": "https://github.com/FFTW/fftw3",
+      "pinned_at": { "kind": "git-commit", "value": "5d0f4db2fc157867b7dc972b40418f171d77a6bc" },
+      "builder_script": "scripts.d/25-fftw3.sh",
+      "reaches_binary_via": "chromaprint (--enable-chromaprint), built with -DFFT_LIB=fftw3",
+      "license_id": "GPL-2.0-or-later",
+      "obligation_class": "source availability (GPL-family)",
+      "licence_confidence": "high - FFTW is a long-standing GPL project and the version string is in the binary",
+      "found_by": ["route-2", "route-1"],
+      "previously_recorded": true,
+      "detection_markers": {
+        "byte_strings": ["(fftw-3.3.11 fftw_wisdom ", "fftw_"],
+        "route2_verdict": "present",
+        "route2_counts": { "fftw_": 1015, "(fftw-3.3.11 fftw_wisdom": 1 }
+      },
+      "gate_must_fail_if_present": true,
+      "notes": "Disclosed by S&C on 2026-08-09 in docs/policies/SOURCE_OFFER.md and the third-party notices. This entry records the detection evidence, not the disclosure."
+    },
+    {
+      "name": "libudfread",
+      "upstream_project": "VideoLAN libudfread",
+      "upstream_url": "https://code.videolan.org/videolan/libudfread",
+      "pinned_at": { "kind": "git-commit", "value": "139a2194525f2745b98a98e4d8fa627d07440176" },
+      "builder_script": "scripts.d/45-libudfread.sh",
+      "reaches_binary_via": "libbluray (--enable-libbluray)",
+      "license_id": "LGPL-2.1-or-later",
+      "obligation_class": "attribution + source availability (LGPL-family)",
+      "licence_confidence": "low - carried over from the bundle definition, not re-fetched at the pin",
+      "found_by": ["route-1", "route-2"],
+      "previously_recorded": true,
+      "detection_markers": {
+        "byte_strings": ["udfread"],
+        "route2_verdict": "present",
+        "route2_counts": { "udfread": 88 }
+      },
+      "gate_must_fail_if_present": false,
+      "notes": "Static linkage engages the LGPL-2.1 s6 relink provision, as for every LGPL-family component in this binary."
+    },
+    {
+      "name": "libogg",
+      "upstream_project": "Xiph.Org libogg",
+      "upstream_url": "https://github.com/xiph/ogg",
+      "pinned_at": { "kind": "git-commit", "value": "06a5e0262cdc28aa4ae6797627a783b5010440f0" },
+      "builder_script": "scripts.d/25-libogg.sh",
+      "reaches_binary_via": "libvorbis, libtheora, libopenmpt",
+      "license_id": "BSD-3-Clause",
+      "obligation_class": "attribution-only",
+      "licence_confidence": "low - not re-fetched at the pin",
+      "found_by": ["route-1", "route-2"],
+      "previously_recorded": true,
+      "detection_markers": {
+        "byte_strings": ["Xiph.Org Foundation for libogg"],
+        "route2_verdict": "present",
+        "route2_counts": { "Xiph.Org Foundation for libogg": 1, "ogg_stream_": 0 }
+      },
+      "gate_must_fail_if_present": false,
+      "notes": "Symbol-shaped markers (`ogg_stream_`) return zero; the vendor banner is the only marker that survives stripping. A worked example of why a symbol probe alone under-reports."
+    },
+    {
+      "name": "libsamplerate",
+      "upstream_project": "libsamplerate (Secret Rabbit Code)",
+      "upstream_url": "https://github.com/libsndfile/libsamplerate",
+      "pinned_at": { "kind": "git-commit", "value": "2ccde9568cca73c7b32c97fefca2e418c16ae5e3" },
+      "builder_script": "scripts.d/45-libsamplerate.sh",
+      "reaches_binary_via": "sdl (--enable-sdl2) only",
+      "license_id": "BSD-2-Clause",
+      "obligation_class": "attribution-only",
+      "licence_confidence": "low - not re-fetched at the pin",
+      "found_by": ["route-1"],
+      "previously_recorded": true,
+      "detection_markers": {
+        "byte_strings": ["libsamplerate", "Secret Rabbit Code", "src_process"],
+        "route2_verdict": "absent",
+        "route2_counts": { "libsamplerate": 0, "Secret Rabbit Code": 0, "src_process": 0 }
+      },
+      "gate_must_fail_if_present": false,
+      "notes": "ROUTES DISAGREE, and the disagreement is explainable. libsamplerate's only path into ffmpeg.exe is SDL2, and SDL2 is independently recorded as NOT linked (zero SDL_* markers; SDL2 serves ffplay.exe, which this project does not ship). Route 1 says built, route 2 says not in the image, and the SDL2 finding says route 2 is probably right. Kept as built-not-linked rather than deleted."
+    },
+    {
+      "name": "libunibreak",
+      "upstream_project": "libunibreak",
+      "upstream_url": "https://github.com/adah1972/libunibreak",
+      "pinned_at": { "kind": "git-commit", "value": "3ce4bfa3129ff3738046a44a6db533d2ce25af2b" },
+      "builder_script": "scripts.d/45-libunibreak.sh",
+      "reaches_binary_via": "libass (--enable-libass)",
+      "license_id": "Zlib",
+      "obligation_class": "attribution-only",
+      "licence_confidence": "low - not re-fetched at the pin",
+      "found_by": ["route-1", "route-2"],
+      "previously_recorded": true,
+      "detection_markers": {
+        "byte_strings": ["unibreakdef.c", "linebreak.c"],
+        "route2_verdict": "present",
+        "route2_counts": { "unibreakdef.c": 1, "linebreak.c": 1 }
+      },
+      "gate_must_fail_if_present": false,
+      "notes": "Detected only by residual assert source-file names."
+    },
+    {
+      "name": "openssl",
+      "upstream_project": "OpenSSL",
+      "upstream_url": "https://github.com/openssl/openssl",
+      "pinned_at": { "kind": "git-tag", "value": "openssl-3.6.3" },
+      "builder_script": "scripts.d/25-openssl.sh",
+      "reaches_binary_via": "libssh, libsrt, libaribcaption",
+      "license_id": "Apache-2.0",
+      "obligation_class": "attribution-only",
+      "licence_confidence": "low - not re-fetched at the pin",
+      "found_by": ["route-1", "route-2"],
+      "previously_recorded": true,
+      "detection_markers": {
+        "byte_strings": ["OpenSSL 3."],
+        "route2_verdict": "present",
+        "route2_counts": { "OpenSSL 3.": 2, "OPENSSL_": 18 }
+      },
+      "gate_must_fail_if_present": false,
+      "notes": "Transitive on WINDOWS specifically. `scripts.d/25-openssl.sh`'s ffbuild_configure returns early for win* targets, so --enable-openssl is absent from the configure line while the library is still built and linked through its dependents. On a linux target the same component would be configure-named. A neat demonstration that 'transitive' is a property of the build, not of the project."
+    },
+    {
+      "name": "mingw-w64",
+      "upstream_project": "mingw-w64 runtime and import libraries",
+      "upstream_url": "https://www.mingw-w64.org/",
+      "pinned_at": { "kind": "git-commit", "value": "734e01d475c1caec5019d8b8eecd528524ff962a" },
+      "builder_script": "scripts.d/10-mingw.sh",
+      "reaches_binary_via": "toolchain (base stage)",
+      "license_id": "permissive (per-file; ZPL-2.1 / MIT / public domain)",
+      "obligation_class": "attribution-only",
+      "licence_confidence": "low - per-file terms, not re-fetched at the pin",
+      "found_by": ["route-1"],
+      "previously_recorded": true,
+      "detection_markers": {
+        "byte_strings": [],
+        "route2_verdict": "not-attempted",
+        "route2_counts": {}
+      },
+      "gate_must_fail_if_present": false,
+      "notes": "Already described in the inventory's toolchain_components. Recorded here too because it is a reached build stage; the two records are the same component seen from two directions."
+    },
+    {
+      "name": "mingw-std-threads",
+      "upstream_project": "mingw-std-threads",
+      "upstream_url": "https://github.com/meganz/mingw-std-threads",
+      "pinned_at": { "kind": "git-commit", "value": "c931bac289dd431f1dd30fc4a5d1a7be36668073" },
+      "builder_script": "scripts.d/10-mingw-std-threads.sh",
+      "reaches_binary_via": "toolchain (base stage)",
+      "license_id": "BSD-2-Clause",
+      "obligation_class": "attribution-only",
+      "licence_confidence": "low - not re-fetched at the pin",
+      "found_by": ["route-1"],
+      "previously_recorded": true,
+      "detection_markers": {
+        "byte_strings": ["mingw_stdthreads"],
+        "route2_verdict": "absent",
+        "route2_counts": { "mingw_stdthreads": 0 }
+      },
+      "gate_must_fail_if_present": false,
+      "notes": "Header-only. Route 2 silence is expected and is not evidence either way."
+    },
+
+    {
+      "name": "libpng",
+      "upstream_project": "libpng (PNG Reference Library)",
+      "upstream_url": "https://github.com/glennrp/libpng",
+      "pinned_at": { "kind": "git-commit", "value": "92c853c34e41570504baa48b8a8169e53b188324" },
+      "builder_script": "scripts.d/50-aribb24/25-libpng.sh",
+      "reaches_binary_via": "libaribb24 (--enable-libaribb24); built as part of the same directory stage",
+      "license_id": "libpng-2.0",
+      "obligation_class": "attribution-only",
+      "licence_confidence": "medium - header at the pinned revision states 'released under the libpng license'; the LICENSE file itself was not retrievable at that path",
+      "found_by": ["route-1", "route-2"],
+      "previously_recorded": false,
+      "detection_markers": {
+        "byte_strings": ["Application built with libpng-"],
+        "route2_verdict": "present",
+        "route2_counts": { "Application built with libpng-": 1, "libpng": 10, "png_": 73 }
+      },
+      "gate_must_fail_if_present": false,
+      "notes": "FFmpeg has no --enable-libpng; PNG support in FFmpeg is native. Every byte of libpng in this binary arrives through aribb24."
+    },
+    {
+      "name": "brotli",
+      "upstream_project": "Brotli",
+      "upstream_url": "https://github.com/google/brotli",
+      "pinned_at": { "kind": "git-commit", "value": "6312ee24cebbe329cee30fe12087469e3014442b" },
+      "builder_script": "scripts.d/50-libjxl/45-brotli.sh",
+      "reaches_binary_via": "libjxl (--enable-libjxl)",
+      "license_id": "MIT",
+      "obligation_class": "attribution-only",
+      "licence_confidence": "high - LICENSE read at the pinned revision",
+      "found_by": ["route-1", "route-2"],
+      "previously_recorded": false,
+      "detection_markers": {
+        "byte_strings": ["BrotliEncoderCreateInstance failed", "Brotli compression failed"],
+        "route2_verdict": "present",
+        "route2_counts": { "Brotli": 3 }
+      },
+      "gate_must_fail_if_present": false,
+      "notes": "Brotli's built-in text dictionary is also present in the image, which is corroborating but too generic to use as a marker."
+    },
+    {
+      "name": "lcms2",
+      "upstream_project": "Little CMS",
+      "upstream_url": "https://github.com/mm2/Little-CMS",
+      "pinned_at": { "kind": "git-commit", "value": "19e786a7feb79ea9387a1afe7cb11e72ee644d36" },
+      "builder_script": "scripts.d/50-libjxl/45-lcms2.sh",
+      "reaches_binary_via": "libjxl (--enable-libjxl)",
+      "license_id": "MIT",
+      "obligation_class": "attribution-only",
+      "licence_confidence": "high - LICENSE read at the pinned revision",
+      "found_by": ["route-1", "route-2"],
+      "previously_recorded": false,
+      "detection_markers": {
+        "byte_strings": ["plugin needs Little CMS "],
+        "route2_verdict": "present",
+        "route2_counts": { "Little CMS": 2, "lcms2": 0 }
+      },
+      "gate_must_fail_if_present": false,
+      "notes": "The obvious marker `lcms2` returns zero. The diagnostic string is the only thing that survives."
+    },
+    {
+      "name": "mbedtls",
+      "upstream_project": "Mbed TLS",
+      "upstream_url": "https://github.com/Mbed-TLS/mbedtls",
+      "pinned_at": { "kind": "git-tag", "value": "v4.1.0" },
+      "builder_script": "scripts.d/50-librist/40-mbedtls.sh",
+      "reaches_binary_via": "librist (--enable-librist), for its CSPRNG",
+      "license_id": "Apache-2.0 OR GPL-2.0-or-later",
+      "obligation_class": "attribution-only under the Apache-2.0 election",
+      "licence_confidence": "high - LICENSE read at the pinned tag; it states the dual grant in its first sentence",
+      "found_by": ["route-1"],
+      "previously_recorded": false,
+      "detection_markers": {
+        "byte_strings": ["mbedtls_ctr_drbg_seed"],
+        "route2_verdict": "inconclusive",
+        "route2_counts": { "mbedtls": 1, "ctr_drbg": 1, "psa_crypto": 0 }
+      },
+      "gate_must_fail_if_present": false,
+      "gate_note": "A GPL-family-name match on `mbedtls` must NOT fail a copyleft gate on its own. The grant is dual and the recipient elects; a gate that treats the GPL half as decisive would fail every build for a component that carries no copyleft obligation here.",
+      "notes": [
+        "THE MOST IMPORTANT NEW ENTRY, and the one most likely to be misread.",
+        "",
+        "Mbed TLS is offered under Apache-2.0 OR GPL-2.0-or-later - the recipient",
+        "chooses. Electing Apache-2.0 leaves attribution only. It is NOT a second",
+        "FFTW.",
+        "",
+        "It is worth naming anyway for three reasons. It is a GPL-family option",
+        "sitting inside an LGPL binary, so an automated scan will surface it and",
+        "someone will have to answer for it. `mbedtls` is on FFmpeg configure's own",
+        "EXTERNAL_LIBRARY_VERSION3_LIST, so a reader who checks that list will",
+        "assume it cannot be here - the list governs `--enable-mbedtls` as FFmpeg's",
+        "TLS backend, which is not what happened; librist pulled it in. And the",
+        "election should be recorded deliberately rather than left implicit.",
+        "",
+        "Route 2 is inconclusive: the single `mbedtls` hit is librist's own error",
+        "message naming the API it calls, which evidences the CALLER, not the",
+        "callee. Route 1 says the archive was built and librist links it for its",
+        "CSPRNG. Recorded as route-1-only rather than upgraded."
+      ]
+    },
+    {
+      "name": "lv2",
+      "upstream_project": "LV2 (the specification package)",
+      "upstream_url": "https://github.com/lv2/lv2",
+      "pinned_at": { "kind": "git-commit", "value": "3c57dae600a5ad8d05acd53ee3490f7d91cb7be6" },
+      "builder_script": "scripts.d/50-lilv/96-lv2.sh",
+      "reaches_binary_via": "lilv, which is what --enable-lv2 actually links",
+      "license_id": "ISC",
+      "obligation_class": "attribution-only",
+      "licence_confidence": "high - COPYING read at the pinned revision",
+      "found_by": ["route-1", "route-2"],
+      "previously_recorded": false,
+      "detection_markers": {
+        "byte_strings": ["http://lv2plug.in"],
+        "route2_verdict": "present",
+        "route2_counts": { "http://lv2plug.in": 48, "lv2_ (lowercase)": 5, "LV2_ (uppercase)": 1 }
+      },
+      "gate_must_fail_if_present": false,
+      "notes": "NAME COLLISION - read carefully. The 58-component inventory has an entry called `lv2`, which is the --enable-lv2 FLAG and is really lilv. This entry is the separate upstream LV2 specification package, a distinct repository with its own pin. They are not the same row."
+    },
+    {
+      "name": "serd",
+      "upstream_project": "serd",
+      "upstream_url": "https://github.com/drobilla/serd",
+      "pinned_at": { "kind": "git-commit", "value": "0317806d56f9288294183b41074a6fd50a924f5a" },
+      "builder_script": "scripts.d/50-lilv/96-serd.sh",
+      "reaches_binary_via": "lilv (--enable-lv2)",
+      "license_id": "ISC",
+      "obligation_class": "attribution-only",
+      "licence_confidence": "high - COPYING read at the pinned revision",
+      "found_by": ["route-1"],
+      "previously_recorded": false,
+      "detection_markers": {
+        "byte_strings": ["serd_"],
+        "route2_verdict": "absent",
+        "route2_counts": { "serd_ (lowercase)": 0, "SERD_ (uppercase)": 0 }
+      },
+      "gate_must_fail_if_present": false,
+      "notes": "ROUTES DISAGREE. lilv is confirmed linked (26 `lilv_` matches, 48 lv2plug.in URIs) and lilv cannot function without serd; the library is small and fully stripped. Recorded as route-1 present, route-2 silent."
+    },
+    {
+      "name": "sord",
+      "upstream_project": "sord",
+      "upstream_url": "https://github.com/drobilla/sord",
+      "pinned_at": { "kind": "git-commit", "value": "c9b049b3ac758cafe354cdf019422febd99abe45" },
+      "builder_script": "scripts.d/50-lilv/97-sord.sh",
+      "reaches_binary_via": "lilv (--enable-lv2)",
+      "license_id": "ISC",
+      "obligation_class": "attribution-only",
+      "licence_confidence": "high - COPYING read at the pinned revision",
+      "found_by": ["route-1"],
+      "previously_recorded": false,
+      "detection_markers": {
+        "byte_strings": ["sord_"],
+        "route2_verdict": "absent",
+        "route2_counts": { "sord_": 0 }
+      },
+      "gate_must_fail_if_present": false,
+      "notes": "Same disagreement as serd. Substring `sord` matches unrelated English text in the binary's data; only `sord_` is usable as a marker, and it is absent."
+    },
+    {
+      "name": "sratom",
+      "upstream_project": "sratom",
+      "upstream_url": "https://github.com/lv2/sratom",
+      "pinned_at": { "kind": "git-commit", "value": "9e8ee84eed502e6030ce8bb49694fd28542b08fc" },
+      "builder_script": "scripts.d/50-lilv/98-sratom.sh",
+      "reaches_binary_via": "lilv (--enable-lv2)",
+      "license_id": "ISC",
+      "obligation_class": "attribution-only",
+      "licence_confidence": "high - COPYING read at the pinned revision",
+      "found_by": ["route-1"],
+      "previously_recorded": false,
+      "detection_markers": {
+        "byte_strings": ["sratom_"],
+        "route2_verdict": "absent",
+        "route2_counts": { "sratom_": 0 }
+      },
+      "gate_must_fail_if_present": false,
+      "notes": "Same disagreement as serd."
+    },
+    {
+      "name": "zix",
+      "upstream_project": "zix",
+      "upstream_url": "https://github.com/drobilla/zix",
+      "pinned_at": { "kind": "git-commit", "value": "a4fab097251f8b8218d3838b40cce5ef39e56aaf" },
+      "builder_script": "scripts.d/50-lilv/96-zix.sh",
+      "reaches_binary_via": "lilv (--enable-lv2)",
+      "license_id": "ISC",
+      "obligation_class": "attribution-only",
+      "licence_confidence": "high - COPYING read at the pinned revision",
+      "found_by": ["route-1"],
+      "previously_recorded": false,
+      "detection_markers": {
+        "byte_strings": ["zix_"],
+        "route2_verdict": "absent",
+        "route2_counts": { "zix_": 0 }
+      },
+      "gate_must_fail_if_present": false,
+      "notes": "Not named anywhere before this pass. The inventory's lv2 entry says 'LV2 (with lilv / serd / sord / sratom)' - a prose acknowledgement of four of the five, with no pins and no licence verification. zix was missing from even that."
+    },
+    {
+      "name": "vulkan-headers",
+      "upstream_project": "Khronos Vulkan-Headers",
+      "upstream_url": "https://github.com/KhronosGroup/Vulkan-Headers",
+      "pinned_at": { "kind": "git-tag", "value": "v1.4.352" },
+      "builder_script": "scripts.d/47-vulkan/40-vulkan-headers.sh",
+      "reaches_binary_via": "the vulkan stage; consumed by libplacebo, whisper and the vulkan loader shim",
+      "license_id": "Apache-2.0 OR MIT",
+      "obligation_class": "attribution-only",
+      "licence_confidence": "high - LICENSE.md read at the pinned tag",
+      "found_by": ["route-1"],
+      "previously_recorded": false,
+      "detection_markers": {
+        "byte_strings": ["VK_HEADER_VERSION"],
+        "route2_verdict": "absent",
+        "route2_counts": { "VK_HEADER_VERSION": 0 }
+      },
+      "gate_must_fail_if_present": false,
+      "notes": "Headers only; contributes no object code, so route-2 silence is expected. Recorded because whether build-time-only material forms part of Corresponding Source is an open routed question, not because it is believed to be in the image."
+    },
+    {
+      "name": "spirv-cross",
+      "upstream_project": "Khronos SPIRV-Cross",
+      "upstream_url": "https://github.com/KhronosGroup/SPIRV-Cross",
+      "pinned_at": { "kind": "git-commit", "value": "38681a30e09679191cc3957719eeee76024f6daf" },
+      "builder_script": "scripts.d/47-vulkan/55-spirv-cross.sh",
+      "reaches_binary_via": "the vulkan stage; a candidate shader backend for libplacebo",
+      "license_id": "Apache-2.0",
+      "obligation_class": "attribution-only",
+      "licence_confidence": "high - LICENSE read at the pinned revision",
+      "found_by": ["route-1"],
+      "previously_recorded": false,
+      "detection_markers": {
+        "byte_strings": ["spirv_cross", "spvc_"],
+        "route2_verdict": "absent",
+        "route2_counts": { "spirv_cross": 0, "SPIRV-Cross": 0, "spvc_": 0 }
+      },
+      "gate_must_fail_if_present": false,
+      "notes": "Built into the prefix, but nothing in the image evidences it and libplacebo was configured against shaderc. Most likely built and not linked. Recorded as built, unconfirmed in the artefact - not asserted present."
+    },
+    {
+      "name": "spirv-headers",
+      "upstream_project": "Khronos SPIRV-Headers",
+      "upstream_url": "https://github.com/KhronosGroup/SPIRV-Headers",
+      "pinned_at": { "kind": "git-commit", "value": "8c5559c134abcf432ec59db842404087b9906c1a" },
+      "builder_script": "scripts.d/47-vulkan/60-spirv-headers.sh",
+      "reaches_binary_via": "the vulkan stage; consumed by shaderc (--enable-libshaderc)",
+      "license_id": "MIT-style Khronos grant (with an Apache-2.0 carve-out for some files)",
+      "obligation_class": "attribution-only",
+      "licence_confidence": "high - LICENSE read at the pinned revision",
+      "found_by": ["route-1"],
+      "previously_recorded": false,
+      "detection_markers": {
+        "byte_strings": ["add your source language to SPIRV-Headers"],
+        "route2_verdict": "inconclusive",
+        "route2_counts": { "SPIRV-Headers": 1 }
+      },
+      "gate_must_fail_if_present": false,
+      "notes": "The single hit is a diagnostic emitted by the SPIR-V toolchain that shaderc carries, so it evidences shaderc rather than these headers. Headers contribute no object code."
+    }
+  ],
+
+  "recorded_but_not_in_this_build": [
+    {
+      "name": "xorg-macros",
+      "recorded_in": "workspace:tools/release/corresponding-source-bundles.json -> transitiveBuildDependencies.components",
+      "finding": "NOT PRESENT in the win64-lgpl build.",
+      "evidence": "`scripts.d/10-xorg-macros.sh` opens its ffbuild_enabled with `[[ $TARGET != linux* ]] && return -1`. The base stage does declare it as a dependency, which is presumably why it was captured, but a declared dependency on a disabled stage builds nothing. The stage is reached and rejected.",
+      "action": "Should be dropped from the shipped build's transitive array, or kept with this evidence attached. Over-inclusion is the safe direction and costs only a directory, so this is a tidy-up rather than a defect."
+    }
+  ],
+
+  "level_3_vendored_dependencies": {
+    "_comment": [
+      "One level below the transitive layer, and only partly mapped. Five enabled",
+      "build scripts fetch git submodules recursively. Whatever those pull is",
+      "compiled in and is named in NO pin file, because BtbN pins the outer",
+      "repository and git pins the inner one.",
+      "",
+      "Route 2 found two of these independently, which is the clearest evidence in",
+      "this whole pass that the two routes are not redundant."
+    ],
+    "scripts_that_fetch_submodules": [
+      "scripts.d/50-libjxl/50-libjxl.sh  (explicitly third_party/highway only)",
+      "scripts.d/50-libplacebo.sh        (recursive, unrestricted)",
+      "scripts.d/50-zimg.sh              (recursive, unrestricted)",
+      "scripts.d/25-openssl.sh           (recursive, unrestricted)",
+      "scripts.d/50-librist/40-mbedtls.sh (recursive, unrestricted)"
+    ],
+    "identified": [
+      {
+        "name": "graphengine",
+        "vendored_by": "zimg (--enable-libzimg)",
+        "upstream_url": "https://github.com/sekrit-twc/graphengine",
+        "pinned_at": { "kind": "git-submodule-commit", "value": "f06d7cb4d589ea4657f01b13613efb7437c8ecda" },
+        "license_id": "WTFPL",
+        "obligation_class": "attribution-only",
+        "licence_confidence": "high - COPYING read at the pinned submodule commit",
+        "found_by": ["route-2", "route-1"],
+        "detection_markers": {
+          "byte_strings": ["N11graphengine4zimg"],
+          "route2_verdict": "present",
+          "route2_counts": { "graphengine (raw substring)": 18, "N11graphengine4zimg (marker)": 12 }
+        },
+        "notes": "Found in the artefact first, as mangled C++ symbol names, then confirmed against zimg's .gitmodules and the submodule pin at the build revision. Route 1 could see only that zimg fetches submodules; it could not name this."
+      },
+      {
+        "name": "ggml",
+        "vendored_by": "whisper.cpp (--enable-whisper)",
+        "upstream_url": "https://github.com/ggml-org/ggml",
+        "pinned_at": { "kind": "vendored-in-tree", "value": "carried inside whisper.cpp at 8443cf05e3fa8ce1b32348e1bcbcf8fc31f7f3ae" },
+        "license_id": "MIT",
+        "obligation_class": "attribution-only",
+        "licence_confidence": "medium - same MIT grant as whisper.cpp, not separately re-fetched",
+        "found_by": ["route-2"],
+        "detection_markers": {
+          "byte_strings": ["failed to create ggml context", "ggml_backend_set_n_threads"],
+          "route2_verdict": "present",
+          "route2_counts": { "ggml": 494 }
+        },
+        "notes": "Already acknowledged in prose by the inventory's whisper entry ('whisper.cpp (with ggml)'). Measured here rather than assumed."
+      },
+      {
+        "name": "highway",
+        "vendored_by": "libjxl (--enable-libjxl)",
+        "upstream_url": "https://github.com/google/highway",
+        "pinned_at": { "kind": "git-submodule-commit", "value": "457c891775a7397bdb0376bb1031e6e027af1c48" },
+        "license_id": "Apache-2.0",
+        "obligation_class": "attribution-only",
+        "licence_confidence": "high - LICENSE read at the pinned submodule commit",
+        "found_by": ["route-1"],
+        "detection_markers": {
+          "byte_strings": ["hwy::", "HWY_"],
+          "route2_verdict": "absent",
+          "route2_counts": { "hwy::": 0, "HWY_": 0, "highway": 1 }
+        },
+        "notes": "The single `highway` substring hit is a word inside Brotli's built-in text dictionary, not a Highway marker - a clean example of a false positive that a naive substring gate would have accepted. Highway is header-heavy and aggressively inlined, so absence of markers is uninformative."
+      }
+    ],
+    "unresolved": [
+      {
+        "scope": "libplacebo submodules",
+        "reason": "Fetched recursively and unrestricted. libplacebo's .gitmodules at the build revision lists nuklear, glad, jinja, markupsafe, Vulkan-Headers and fast_float. Which of those reach the compiled library (rather than only its demos or its code generators) was not determined, and none is pinned in any project record.",
+        "why_not_resolved": "Would require reproducing the meson configure to see which subprojects were used. Out of scope for a static pass; named so it is not mistaken for cleared."
+      },
+      {
+        "scope": "mbedtls submodules",
+        "reason": "v4.1.0 pulls `framework` and `tf-psa-crypto`. TF-PSA-Crypto is a separate repository carrying the crypto implementation, under the same dual Apache-2.0 OR GPL-2.0-or-later grant. Not separately pinned or verified.",
+        "why_not_resolved": "Its licence follows mbedtls's own dual grant, so the obligation answer does not change; the pin does not exist in any project record and should."
+      },
+      {
+        "scope": "openssl submodules",
+        "reason": "Fetched recursively. OpenSSL's submodules at 3.x are test/fuzz corpora rather than shipped code, so this is expected to be empty of obligations, but it was not verified at the pin.",
+        "why_not_resolved": "Low value relative to cost; recorded rather than silently assumed."
+      },
+      {
+        "scope": "level 4 and below",
+        "reason": "A vendored submodule may itself vendor. Nothing in this pass looks below level 3.",
+        "why_not_resolved": "There is no declared data for it at any level; each step down costs a full reproduction of the dependent's build. The honest position is that the depth is bounded by effort, not by evidence."
+      }
+    ],
+    "sc_obligation_assessment_2026_08_14": {
+      "by": "S&C",
+      "verdict": "The unresolved level-3 sets are a RECORD-completeness gap (unrecorded git-submodule pins), not a compliance gap. On the evidence available, none of them introduces a new or stronger obligation than what is already disclosed and published, so no source archive or notice is missing on their account. What is genuinely open is (a) capturing the pins, and (b) confirming which subprojects reach the shipped library - both of which need a meson/cmake reproduction and are out of scope for a static pass.",
+      "per_set": [
+        "identified (graphengine WTFPL, ggml MIT, highway Apache-2.0): all attribution-only, recorded; no source obligation.",
+        "libplacebo submodules (nuklear, glad, jinja, markupsafe, Vulkan-Headers, fast_float): all attribution-family licences (MIT / BSD / Apache-2.0 / public-domain-equivalent). No LGPL/GPL member, so the unresolved 'which reach the compiled library' question can only change WHICH attribution applies, never whether a copyleft or source obligation arises.",
+        "mbedtls submodules (framework, tf-psa-crypto): tf-psa-crypto follows mbedtls's own dual Apache-2.0 OR GPL-2.0-or-later grant, so the obligation is unchanged. Concrete record action: capture the tf-psa-crypto submodule pin at the build revision so it exists in a project record.",
+        "openssl submodules: 3.x submodules are test/fuzz corpora, not shipped code, so no obligation is expected; unverified at the pin, recorded rather than assumed.",
+        "level 4+: not examined; bounded by effort, not evidence."
+      ],
+      "residual_actions": [
+        "RELEASE PIPELINE / build repro: record the tf-psa-crypto submodule pin and, if a meson/cmake reproduction is ever run for libplacebo/openssl, capture which subprojects were used.",
+        "No notice or source publication is blocked by this item."
+      ],
+      "disclaimer": "Engineering licence/provenance evidence, not legal advice."
+    }
+  },
+
+  "corrections_to_the_component_inventory": [
+    {
+      "target": "components[] entry `vulkan`",
+      "current_text": "upstream_project: 'Khronos Vulkan-Headers / Vulkan-Loader', upstream_url: KhronosGroup/Vulkan-Headers, license_id: Apache-2.0",
+      "finding": "The loader actually linked is not Khronos's. `scripts.d/47-vulkan/45-vulkan-loader.sh` pins https://github.com/BtbN/Vulkan-Shim-Loader at 65b3936528cd92eb4ea3de485d03f858a3850484 - the builder's own shim, MIT, Copyright 2025 Timo Rothenpieler. Verified by reading its LICENSE at the pinned commit.",
+      "obligation_effect": "None. MIT and Apache-2.0 are both attribution-only.",
+      "action": "APPLIED into components[] on 2026-08-14 by S&C at the owner's/REVIEW's request: the `vulkan` entry in THIRD_PARTY_LICENSES.ffmpeg-components.json now names BtbN Vulkan-Shim-Loader (65b3936528cd92eb4ea3de485d03f858a3850484), MIT, Copyright 2025 Timo Rothenpieler. NOTE for RELEASE PIPELINE: if the bundle generator re-asserts components[] against the configure line, teach it these corrected metadata values so a regeneration does not restore the Khronos/Apache-2.0 attribution (the configure line says only `--enable-vulkan` and does not assert the loader identity)."
+    }
+  ],
+
+  "open_questions_not_answered_here": [
+    "Whether build-time-only material (header packages, autoconf macros, code generators) forms part of Corresponding Source. Already routed; unchanged by this pass.",
+    "Whether the LGPL-2.1 s6 / LGPL-3 s4 relink provision, which static linkage engages for every LGPL-family component, is satisfiable for this binary at all. Unchanged by this pass.",
+    "Whether any of the above is legally sufficient. This file makes no such claim."
+  ]
+}

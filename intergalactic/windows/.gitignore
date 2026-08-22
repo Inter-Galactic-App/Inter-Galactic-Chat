@@ -1,0 +1,25 @@
+flutter/ephemeral/
+
+# Visual Studio user-specific files.
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Visual Studio build-related files.
+x64/
+x86/
+
+# Visual Studio cache files
+# files ending in .cache can be ignored
+*.[Cc]ache
+# but keep track of directories ending in .cache
+!*.[Cc]ache/
+
+# FFmpeg is no longer bundled (2026-08-15). These patterns stay so a leftover
+# staged binary on an existing checkout is not accidentally committed; the
+# Windows CMakeLists now FATAL_ERRORs if this directory is non-empty, which is
+# what actually stops it shipping again.
+third_party/ffmpeg/bin/*.exe
+third_party/ffmpeg/bin/*.dll
+third_party/ffmpeg/bin/*.pdb

@@ -1,0 +1,17 @@
+*.json -text -diff
+*.txt -text -diff
+crate-license-texts/** -text -diff
+
+# These ten copied upstream notice files include the upstream terminal blank
+# line. Keep the bytes intact while suppressing only that diff-check warning;
+# every other whitespace class remains checked normally.
+crate-license-texts/crc32fast-1.4.0/LICENSE-APACHE whitespace=-blank-at-eof
+crate-license-texts/linux-raw-sys-0.4.13/LICENSE-Apache-2.0_WITH_LLVM-exception whitespace=-blank-at-eof
+crate-license-texts/rustfft-6.2.0/LICENSE-APACHE whitespace=-blank-at-eof
+crate-license-texts/rustix-0.38.34/LICENSE-Apache-2.0_WITH_LLVM-exception whitespace=-blank-at-eof
+crate-license-texts/scan_fmt-0.2.6/LICENSE whitespace=-blank-at-eof
+crate-license-texts/strength_reduce-0.2.4/LICENSE-APACHE whitespace=-blank-at-eof
+crate-license-texts/tinyvec_macros-0.1.1/LICENSE-APACHE.md whitespace=-blank-at-eof
+crate-license-texts/tinyvec_macros-0.1.1/LICENSE-ZLIB.md whitespace=-blank-at-eof
+crate-license-texts/zerocopy-0.7.33/LICENSE-APACHE whitespace=-blank-at-eof
+crate-license-texts/zerocopy-0.7.33/LICENSE-MIT whitespace=-blank-at-eof

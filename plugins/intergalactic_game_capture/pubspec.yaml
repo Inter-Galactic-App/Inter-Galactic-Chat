@@ -1,0 +1,14 @@
+name: intergalactic_game_capture
+description: Debug-only native D3D11 game-capture POC for Inter Galactic.
+publish_to: none
+version: 0.0.1
+
+environment:
+  sdk: '>=3.6.0 <4.0.0'
+  flutter: '>=3.24.0'
+
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
