@@ -1,0 +1,907 @@
+{
+  "schemaVersion": 1,
+  "generated_at": "2026-08-14T21:58:03Z",
+  "generated_by": "RELEASE PIPELINE via tools/release/Get-CorrespondingSourceHolding.ps1",
+  "bundle_id": "btbn-ffmpeg-win64-n8.1.1-13-g83e8541aa6",
+  "status": "Tracked release evidence. Engineering provenance, not legal advice. Records which source corresponds to the shipped binary, at which upstream commit, and with what digest. The archives it names were published at https://app.ourgalaxy.space/source/ on 2026-08-09 under GPL-3 6(d); this file is the tracked half and is not itself a publication record. It said NOTHING HERE IS PUBLISHED until 2026-08-09, which stopped being true the day the archives went live - the string is generated, so it had to change here or every regeneration would restore it.",
+  "what_this_is": [
+    "One archive per component carrying a source-availability obligation, cut at the",
+    "exact upstream commit the shipped binary was built from, published",
+    "beside the binaries. This file is the tracked half: the commit, the digest, the",
+    "size, and the licence text captured at that same commit.",
+    "",
+    "THE MODEL CHANGED ON 2026-08-09 AND THIS RECORD REFLECTS THE CORRECTED ONE.",
+    "The earlier plan was to hold the source privately and satisfy requests for it.",
+    "S&C read the clauses - docs/security/findings/SOURCE_OFFER_MODEL_CLAUSE_VERIFICATION_2026-08-09.md -",
+    "and found the written-offer routes in GPL-3 6(a) and 6(b) both begin \"Convey the",
+    "object code in, or embodied in, a physical product\". These binaries are",
+    "downloads. Those routes are unavailable, not merely unmet. 6(d) is what is left,",
+    "and it asks for \"equivalent access to the Corresponding Source in the same way",
+    "through the same place\" - which on-request delivery is not. This binds",
+    "ffmpeg.exe itself, LGPL-3.0-or-later through --enable-version3.",
+    "",
+    "So these archives were published to /source/, next to the binaries, the way",
+    "the four archives already there were. Publication was an owner/OPERATIONS",
+    "action and happened on 2026-08-09; publication.state below records it.",
+    "",
+    "The staged bytes live outside git. That is only acceptable because of this file:",
+    "every archive is refetchable from the upstream URL and commit SHA recorded here,",
+    "and the digest says whether what came back is the same source. Lose the staging",
+    "and it is rebuildable; lose this file and it is not."
+  ],
+  "publication": {
+    "state": "PUBLISHED 2026-08-09 at https://app.ourgalaxy.space/source/. Updated from STAGED, NOT PUBLISHED on the day the archives went live: this string is generated, so leaving it would have restored the stale claim on the next regeneration.",
+    "destination": "the same place the binaries are served from - the /source/ directory alongside ffmpeg-n8.1.1-13-g83e8541aa6-source.tar.gz, mpv-v0.36.0-403-g652a1dd907-source.tar.gz and ffmpeg-n6.0-source.tar.gz",
+    "staging_path": "Corresponding_Source/source/  (workspace root; flat, mirroring the destination so publishing is a copy)",
+    "basis": "GPL-3 6(d) / LGPL-2.1 6(d) / GPL-2 3 closing paragraph / MPL-2.0 3.2(a) - equivalent access from the same place. See docs/security/findings/SOURCE_OFFER_MODEL_CLAUSE_VERIFICATION_2026-08-09.md.",
+    "who_publishes": "owner / OPERATIONS. This script has no upload path and must not acquire one.",
+    "total_bytes": 21601212.0,
+    "in_git": false,
+    "why_not_in_git": "Upstream source archives. Tracking them would weigh down every clone of the workspace repo for material that is byte-for-byte refetchable from the pins in this file.",
+    "durability": "NOT one of the disposable roots named in AGENTS.md (runtime/, docs/logs/, release-logs/, dist/, references/, Desktop_Builds/). Registered in docs/agent-control/workspace-layout-guide.md, declared Advisory in tools/quality/Assert-DurablePointers.ps1 so a durable record citing it says so out loud, and carries its own README.",
+    "retention": "GPL-3 6(d): \"you remain obligated to ensure that it is available for as long as needed to satisfy these requirements.\" Retention is a licence condition once published, not a convenience.",
+    "rebuild_command": "pwsh tools/release/Get-CorrespondingSourceHolding.ps1 -Mode Fetch",
+    "verify_command": "pwsh tools/release/Get-CorrespondingSourceHolding.ps1 -Mode Verify"
+  },
+  "summary": {
+    "components_in_scope": 18,
+    "resolved_to_exact_revision": 18,
+    "source_staged": 18,
+    "licence_texts_captured": 27.0,
+    "licence_texts_missing": 0,
+    "pins_between_releases": 16,
+    "version_claims_checked": 8,
+    "version_claims_that_are_the_pinned_source": 1,
+    "version_claims_that_are_NOT_the_pinned_source": 7,
+    "with_problems": 0,
+    "staged_bytes": 21601212.0
+  },
+  "pin_vs_release_note": [
+    "A pinned commit that carries no upstream tag means no release tarball is this",
+    "source. fftw3 is the worked example: it is pinned five commits after the",
+    "fftw-3.3.11 tag while the binary self-reports fftw-3.3.11, so publishing the",
+    "3.3.11 release tarball would publish source that was not what was compiled.",
+    "The check is run for every component here rather than that one, and the",
+    "summary above says how often it comes back the same way.",
+    "",
+    "version_claim_check is the sharper form of the same question. Where a version",
+    "was recovered from the shipped binary and corroborated against the builder pin,",
+    "that agreement is about the VERSION, not about the source: it does not mean the",
+    "pinned commit is the release. Each such claim is measured against its upstream",
+    "tag here, in commits."
+  ],
+  "licence_texts_missing": [],
+  "licence_texts_note": [
+    "summary.licence_texts_missing is the number of components holding NO",
+    "licence text; the array above names them. Zero means every component in",
+    "scope carries at least one text captured at its own pinned commit, which",
+    "is the stronger evidence: a licence can change between revisions, so a",
+    "generic SPDX copy is not proof of what shipped with that source.",
+    "",
+    "Zero here is a MEASUREMENT taken on this run, not a standing fact. It is",
+    "recomputed every time and will go non-zero the moment a component is",
+    "added whose pinned commit has no licence-bearing file at its root, which",
+    "is exactly when someone needs to be told.",
+    "",
+    "Scope note: this counts the components in THIS record. It is not a claim",
+    "about transitive or vendored dependencies, whose licence texts are",
+    "tracked where those dependencies are enumerated, not here."
+  ],
+  "components": [
+    {
+      "component": "iconv",
+      "origin": "configure-line component",
+      "licence_id_claimed": "LGPL-2.1-or-later",
+      "upstream_url": "https://git.savannah.gnu.org/git/libiconv.git",
+      "builder_script": "scripts.d/20-libiconv.sh",
+      "pin_as_recorded": {
+        "kind": "git-commit",
+        "value": "9d19c66d0a1768cffcf497b2db70bf4018b578d7"
+      },
+      "resolution_required": false,
+      "resolution_method": "git fetch --depth 1 of the pinned SHA directly from upstream",
+      "resolved_commit": "9d19c66d0a1768cffcf497b2db70bf4018b578d7",
+      "commit_date": "2026-03-26T16:39:03+01:00",
+      "release_tag_at_pin": null,
+      "upstream_tag_count": 33,
+      "pin_vs_release": "BETWEEN RELEASES - upstream publishes 33 tags and the pinned commit is not one of them, so no release tarball is this source",
+      "version_claimed": null,
+      "version_claim_check": null,
+      "held_source": {
+        "archive_name": "iconv-g9d19c66d0a17-source.tar.gz",
+        "size_bytes": 4671634,
+        "sha256": "AFC34E064C7AA101978FECE872F85B7D87F9E8F06946B9F0C1E09DD09FCAE67A",
+        "produced_by": "git archive --format=tar.gz --prefix=iconv-9d19c66d0a17/ 9d19c66d0a1768cffcf497b2db70bf4018b578d7",
+        "eol_check": "VERIFIED - 'COPYING' matches its upstream blob byte-for-byte (35147 bytes), so git archive applied no eol conversion",
+        "eol_check_note": "Compares one licence file's size in the object database against the same file extracted from the produced archive. Equal means git archive applied no eol conversion. Archives produced before 2026-08-14 were CRLF-converted and predate this check entirely.",
+        "digest_note": "Digest of the archive as produced on this machine. The authoritative identity of the source is the commit SHA above; gzip output is not guaranteed byte-identical across git/zlib versions, so a differing digest on a re-archive of the same commit is not a mismatch of the source."
+      },
+      "licence_texts": [
+        {
+          "upstream_path": "COPYING",
+          "retrieved_from": "https://git.savannah.gnu.org/git/libiconv.git @ 9d19c66d0a1768cffcf497b2db70bf4018b578d7",
+          "evidence_path": "docs/release/evidence/license-sources/iconv/COPYING.at-9d19c66d0a17.txt",
+          "size_bytes": 35147,
+          "sha256": "8CEB4B9EE5ADEDDE47B31E975C1D90C73AD27B6B165A1DCD80C7C545EB65B903"
+        },
+        {
+          "upstream_path": "COPYING.LIB",
+          "retrieved_from": "https://git.savannah.gnu.org/git/libiconv.git @ 9d19c66d0a1768cffcf497b2db70bf4018b578d7",
+          "evidence_path": "docs/release/evidence/license-sources/iconv/COPYING.LIB.at-9d19c66d0a17.txt",
+          "size_bytes": 26419,
+          "sha256": "20E50FE7AAE3E56378EBF0417D9DE904F55A0E61E4DF315333E632A4D3555D95"
+        }
+      ],
+      "problems": []
+    },
+    {
+      "component": "libfribidi",
+      "origin": "configure-line component",
+      "licence_id_claimed": "LGPL-2.1-or-later",
+      "upstream_url": "https://github.com/fribidi/fribidi.git",
+      "builder_script": "scripts.d/25-fribidi.sh",
+      "pin_as_recorded": {
+        "kind": "git-commit",
+        "value": "5c85a174650ab8ef106ce85f13bcf2950d3fc65f"
+      },
+      "resolution_required": false,
+      "resolution_method": "git fetch --depth 1 of the pinned SHA directly from upstream",
+      "resolved_commit": "5c85a174650ab8ef106ce85f13bcf2950d3fc65f",
+      "commit_date": "2026-04-13T22:09:20+03:00",
+      "release_tag_at_pin": null,
+      "upstream_tag_count": 23,
+      "pin_vs_release": "BETWEEN RELEASES - upstream publishes 23 tags and the pinned commit is not one of them, so no release tarball is this source",
+      "version_claimed": "1.0.16",
+      "version_claim_check": {
+        "claimed_version": "1.0.16",
+        "upstream_tag_for_version": "v1.0.16",
+        "tag_commit": "9123b467f080c7ea15509bd7cbd457817544a7e1",
+        "commits_ahead_of_tag": 4,
+        "tag_is_ancestor_of_pin": true,
+        "verdict": "pin is 4 commit(s) AHEAD of v1.0.16. The 1.0.16 release tarball is NOT this source."
+      },
+      "held_source": {
+        "archive_name": "libfribidi-g5c85a174650a-source.tar.gz",
+        "size_bytes": 2130892,
+        "sha256": "483778150A98CBBC3125DFB9B2161D03D88EDB3907C27F60B8C5A6DB771F40F6",
+        "produced_by": "git archive --format=tar.gz --prefix=libfribidi-5c85a174650a/ 5c85a174650ab8ef106ce85f13bcf2950d3fc65f",
+        "eol_check": "VERIFIED - 'COPYING' matches its upstream blob byte-for-byte (26440 bytes), so git archive applied no eol conversion",
+        "eol_check_note": "Compares one licence file's size in the object database against the same file extracted from the produced archive. Equal means git archive applied no eol conversion. Archives produced before 2026-08-14 were CRLF-converted and predate this check entirely.",
+        "digest_note": "Digest of the archive as produced on this machine. The authoritative identity of the source is the commit SHA above; gzip output is not guaranteed byte-identical across git/zlib versions, so a differing digest on a re-archive of the same commit is not a mismatch of the source."
+      },
+      "licence_texts": [
+        {
+          "upstream_path": "COPYING",
+          "retrieved_from": "https://github.com/fribidi/fribidi.git @ 5c85a174650ab8ef106ce85f13bcf2950d3fc65f",
+          "evidence_path": "docs/release/evidence/license-sources/libfribidi/COPYING.at-5c85a174650a.txt",
+          "size_bytes": 26440,
+          "sha256": "32434AFCC8666BA060E111D715BFDB6C2D5DD8A35FA4D3AB8AD67D8F850D2F2B"
+        }
+      ],
+      "problems": []
+    },
+    {
+      "component": "gmp",
+      "origin": "configure-line component",
+      "licence_id_claimed": "LGPL-3.0-or-later",
+      "upstream_url": "https://github.com/BtbN/gmplib.git",
+      "builder_script": "scripts.d/25-gmp.sh",
+      "pin_as_recorded": {
+        "kind": "git-commit",
+        "value": "9994908f090c694f8a152d660dc6852e0c48557a"
+      },
+      "resolution_required": false,
+      "resolution_method": "git fetch --depth 1 of the pinned SHA directly from upstream",
+      "resolved_commit": "9994908f090c694f8a152d660dc6852e0c48557a",
+      "commit_date": "2025-09-24T15:34:54+02:00",
+      "release_tag_at_pin": null,
+      "upstream_tag_count": 12,
+      "pin_vs_release": "BETWEEN RELEASES - upstream publishes 12 tags and the pinned commit is not one of them, so no release tarball is this source",
+      "version_claimed": null,
+      "version_claim_check": null,
+      "held_source": {
+        "archive_name": "gmp-g9994908f090c-source.tar.gz",
+        "size_bytes": 2538283,
+        "sha256": "FDB5D9E49AFBE3CF90749D49E4A511407AD6891F9E1C5C204C6266F6A062F751",
+        "produced_by": "git archive --format=tar.gz --prefix=gmp-9994908f090c/ 9994908f090c694f8a152d660dc6852e0c48557a",
+        "eol_check": "VERIFIED - 'COPYING.LESSERv3' matches its upstream blob byte-for-byte (7639 bytes), so git archive applied no eol conversion",
+        "eol_check_note": "Compares one licence file's size in the object database against the same file extracted from the produced archive. Equal means git archive applied no eol conversion. Archives produced before 2026-08-14 were CRLF-converted and predate this check entirely.",
+        "digest_note": "Digest of the archive as produced on this machine. The authoritative identity of the source is the commit SHA above; gzip output is not guaranteed byte-identical across git/zlib versions, so a differing digest on a re-archive of the same commit is not a mismatch of the source."
+      },
+      "licence_texts": [
+        {
+          "upstream_path": "COPYING.LESSERv3",
+          "retrieved_from": "https://github.com/BtbN/gmplib.git @ 9994908f090c694f8a152d660dc6852e0c48557a",
+          "evidence_path": "docs/release/evidence/license-sources/gmp/COPYING.LESSERv3.at-9994908f090c.txt",
+          "size_bytes": 7639,
+          "sha256": "A853C2FFEC17057872340EEE242AE4D96CBF2B520AE27D903E1B2FEF1A5F9D1C"
+        },
+        {
+          "upstream_path": "COPYINGv2",
+          "retrieved_from": "https://github.com/BtbN/gmplib.git @ 9994908f090c694f8a152d660dc6852e0c48557a",
+          "evidence_path": "docs/release/evidence/license-sources/gmp/COPYINGv2.at-9994908f090c.txt",
+          "size_bytes": 18092,
+          "sha256": "8177F97513213526DF2CF6184D8FF986C675AFB514D4E68A404010521B880643"
+        },
+        {
+          "upstream_path": "COPYINGv3",
+          "retrieved_from": "https://github.com/BtbN/gmplib.git @ 9994908f090c694f8a152d660dc6852e0c48557a",
+          "evidence_path": "docs/release/evidence/license-sources/gmp/COPYINGv3.at-9994908f090c.txt",
+          "size_bytes": 35150,
+          "sha256": "E6037104443F9A7829B2AA7C5370D0789A7BDA3CA65A0B904CDC0C2E285D9195"
+        }
+      ],
+      "problems": []
+    },
+    {
+      "component": "libaribb24",
+      "origin": "configure-line component",
+      "licence_id_claimed": "LGPL-3.0-or-later",
+      "upstream_url": "https://github.com/nkoriyama/aribb24.git",
+      "builder_script": "scripts.d/50-aribb24/50-libaribb24.sh",
+      "pin_as_recorded": {
+        "kind": "git-commit",
+        "value": "5e9be272f96e00f15a2f3c5f8ba7e124862aec38"
+      },
+      "resolution_required": false,
+      "resolution_method": "git fetch --depth 1 of the pinned SHA directly from upstream",
+      "resolved_commit": "5e9be272f96e00f15a2f3c5f8ba7e124862aec38",
+      "commit_date": "2016-02-12T10:59:02+09:00",
+      "release_tag_at_pin": null,
+      "upstream_tag_count": 5,
+      "pin_vs_release": "BETWEEN RELEASES - upstream publishes 5 tags and the pinned commit is not one of them, so no release tarball is this source",
+      "version_claimed": null,
+      "version_claim_check": null,
+      "held_source": {
+        "archive_name": "libaribb24-g5e9be272f96e-source.tar.gz",
+        "size_bytes": 47402,
+        "sha256": "79B6412DB71F1CB1B76CEB7A7F172C8A6A07D7708D4CEB56ED613949F63A057B",
+        "produced_by": "git archive --format=tar.gz --prefix=libaribb24-5e9be272f96e/ 5e9be272f96e00f15a2f3c5f8ba7e124862aec38",
+        "eol_check": "VERIFIED - 'COPYING' matches its upstream blob byte-for-byte (7651 bytes), so git archive applied no eol conversion",
+        "eol_check_note": "Compares one licence file's size in the object database against the same file extracted from the produced archive. Equal means git archive applied no eol conversion. Archives produced before 2026-08-14 were CRLF-converted and predate this check entirely.",
+        "digest_note": "Digest of the archive as produced on this machine. The authoritative identity of the source is the commit SHA above; gzip output is not guaranteed byte-identical across git/zlib versions, so a differing digest on a re-archive of the same commit is not a mismatch of the source."
+      },
+      "licence_texts": [
+        {
+          "upstream_path": "COPYING",
+          "retrieved_from": "https://github.com/nkoriyama/aribb24.git @ 5e9be272f96e00f15a2f3c5f8ba7e124862aec38",
+          "evidence_path": "docs/release/evidence/license-sources/libaribb24/COPYING.at-5e9be272f96e.txt",
+          "size_bytes": 7651,
+          "sha256": "DA7EABB7BAFDF7D3AE5E9F223AA5BDC1EECE45AC569DC21B3B037520B4464768"
+        }
+      ],
+      "problems": []
+    },
+    {
+      "component": "chromaprint",
+      "origin": "configure-line component",
+      "licence_id_claimed": "LGPL-2.1-or-later",
+      "upstream_url": "https://github.com/acoustid/chromaprint.git",
+      "builder_script": "scripts.d/50-chromaprint.sh",
+      "pin_as_recorded": {
+        "kind": "git-commit",
+        "value": "6b13ce3a81ae931e7477c4856a86bece99157cd8"
+      },
+      "resolution_required": false,
+      "resolution_method": "git fetch --depth 1 of the pinned SHA directly from upstream",
+      "resolved_commit": "6b13ce3a81ae931e7477c4856a86bece99157cd8",
+      "commit_date": "2026-01-15T13:28:55+01:00",
+      "release_tag_at_pin": null,
+      "upstream_tag_count": 22,
+      "pin_vs_release": "BETWEEN RELEASES - upstream publishes 22 tags and the pinned commit is not one of them, so no release tarball is this source",
+      "version_claimed": null,
+      "version_claim_check": null,
+      "held_source": {
+        "archive_name": "chromaprint-g6b13ce3a81ae-source.tar.gz",
+        "size_bytes": 1578164,
+        "sha256": "2A63E9CC3EE0A2F27FA863C1CC17A976D65226EE8137DC0F6880E70ACC660B1E",
+        "produced_by": "git archive --format=tar.gz --prefix=chromaprint-6b13ce3a81ae/ 6b13ce3a81ae931e7477c4856a86bece99157cd8",
+        "eol_check": "VERIFIED - 'LICENSE.md' matches its upstream blob byte-for-byte (1801 bytes), so git archive applied no eol conversion",
+        "eol_check_note": "Compares one licence file's size in the object database against the same file extracted from the produced archive. Equal means git archive applied no eol conversion. Archives produced before 2026-08-14 were CRLF-converted and predate this check entirely.",
+        "digest_note": "Digest of the archive as produced on this machine. The authoritative identity of the source is the commit SHA above; gzip output is not guaranteed byte-identical across git/zlib versions, so a differing digest on a re-archive of the same commit is not a mismatch of the source."
+      },
+      "licence_texts": [
+        {
+          "upstream_path": "LICENSE.md",
+          "retrieved_from": "https://github.com/acoustid/chromaprint.git @ 6b13ce3a81ae931e7477c4856a86bece99157cd8",
+          "evidence_path": "docs/release/evidence/license-sources/chromaprint/LICENSE.md.at-6b13ce3a81ae.txt",
+          "size_bytes": 1801,
+          "sha256": "562CFE59627E0C4E8E3B066F3FF2E9736F83811FFE4C6C2C7796595AA7595EBD"
+        }
+      ],
+      "problems": []
+    },
+    {
+      "component": "libgme",
+      "origin": "configure-line component",
+      "licence_id_claimed": "LGPL-2.1-or-later",
+      "upstream_url": "https://github.com/libgme/game-music-emu.git",
+      "builder_script": "scripts.d/50-gme.sh",
+      "pin_as_recorded": {
+        "kind": "git-commit",
+        "value": "dd3182a8bdae3ff761438632aace418fbcaed439"
+      },
+      "resolution_required": false,
+      "resolution_method": "git fetch --depth 1 of the pinned SHA directly from upstream",
+      "resolved_commit": "dd3182a8bdae3ff761438632aace418fbcaed439",
+      "commit_date": "2026-04-21T11:53:16+03:00",
+      "release_tag_at_pin": null,
+      "upstream_tag_count": 7,
+      "pin_vs_release": "BETWEEN RELEASES - upstream publishes 7 tags and the pinned commit is not one of them, so no release tarball is this source",
+      "version_claimed": null,
+      "version_claim_check": null,
+      "held_source": {
+        "archive_name": "libgme-gdd3182a8bdae-source.tar.gz",
+        "size_bytes": 347895,
+        "sha256": "11EBD1DD9382F2D602BEF3BA8402B0B203025C477A7E0DA9191F4787C433711D",
+        "produced_by": "git archive --format=tar.gz --prefix=libgme-dd3182a8bdae/ dd3182a8bdae3ff761438632aace418fbcaed439",
+        "eol_check": "VERIFIED - 'license.gpl2.txt' matches its upstream blob byte-for-byte (18092 bytes), so git archive applied no eol conversion",
+        "eol_check_note": "Compares one licence file's size in the object database against the same file extracted from the produced archive. Equal means git archive applied no eol conversion. Archives produced before 2026-08-14 were CRLF-converted and predate this check entirely.",
+        "digest_note": "Digest of the archive as produced on this machine. The authoritative identity of the source is the commit SHA above; gzip output is not guaranteed byte-identical across git/zlib versions, so a differing digest on a re-archive of the same commit is not a mismatch of the source."
+      },
+      "licence_texts": [
+        {
+          "upstream_path": "license.gpl2.txt",
+          "retrieved_from": "https://github.com/libgme/game-music-emu.git @ dd3182a8bdae3ff761438632aace418fbcaed439",
+          "evidence_path": "docs/release/evidence/license-sources/libgme/license.gpl2.txt.at-dd3182a8bdae.txt",
+          "size_bytes": 18092,
+          "sha256": "8177F97513213526DF2CF6184D8FF986C675AFB514D4E68A404010521B880643"
+        },
+        {
+          "upstream_path": "license.txt",
+          "retrieved_from": "https://github.com/libgme/game-music-emu.git @ dd3182a8bdae3ff761438632aace418fbcaed439",
+          "evidence_path": "docs/release/evidence/license-sources/libgme/license.txt.at-dd3182a8bdae.txt",
+          "size_bytes": 26938,
+          "sha256": "D2EFC89FBB7533572A472D34E07964951810A3A4F8D3159ECC2DCAA1452C5C26"
+        }
+      ],
+      "problems": []
+    },
+    {
+      "component": "libbluray",
+      "origin": "configure-line component",
+      "licence_id_claimed": "LGPL-2.1-or-later",
+      "upstream_url": "https://code.videolan.org/videolan/libbluray.git",
+      "builder_script": "scripts.d/50-libbluray.sh",
+      "pin_as_recorded": {
+        "kind": "git-commit",
+        "value": "4dfb9b0123b006ce5d66592dc8058f61e5c0cdc8"
+      },
+      "resolution_required": false,
+      "resolution_method": "git fetch --depth 1 of the pinned SHA directly from upstream",
+      "resolved_commit": "4dfb9b0123b006ce5d66592dc8058f61e5c0cdc8",
+      "commit_date": "2026-01-30T19:21:44+02:00",
+      "release_tag_at_pin": null,
+      "upstream_tag_count": 33,
+      "pin_vs_release": "BETWEEN RELEASES - upstream publishes 33 tags and the pinned commit is not one of them, so no release tarball is this source",
+      "version_claimed": "1.4.1",
+      "version_claim_check": {
+        "claimed_version": "1.4.1",
+        "upstream_tag_for_version": "1.4.1",
+        "tag_commit": "64f403c8362f37609e65d243aab11656ed167f0e",
+        "commits_ahead_of_tag": 20,
+        "tag_is_ancestor_of_pin": true,
+        "verdict": "pin is 20 commit(s) AHEAD of 1.4.1. The 1.4.1 release tarball is NOT this source."
+      },
+      "held_source": {
+        "archive_name": "libbluray-g4dfb9b0123b0-source.tar.gz",
+        "size_bytes": 608318,
+        "sha256": "17C394C95012EA550D1AD5A40AB3DE59CF6B54CD295FFC34D5B5E9F7D8D1795A",
+        "produced_by": "git archive --format=tar.gz --prefix=libbluray-4dfb9b0123b0/ 4dfb9b0123b006ce5d66592dc8058f61e5c0cdc8",
+        "eol_check": "VERIFIED - 'COPYING' matches its upstream blob byte-for-byte (24478 bytes), so git archive applied no eol conversion",
+        "eol_check_note": "Compares one licence file's size in the object database against the same file extracted from the produced archive. Equal means git archive applied no eol conversion. Archives produced before 2026-08-14 were CRLF-converted and predate this check entirely.",
+        "digest_note": "Digest of the archive as produced on this machine. The authoritative identity of the source is the commit SHA above; gzip output is not guaranteed byte-identical across git/zlib versions, so a differing digest on a re-archive of the same commit is not a mismatch of the source."
+      },
+      "licence_texts": [
+        {
+          "upstream_path": "COPYING",
+          "retrieved_from": "https://code.videolan.org/videolan/libbluray.git @ 4dfb9b0123b006ce5d66592dc8058f61e5c0cdc8",
+          "evidence_path": "docs/release/evidence/license-sources/libbluray/COPYING.at-4dfb9b0123b0.txt",
+          "size_bytes": 24478,
+          "sha256": "B3AA400ACA6D2BA1F0BD03BD98D03D1FE7489A3BBB26969D72016360AF8A5C9D"
+        }
+      ],
+      "problems": []
+    },
+    {
+      "component": "libmp3lame",
+      "origin": "configure-line component",
+      "licence_id_claimed": "LGPL-2.0-or-later",
+      "upstream_url": "https://svn.code.sf.net/p/lame/svn/trunk/lame",
+      "builder_script": "scripts.d/50-libmp3lame.sh",
+      "pin_as_recorded": {
+        "kind": "svn-rev",
+        "value": "6531"
+      },
+      "resolution_required": true,
+      "resolution_method": "Subversion revision exported over HTTP DAV (tools/release/svn_export_dav.py). Upstream is SVN-only; there is no upstream git commit to resolve to.",
+      "resolved_commit": null,
+      "commit_date": null,
+      "release_tag_at_pin": null,
+      "upstream_tag_count": null,
+      "pin_vs_release": "not applicable - Subversion revision. r6531 is immutable and monotonic within the repository, which is the same guarantee a commit SHA gives; it is simply not a SHA.",
+      "version_claimed": "3.101b3",
+      "version_claim_check": null,
+      "held_source": {
+        "archive_name": "libmp3lame-svn-r6531-source.tar.gz",
+        "size_bytes": 1486933,
+        "sha256": "3DAE9B9162918E3192CA30B27BE16D8CD94157845BA7945E3F81D76AF535BFC8",
+        "produced_by": "tools/release/svn_export_dav.py + tar -czf (329 files, 5875376 bytes on disk)",
+        "digest_note": "Digest of the archive as produced on this machine. The authoritative identity is the SVN revision; per-file last-changed revisions are recorded beside the holding in svn/."
+      },
+      "licence_texts": [
+        {
+          "upstream_path": "COPYING",
+          "retrieved_from": "https://svn.code.sf.net/p/lame/svn/trunk/lame @ r6531",
+          "evidence_path": "docs/release/evidence/license-sources/libmp3lame/COPYING.at-r6531.txt",
+          "size_bytes": 25281,
+          "sha256": "E64F9C5A18F56828C10A575DF13ADE641AA3AF4512A7AFE6C411256943B57AAF"
+        },
+        {
+          "upstream_path": "LICENSE",
+          "retrieved_from": "https://svn.code.sf.net/p/lame/svn/trunk/lame @ r6531",
+          "evidence_path": "docs/release/evidence/license-sources/libmp3lame/LICENSE.at-r6531.txt",
+          "size_bytes": 503,
+          "sha256": "5C1F8D44F1EACBEA3E1C31FF6EE11A4E1690CCBED4EE4AF16DE3B6EB61DC69A8"
+        }
+      ],
+      "problems": []
+    },
+    {
+      "component": "libplacebo",
+      "origin": "configure-line component",
+      "licence_id_claimed": "LGPL-2.1-or-later",
+      "upstream_url": "https://code.videolan.org/videolan/libplacebo.git",
+      "builder_script": "scripts.d/50-libplacebo.sh",
+      "pin_as_recorded": {
+        "kind": "git-commit",
+        "value": "464d6eab8900c87a539943d0cd8575fffe566f72"
+      },
+      "resolution_required": false,
+      "resolution_method": "git fetch --depth 1 of the pinned SHA directly from upstream",
+      "resolved_commit": "464d6eab8900c87a539943d0cd8575fffe566f72",
+      "commit_date": "2026-05-20T23:24:20+02:00",
+      "release_tag_at_pin": null,
+      "upstream_tag_count": 61,
+      "pin_vs_release": "BETWEEN RELEASES - upstream publishes 61 tags and the pinned commit is not one of them, so no release tarball is this source",
+      "version_claimed": "v7.364.0",
+      "version_claim_check": {
+        "claimed_version": "v7.364.0",
+        "upstream_tag_for_version": null,
+        "verdict": "NO UPSTREAM TAG for the claimed version 'v7.364.0'. The version came from the binary's self-report, and no release by that name exists to compare against - so it is a build identifier, not a release identifier, and must not be used to select a source tarball."
+      },
+      "held_source": {
+        "archive_name": "libplacebo-g464d6eab8900-source.tar.gz",
+        "size_bytes": 866295,
+        "sha256": "0A4C728A3B9A188B227C26D49F4067255B8148D7F23F0FA959F0E205DF31098E",
+        "produced_by": "git archive --format=tar.gz --prefix=libplacebo-464d6eab8900/ 464d6eab8900c87a539943d0cd8575fffe566f72",
+        "eol_check": "VERIFIED - 'LICENSE' matches its upstream blob byte-for-byte (24478 bytes), so git archive applied no eol conversion",
+        "eol_check_note": "Compares one licence file's size in the object database against the same file extracted from the produced archive. Equal means git archive applied no eol conversion. Archives produced before 2026-08-14 were CRLF-converted and predate this check entirely.",
+        "digest_note": "Digest of the archive as produced on this machine. The authoritative identity of the source is the commit SHA above; gzip output is not guaranteed byte-identical across git/zlib versions, so a differing digest on a re-archive of the same commit is not a mismatch of the source."
+      },
+      "licence_texts": [
+        {
+          "upstream_path": "LICENSE",
+          "retrieved_from": "https://code.videolan.org/videolan/libplacebo.git @ 464d6eab8900c87a539943d0cd8575fffe566f72",
+          "evidence_path": "docs/release/evidence/license-sources/libplacebo/LICENSE.at-464d6eab8900.txt",
+          "size_bytes": 24478,
+          "sha256": "B3AA400ACA6D2BA1F0BD03BD98D03D1FE7489A3BBB26969D72016360AF8A5C9D"
+        }
+      ],
+      "problems": []
+    },
+    {
+      "component": "libssh",
+      "origin": "configure-line component",
+      "licence_id_claimed": "LGPL-2.1-or-later",
+      "upstream_url": "https://gitlab.com/libssh/libssh-mirror.git",
+      "builder_script": "scripts.d/50-libssh.sh",
+      "pin_as_recorded": {
+        "kind": "git-commit",
+        "value": "d94a96bf23a982e6047cf5c128804b014e1f92eb"
+      },
+      "resolution_required": false,
+      "resolution_method": "git fetch --depth 1 of the pinned SHA directly from upstream",
+      "resolved_commit": "d94a96bf23a982e6047cf5c128804b014e1f92eb",
+      "commit_date": "2026-05-08T14:23:34+02:00",
+      "release_tag_at_pin": null,
+      "upstream_tag_count": 67,
+      "pin_vs_release": "BETWEEN RELEASES - upstream publishes 67 tags and the pinned commit is not one of them, so no release tarball is this source",
+      "version_claimed": "0.12.0",
+      "version_claim_check": {
+        "claimed_version": "0.12.0",
+        "upstream_tag_for_version": "libssh-0.12.0",
+        "tag_commit": "fb1e5fa2348e8b0f3602359a1f5d370f2f69c342",
+        "commits_ahead_of_tag": 145,
+        "tag_is_ancestor_of_pin": true,
+        "verdict": "pin is 145 commit(s) AHEAD of libssh-0.12.0. The 0.12.0 release tarball is NOT this source."
+      },
+      "held_source": {
+        "archive_name": "libssh-gd94a96bf23a9-source.tar.gz",
+        "size_bytes": 1163146,
+        "sha256": "D2F659B0753A137C6A6E6E4B949C77C78C3F1B302F0651FA16C5C66BCB02953A",
+        "produced_by": "git archive --format=tar.gz --prefix=libssh-d94a96bf23a9/ d94a96bf23a982e6047cf5c128804b014e1f92eb",
+        "eol_check": "VERIFIED - 'COPYING' matches its upstream blob byte-for-byte (25008 bytes), so git archive applied no eol conversion",
+        "eol_check_note": "Compares one licence file's size in the object database against the same file extracted from the produced archive. Equal means git archive applied no eol conversion. Archives produced before 2026-08-14 were CRLF-converted and predate this check entirely.",
+        "digest_note": "Digest of the archive as produced on this machine. The authoritative identity of the source is the commit SHA above; gzip output is not guaranteed byte-identical across git/zlib versions, so a differing digest on a re-archive of the same commit is not a mismatch of the source."
+      },
+      "licence_texts": [
+        {
+          "upstream_path": "COPYING",
+          "retrieved_from": "https://gitlab.com/libssh/libssh-mirror.git @ d94a96bf23a982e6047cf5c128804b014e1f92eb",
+          "evidence_path": "docs/release/evidence/license-sources/libssh/COPYING.at-d94a96bf23a9.txt",
+          "size_bytes": 25008,
+          "sha256": "1656186E951DB1C010A8485481FA94587F7E53A26D24976BEF97945AD0C4DF5A"
+        }
+      ],
+      "problems": []
+    },
+    {
+      "component": "libzmq",
+      "origin": "configure-line component",
+      "licence_id_claimed": "MPL-2.0",
+      "upstream_url": "https://github.com/zeromq/libzmq.git",
+      "builder_script": "scripts.d/50-libzmq.sh",
+      "pin_as_recorded": {
+        "kind": "git-commit",
+        "value": "b946c18f676760387276cd095bbdd8c0e18c09bf"
+      },
+      "resolution_required": false,
+      "resolution_method": "git fetch --depth 1 of the pinned SHA directly from upstream",
+      "resolved_commit": "b946c18f676760387276cd095bbdd8c0e18c09bf",
+      "commit_date": "2026-04-07T19:05:29+01:00",
+      "release_tag_at_pin": null,
+      "upstream_tag_count": 39,
+      "pin_vs_release": "BETWEEN RELEASES - upstream publishes 39 tags and the pinned commit is not one of them, so no release tarball is this source",
+      "version_claimed": null,
+      "version_claim_check": null,
+      "held_source": {
+        "archive_name": "libzmq-gb946c18f6767-source.tar.gz",
+        "size_bytes": 883152,
+        "sha256": "F4F248B46DE70BDA330DDD256EA0204C2E18E29C81EAAF38D2926571D6167C81",
+        "produced_by": "git archive --format=tar.gz --prefix=libzmq-b946c18f6767/ b946c18f676760387276cd095bbdd8c0e18c09bf",
+        "eol_check": "VERIFIED - 'LICENSE' matches its upstream blob byte-for-byte (16725 bytes), so git archive applied no eol conversion",
+        "eol_check_note": "Compares one licence file's size in the object database against the same file extracted from the produced archive. Equal means git archive applied no eol conversion. Archives produced before 2026-08-14 were CRLF-converted and predate this check entirely.",
+        "digest_note": "Digest of the archive as produced on this machine. The authoritative identity of the source is the commit SHA above; gzip output is not guaranteed byte-identical across git/zlib versions, so a differing digest on a re-archive of the same commit is not a mismatch of the source."
+      },
+      "licence_texts": [
+        {
+          "upstream_path": "LICENSE",
+          "retrieved_from": "https://github.com/zeromq/libzmq.git @ b946c18f676760387276cd095bbdd8c0e18c09bf",
+          "evidence_path": "docs/release/evidence/license-sources/libzmq/LICENSE.at-b946c18f6767.txt",
+          "size_bytes": 16725,
+          "sha256": "1F256ECAD192880510E84AD60474EAB7589218784B9A50BC7CEEE34C2B91F1D5"
+        }
+      ],
+      "problems": []
+    },
+    {
+      "component": "openal",
+      "origin": "configure-line component",
+      "licence_id_claimed": "LGPL-2.0-or-later",
+      "upstream_url": "https://github.com/kcat/openal-soft.git",
+      "builder_script": "scripts.d/50-openal.sh",
+      "pin_as_recorded": {
+        "kind": "git-commit",
+        "value": "83ea7236c6f23fc98e2b62eb9c5b3abfd4b2be86"
+      },
+      "resolution_required": false,
+      "resolution_method": "git fetch --depth 1 of the pinned SHA directly from upstream",
+      "resolved_commit": "83ea7236c6f23fc98e2b62eb9c5b3abfd4b2be86",
+      "commit_date": "2026-05-13T05:00:13-07:00",
+      "release_tag_at_pin": null,
+      "upstream_tag_count": 47,
+      "pin_vs_release": "BETWEEN RELEASES - upstream publishes 47 tags and the pinned commit is not one of them, so no release tarball is this source",
+      "version_claimed": "1.25.2",
+      "version_claim_check": {
+        "claimed_version": "1.25.2",
+        "upstream_tag_for_version": "1.25.2",
+        "tag_commit": "b2c48f7718ef3fcf67921a8b6534c4914e328970",
+        "commits_ahead_of_tag": 5,
+        "tag_is_ancestor_of_pin": true,
+        "verdict": "pin is 5 commit(s) AHEAD of 1.25.2. The 1.25.2 release tarball is NOT this source."
+      },
+      "held_source": {
+        "archive_name": "openal-g83ea7236c6f2-source.tar.gz",
+        "size_bytes": 1405257,
+        "sha256": "BD0C383638C1D17BCA47957A9CA2CBD19E4574290429A9E8886EFC5B40AF7F44",
+        "produced_by": "git archive --format=tar.gz --prefix=openal-83ea7236c6f2/ 83ea7236c6f23fc98e2b62eb9c5b3abfd4b2be86",
+        "eol_check": "VERIFIED - 'COPYING' matches its upstream blob byte-for-byte (23330 bytes), so git archive applied no eol conversion",
+        "eol_check_note": "Compares one licence file's size in the object database against the same file extracted from the produced archive. Equal means git archive applied no eol conversion. Archives produced before 2026-08-14 were CRLF-converted and predate this check entirely.",
+        "digest_note": "Digest of the archive as produced on this machine. The authoritative identity of the source is the commit SHA above; gzip output is not guaranteed byte-identical across git/zlib versions, so a differing digest on a re-archive of the same commit is not a mismatch of the source."
+      },
+      "licence_texts": [
+        {
+          "upstream_path": "COPYING",
+          "retrieved_from": "https://github.com/kcat/openal-soft.git @ 83ea7236c6f23fc98e2b62eb9c5b3abfd4b2be86",
+          "evidence_path": "docs/release/evidence/license-sources/openal/COPYING.at-83ea7236c6f2.txt",
+          "size_bytes": 23330,
+          "sha256": "D808CE217E5B611854DA622B57EC29FE545584C48BC5352FAE72A4B6E5074A15"
+        },
+        {
+          "upstream_path": "LICENSE-pffft",
+          "retrieved_from": "https://github.com/kcat/openal-soft.git @ 83ea7236c6f23fc98e2b62eb9c5b3abfd4b2be86",
+          "evidence_path": "docs/release/evidence/license-sources/openal/LICENSE-pffft.at-83ea7236c6f2.txt",
+          "size_bytes": 1669,
+          "sha256": "64056328B3E7BC104E24EF96ACCC1A7ABEAD156F0C02D1B87C97E3F3A28030DE"
+        }
+      ],
+      "problems": []
+    },
+    {
+      "component": "libsoxr",
+      "origin": "configure-line component",
+      "licence_id_claimed": "LGPL-2.1-or-later",
+      "upstream_url": "https://git.code.sf.net/p/soxr/code",
+      "builder_script": "scripts.d/50-soxr.sh",
+      "pin_as_recorded": {
+        "kind": "git-commit",
+        "value": "945b592b70470e29f917f4de89b4281fbbd540c0"
+      },
+      "resolution_required": false,
+      "resolution_method": "git fetch --depth 1 of the pinned SHA directly from upstream",
+      "resolved_commit": "945b592b70470e29f917f4de89b4281fbbd540c0",
+      "commit_date": "2018-02-24T10:53:13Z",
+      "release_tag_at_pin": "0.1.3",
+      "upstream_tag_count": 4,
+      "pin_vs_release": "exactly on release tag 0.1.3",
+      "version_claimed": "0.1.3",
+      "version_claim_check": {
+        "claimed_version": "0.1.3",
+        "upstream_tag_for_version": "0.1.3",
+        "tag_commit": "945b592b70470e29f917f4de89b4281fbbd540c0",
+        "commits_ahead_of_tag": 0,
+        "verdict": "pin IS the 0.1.3 release commit"
+      },
+      "held_source": {
+        "archive_name": "libsoxr-g945b592b7047-source.tar.gz",
+        "size_bytes": 144546,
+        "sha256": "679380918DD569F7D7AE62C75B18EB71B6C5783BC1B9CC273A7EFD4B0702C87B",
+        "produced_by": "git archive --format=tar.gz --prefix=libsoxr-945b592b7047/ 945b592b70470e29f917f4de89b4281fbbd540c0",
+        "eol_check": "VERIFIED - 'COPYING.LGPL' matches its upstream blob byte-for-byte (26432 bytes), so git archive applied no eol conversion",
+        "eol_check_note": "Compares one licence file's size in the object database against the same file extracted from the produced archive. Equal means git archive applied no eol conversion. Archives produced before 2026-08-14 were CRLF-converted and predate this check entirely.",
+        "digest_note": "Digest of the archive as produced on this machine. The authoritative identity of the source is the commit SHA above; gzip output is not guaranteed byte-identical across git/zlib versions, so a differing digest on a re-archive of the same commit is not a mismatch of the source."
+      },
+      "licence_texts": [
+        {
+          "upstream_path": "COPYING.LGPL",
+          "retrieved_from": "https://git.code.sf.net/p/soxr/code @ 945b592b70470e29f917f4de89b4281fbbd540c0",
+          "evidence_path": "docs/release/evidence/license-sources/libsoxr/COPYING.LGPL.at-945b592b7047.txt",
+          "size_bytes": 26432,
+          "sha256": "F2F118B9029EC1871B953639ECC46651B2FC7B62E295E6CF3EF2AC4C9A058B33"
+        },
+        {
+          "upstream_path": "LICENCE",
+          "retrieved_from": "https://git.code.sf.net/p/soxr/code @ 945b592b70470e29f917f4de89b4281fbbd540c0",
+          "evidence_path": "docs/release/evidence/license-sources/libsoxr/LICENCE.at-945b592b7047.txt",
+          "size_bytes": 1024,
+          "sha256": "DC98676341FDCD29D9F279C9679D6A75288785B174DED8D1B2E316C366166135"
+        }
+      ],
+      "problems": []
+    },
+    {
+      "component": "libsrt",
+      "origin": "configure-line component",
+      "licence_id_claimed": "MPL-2.0",
+      "upstream_url": "https://github.com/Haivision/srt.git",
+      "builder_script": "scripts.d/50-srt.sh",
+      "pin_as_recorded": {
+        "kind": "git-commit",
+        "value": "2e2ab20ee0f2eb43cf0fe974695aafec9767654f"
+      },
+      "resolution_required": false,
+      "resolution_method": "git fetch --depth 1 of the pinned SHA directly from upstream",
+      "resolved_commit": "2e2ab20ee0f2eb43cf0fe974695aafec9767654f",
+      "commit_date": "2026-05-21T14:20:43+02:00",
+      "release_tag_at_pin": null,
+      "upstream_tag_count": 56,
+      "pin_vs_release": "BETWEEN RELEASES - upstream publishes 56 tags and the pinned commit is not one of them, so no release tarball is this source",
+      "version_claimed": null,
+      "version_claim_check": null,
+      "held_source": {
+        "archive_name": "libsrt-g2e2ab20ee0f2-source.tar.gz",
+        "size_bytes": 1779008,
+        "sha256": "FB5B536EFB990A0EF3C89C2CBDF4DB13C3E31B52331F2EB27D99855FFC0C3431",
+        "produced_by": "git archive --format=tar.gz --prefix=libsrt-2e2ab20ee0f2/ 2e2ab20ee0f2eb43cf0fe974695aafec9767654f",
+        "eol_check": "VERIFIED - 'LICENSE' matches its upstream blob byte-for-byte (16726 bytes), so git archive applied no eol conversion",
+        "eol_check_note": "Compares one licence file's size in the object database against the same file extracted from the produced archive. Equal means git archive applied no eol conversion. Archives produced before 2026-08-14 were CRLF-converted and predate this check entirely.",
+        "digest_note": "Digest of the archive as produced on this machine. The authoritative identity of the source is the commit SHA above; gzip output is not guaranteed byte-identical across git/zlib versions, so a differing digest on a re-archive of the same commit is not a mismatch of the source."
+      },
+      "licence_texts": [
+        {
+          "upstream_path": "LICENSE",
+          "retrieved_from": "https://github.com/Haivision/srt.git @ 2e2ab20ee0f2eb43cf0fe974695aafec9767654f",
+          "evidence_path": "docs/release/evidence/license-sources/libsrt/LICENSE.at-2e2ab20ee0f2.txt",
+          "size_bytes": 16726,
+          "sha256": "FAB3DD6BDAB226F1C08630B1DD917E11FCB4EC5E1E020E2C16F83A0A13863E85"
+        }
+      ],
+      "problems": []
+    },
+    {
+      "component": "libtwolame",
+      "origin": "configure-line component",
+      "licence_id_claimed": "LGPL-2.1-or-later",
+      "upstream_url": "https://github.com/njh/twolame.git",
+      "builder_script": "scripts.d/50-twolame.sh",
+      "pin_as_recorded": {
+        "kind": "git-commit",
+        "value": "6fced852d4d5cfad58cf9dbe3ea619b08e87d398"
+      },
+      "resolution_required": false,
+      "resolution_method": "git fetch --depth 1 of the pinned SHA directly from upstream",
+      "resolved_commit": "6fced852d4d5cfad58cf9dbe3ea619b08e87d398",
+      "commit_date": "2026-02-24T11:03:41Z",
+      "release_tag_at_pin": null,
+      "upstream_tag_count": 7,
+      "pin_vs_release": "BETWEEN RELEASES - upstream publishes 7 tags and the pinned commit is not one of them, so no release tarball is this source",
+      "version_claimed": null,
+      "version_claim_check": null,
+      "held_source": {
+        "archive_name": "libtwolame-g6fced852d4d5-source.tar.gz",
+        "size_bytes": 431066,
+        "sha256": "F93F5BD18D6582BA3231828333F63A57F18B41C45ABD51459C3061FB05804FA2",
+        "produced_by": "git archive --format=tar.gz --prefix=libtwolame-6fced852d4d5/ 6fced852d4d5cfad58cf9dbe3ea619b08e87d398",
+        "eol_check": "VERIFIED - 'COPYING' matches its upstream blob byte-for-byte (26428 bytes), so git archive applied no eol conversion",
+        "eol_check_note": "Compares one licence file's size in the object database against the same file extracted from the produced archive. Equal means git archive applied no eol conversion. Archives produced before 2026-08-14 were CRLF-converted and predate this check entirely.",
+        "digest_note": "Digest of the archive as produced on this machine. The authoritative identity of the source is the commit SHA above; gzip output is not guaranteed byte-identical across git/zlib versions, so a differing digest on a re-archive of the same commit is not a mismatch of the source."
+      },
+      "licence_texts": [
+        {
+          "upstream_path": "COPYING",
+          "retrieved_from": "https://github.com/njh/twolame.git @ 6fced852d4d5cfad58cf9dbe3ea619b08e87d398",
+          "evidence_path": "docs/release/evidence/license-sources/libtwolame/COPYING.at-6fced852d4d5.txt",
+          "size_bytes": 26428,
+          "sha256": "257A842724705950B07DA76CE0E22FFA80EC77B3E9DFC6702522AC342409DA0F"
+        }
+      ],
+      "problems": []
+    },
+    {
+      "component": "libzvbi",
+      "origin": "configure-line component",
+      "licence_id_claimed": "LGPL-2.0-or-later AND GPL-2.0-only",
+      "upstream_url": "https://github.com/zapping-vbi/zvbi",
+      "builder_script": "scripts.d/50-zvbi.sh",
+      "pin_as_recorded": {
+        "kind": "git-commit",
+        "value": "41477c97c8edf7a01f1594b2a95b94f0117eed21"
+      },
+      "resolution_required": false,
+      "resolution_method": "git fetch --depth 1 of the pinned SHA directly from upstream",
+      "resolved_commit": "41477c97c8edf7a01f1594b2a95b94f0117eed21",
+      "commit_date": "2025-11-03T21:40:20+02:00",
+      "release_tag_at_pin": null,
+      "upstream_tag_count": 10,
+      "pin_vs_release": "BETWEEN RELEASES - upstream publishes 10 tags and the pinned commit is not one of them, so no release tarball is this source",
+      "version_claimed": "0.2.44",
+      "version_claim_check": {
+        "claimed_version": "0.2.44",
+        "upstream_tag_for_version": "v0.2.44",
+        "tag_commit": "5169a428d51c3ae8ff7b0897e8a687d8e05e37b5",
+        "commits_ahead_of_tag": 4,
+        "tag_is_ancestor_of_pin": true,
+        "verdict": "pin is 4 commit(s) AHEAD of v0.2.44. The 0.2.44 release tarball is NOT this source."
+      },
+      "held_source": {
+        "archive_name": "libzvbi-g41477c97c8ed-source.tar.gz",
+        "size_bytes": 942506,
+        "sha256": "A55E791D4C7430CC5FBFA0BCDBC1445E61317140AC1392C11311A93FABCB4AC4",
+        "produced_by": "git archive --format=tar.gz --prefix=libzvbi-41477c97c8ed/ 41477c97c8edf7a01f1594b2a95b94f0117eed21",
+        "eol_check": "VERIFIED - 'COPYING.md' matches its upstream blob byte-for-byte (78695 bytes), so git archive applied no eol conversion",
+        "eol_check_note": "Compares one licence file's size in the object database against the same file extracted from the produced archive. Equal means git archive applied no eol conversion. Archives produced before 2026-08-14 were CRLF-converted and predate this check entirely.",
+        "digest_note": "Digest of the archive as produced on this machine. The authoritative identity of the source is the commit SHA above; gzip output is not guaranteed byte-identical across git/zlib versions, so a differing digest on a re-archive of the same commit is not a mismatch of the source."
+      },
+      "licence_texts": [
+        {
+          "upstream_path": "COPYING.md",
+          "retrieved_from": "https://github.com/zapping-vbi/zvbi @ 41477c97c8edf7a01f1594b2a95b94f0117eed21",
+          "evidence_path": "docs/release/evidence/license-sources/libzvbi/COPYING.md.at-41477c97c8ed.txt",
+          "size_bytes": 78695,
+          "sha256": "01B41F9B6E262BB62063151F15988A236296BBB5EEB9752692FC7DC2FB27EC45"
+        }
+      ],
+      "problems": []
+    },
+    {
+      "component": "fftw3",
+      "origin": "transitive build dependency",
+      "licence_id_claimed": "GPL-2.0-or-later",
+      "upstream_url": "https://github.com/FFTW/fftw3",
+      "builder_script": "scripts.d/25-fftw3.sh",
+      "pin_as_recorded": {
+        "kind": "git-commit",
+        "value": "5d0f4db2fc157867b7dc972b40418f171d77a6bc"
+      },
+      "resolution_required": false,
+      "resolution_method": "git fetch --depth 1 of the pinned SHA directly from upstream",
+      "resolved_commit": "5d0f4db2fc157867b7dc972b40418f171d77a6bc",
+      "commit_date": "2026-05-16T10:10:52-04:00",
+      "release_tag_at_pin": null,
+      "upstream_tag_count": 34,
+      "pin_vs_release": "BETWEEN RELEASES - upstream publishes 34 tags and the pinned commit is not one of them, so no release tarball is this source",
+      "version_claimed": "3.3.11",
+      "version_claim_check": {
+        "claimed_version": "3.3.11",
+        "upstream_tag_for_version": "fftw-3.3.11",
+        "tag_commit": "d69d34f078baee4fa38a035634017404cce3e09a",
+        "commits_ahead_of_tag": 5,
+        "tag_is_ancestor_of_pin": true,
+        "verdict": "pin is 5 commit(s) AHEAD of fftw-3.3.11. The 3.3.11 release tarball is NOT this source."
+      },
+      "held_source": {
+        "archive_name": "fftw3-g5d0f4db2fc15-source.tar.gz",
+        "size_bytes": 543664,
+        "sha256": "EC2AB86959EC450B0A25A875E93E0FDCD830BD156FE3FD28C9F78C9D2663279C",
+        "produced_by": "git archive --format=tar.gz --prefix=fftw3-5d0f4db2fc15/ 5d0f4db2fc157867b7dc972b40418f171d77a6bc",
+        "eol_check": "VERIFIED - 'COPYING' matches its upstream blob byte-for-byte (18002 bytes), so git archive applied no eol conversion",
+        "eol_check_note": "Compares one licence file's size in the object database against the same file extracted from the produced archive. Equal means git archive applied no eol conversion. Archives produced before 2026-08-14 were CRLF-converted and predate this check entirely.",
+        "digest_note": "Digest of the archive as produced on this machine. The authoritative identity of the source is the commit SHA above; gzip output is not guaranteed byte-identical across git/zlib versions, so a differing digest on a re-archive of the same commit is not a mismatch of the source."
+      },
+      "licence_texts": [
+        {
+          "upstream_path": "COPYING",
+          "retrieved_from": "https://github.com/FFTW/fftw3 @ 5d0f4db2fc157867b7dc972b40418f171d77a6bc",
+          "evidence_path": "docs/release/evidence/license-sources/fftw3/COPYING.at-5d0f4db2fc15.txt",
+          "size_bytes": 18002,
+          "sha256": "231F7EDCC7352D7734A96EEF0B8030F77982678C516876FCB81E25B32D68564C"
+        },
+        {
+          "upstream_path": "COPYRIGHT",
+          "retrieved_from": "https://github.com/FFTW/fftw3 @ 5d0f4db2fc157867b7dc972b40418f171d77a6bc",
+          "evidence_path": "docs/release/evidence/license-sources/fftw3/COPYRIGHT.at-5d0f4db2fc15.txt",
+          "size_bytes": 844,
+          "sha256": "8A74B35D541D93FDF58A22A3D3BAA48AE3EDBF6D715EDFEB6457C21968AE43AC"
+        },
+        {
+          "upstream_path": "doc/license.texi",
+          "retrieved_from": "https://github.com/FFTW/fftw3 @ 5d0f4db2fc157867b7dc972b40418f171d77a6bc",
+          "evidence_path": "docs/release/evidence/license-sources/fftw3/doc_license.texi.at-5d0f4db2fc15.txt",
+          "size_bytes": 1842,
+          "sha256": "68F733830A3B4DBF66815CA54B5637015517848C5F32F38F1EA2057782161A77"
+        }
+      ],
+      "problems": []
+    },
+    {
+      "component": "libudfread",
+      "origin": "transitive build dependency",
+      "licence_id_claimed": "LGPL-2.1-or-later",
+      "upstream_url": "https://code.videolan.org/videolan/libudfread",
+      "builder_script": "scripts.d/45-libudfread.sh",
+      "pin_as_recorded": {
+        "kind": "git-commit",
+        "value": "139a2194525f2745b98a98e4d8fa627d07440176"
+      },
+      "resolution_required": false,
+      "resolution_method": "git fetch --depth 1 of the pinned SHA directly from upstream",
+      "resolved_commit": "139a2194525f2745b98a98e4d8fa627d07440176",
+      "commit_date": "2025-09-05T13:52:25+01:00",
+      "release_tag_at_pin": null,
+      "upstream_tag_count": 6,
+      "pin_vs_release": "BETWEEN RELEASES - upstream publishes 6 tags and the pinned commit is not one of them, so no release tarball is this source",
+      "version_claimed": null,
+      "version_claim_check": null,
+      "held_source": {
+        "archive_name": "libudfread-g139a2194525f-source.tar.gz",
+        "size_bytes": 33051,
+        "sha256": "DDB0EF3F0B09C9E12C3A5D83BA021E1F91BCB27BD8E2BDCBAE7432857E7F17A7",
+        "produced_by": "git archive --format=tar.gz --prefix=libudfread-139a2194525f/ 139a2194525f2745b98a98e4d8fa627d07440176",
+        "eol_check": "VERIFIED - 'COPYING' matches its upstream blob byte-for-byte (26530 bytes), so git archive applied no eol conversion",
+        "eol_check_note": "Compares one licence file's size in the object database against the same file extracted from the produced archive. Equal means git archive applied no eol conversion. Archives produced before 2026-08-14 were CRLF-converted and predate this check entirely.",
+        "digest_note": "Digest of the archive as produced on this machine. The authoritative identity of the source is the commit SHA above; gzip output is not guaranteed byte-identical across git/zlib versions, so a differing digest on a re-archive of the same commit is not a mismatch of the source."
+      },
+      "licence_texts": [
+        {
+          "upstream_path": "COPYING",
+          "retrieved_from": "https://code.videolan.org/videolan/libudfread @ 139a2194525f2745b98a98e4d8fa627d07440176",
+          "evidence_path": "docs/release/evidence/license-sources/libudfread/COPYING.at-139a2194525f.txt",
+          "size_bytes": 26530,
+          "sha256": "DC626520DCD53A22F727AF3EE42C770E56C97A64FE3ADB063799D8AB032FE551"
+        }
+      ],
+      "problems": []
+    }
+  ]
+}

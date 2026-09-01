@@ -1,0 +1,35 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+.gitattributes text eol=lf
+.gitignore text eol=lf
+*.sh text eol=lf
+*.bat text eol=crlf
+dist/source/* filter=lfs diff=lfs merge=lfs -text
+dist/source/*.zip filter=lfs diff=lfs merge=lfs -text
+
+# Captured upstream licence texts are EVIDENCE and must stay byte-identical to
+# what the pinned commit contained. `* text=auto` above would rewrite their line
+# endings on checkout, which silently breaks the SHA-256 recorded for each of
+# them in docs/release/evidence/corresponding-source-holding/HOLDING.json - the
+# digest is the only thing that lets a reader confirm the text they are reading
+# is the one that shipped.
+docs/release/evidence/license-sources/** -text
+
+# The same reasoning applies to the licence texts SHIPPED to users. These are the
+# copies LGPL-2.1 s6 / LGPL-3 s4(b) require to accompany the binary, rendered by
+# the in-app licence page. A licence document must be verbatim, and
+# `* text=auto` would silently rewrite it on checkout.
+#
+# These once had to stay byte-identical to a second copy under
+# intergalactic/windows/third_party/ffmpeg/licenses/, which was excluded from
+# this rule because changing it would have altered what shipped beside
+# ffmpeg.exe. That directory was deleted with FFmpeg on 2026-08-15, so this is
+# now the only shipped copy and the exclusion no longer has anything to guard.
+intergalactic/assets/licenses/** -text
+
+# WebRTC-SDK v137.7151.04 publishes this notice packet with trailing spaces and
+# a terminal blank line. Both copies below are intentionally byte-identical to
+# that upstream packet and are SHA-256-pinned evidence, so do not normalize
+# whitespace merely to satisfy a generic diff check.
+docs/release/evidence/license-sources/android-native-payloads/webrtc-sdk-android-137.7151.04-WEBRTC.md whitespace=-trailing-space,-blank-at-eof
+intergalactic/assets/licenses/webrtc-sdk-android-137.7151.04-NOTICES.txt whitespace=-trailing-space,-blank-at-eof

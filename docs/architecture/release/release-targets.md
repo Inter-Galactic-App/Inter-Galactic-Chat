@@ -1,0 +1,424 @@
+# Release Targets
+
+## Purpose
+
+This file documents what a release is expected to prove for:
+
+- Android
+- iOS
+- Web
+- Desktop
+
+It is written for contributors and maintainers who are changing code that can
+affect packaging, startup, updater behavior, notifications, or encrypted
+usability.
+
+Detailed release-management runbooks now live under `docs/release/`:
+
+- `docs/release/release-checklist.md` - release candidate, pre-release,
+  publish, and post-release checklist.
+- `docs/release/release-artifact-checklist.md` - artifact naming, signing,
+  checksums, and `latest.json` validation.
+- `docs/release/versioning-policy.md` - `X.Y.Z+build` version policy.
+- `docs/release/build-signing.md` - Windows, Android, iOS, web, and GitHub
+  build/signing flow.
+- `docs/release/test-matrix.md` - desktop/mobile/web smoke and upgrade
+  matrix.
+- `docs/release/rollback-plan.md` - manifest rollback and hotfix-forward plan.
+- `docs/release/release-notes-template.md` - release notes, known issues, and
+  upgrade-risk template.
+
+## Shared Expectations
+
+A release is not just a successful build.
+
+Across all targets, verify:
+
+- app starts cleanly
+- login works
+- session restore works
+- encrypted rooms remain usable
+- key feature paths affected by the change still work
+- packaging/update metadata matches runtime expectations
+
+### Architecture-Boundaries (tracked)
+
+The release validation chain is intentionally narrow:
+
+1. `intergalactic/scripts/build_release.dart` (build orchestrator)
+   - Parses release identity (`--version_tag`), validates inputs, injects compile-time
+     `--dart-define` values (for example `PLATFORM`, `VERSION_TAG`,
+     `BUILD_MODE`, `GIT_HASH`, `BUILD_DATE`, `UPDATE_MANIFEST_URL`,
+     `ENABLE_GOOGLE_SERVICES`), and runs the platform `flutter build`.
+   - It can also sync iOS Runner metadata before packaging when Android/iOS
+     details are in scope.
+2. `intergalactic/lib/config/build_config.dart` (compile-time contract)
+   - Reads injected defines as `BuildConfig` constants such as
+     `VERSION_TAG`, `BUILD_DATE`, `PLATFORM`, and `UPDATE_MANIFEST_URL`.
+   - Runtime behavior and feature gates read these constants as release context;
+     compile-time values themselves do not perform runtime trust checks.
+3. `intergalactic/scripts/generate_update_manifest.dart` (manifest emitter)
+   - Creates the published manifest payload (`version`, `version_name`,
+     `build_number`, `build_date_ms`, platform URLs, release notes, auto-update
+     capability).
+   - The identity passed to this script must align with the identity used for the
+     corresponding build.
+4. `intergalactic/lib/utils/update_checker_io.dart` (runtime updater validation)
+   - Fetches `UPDATE_MANIFEST_URL` from `BuildConfig`, performs runtime trust
+     validation of manifest/destination, compares remote `version` to local
+     `BuildConfig.VERSION_TAG`, and runs update prompts / auto-update only when
+     checks pass.
+5. `intergalactic/scripts/verify_release_identity.ps1` (release gate)
+   - Verifies resulting artifacts and manifest fields (`version`,
+     `version_name`, `build_number`) against current pubspec/build metadata before
+     publication handoff.
+
+Artifact integrity, signing and rollback — stated so a reader does not have to
+infer it from silence (added 2026-08-17):
+
+- **Checksum verification is both a publication artefact and, on Windows only,
+  an update-chain step.** A `checksums-<version>.txt` is published beside each
+  release and the release record verifies it against the served bytes, so a
+  human can validate a download. Separately, the Windows auto-updater computes
+  the SHA-256 of the installer it downloaded and refuses to run it unless the
+  digest matches the manifest's inline `sha256` or the entry for that filename
+  in the fetched checksum file (`_verifyChecksum` in
+  `intergalactic/lib/utils/update_checker_io.dart`, before the Authenticode
+  check and before installer launch). That verifier is inside
+  `PlatformUtils.isWindows` guards, so it is the **only** platform where the
+  runtime performs it - and step 4's "trust validation of manifest/destination"
+  is still a separate, weaker property that bounds *where* the app fetches
+  from, not *what* came back. Elsewhere the digest is a human step.
+  (This bullet previously said the runtime never verified a digest, which
+  contradicted the Windows platform requirements further down this file.)
+- **Signing is platform-enforced or absent, and it differs per platform.**
+  Android verifies its own APK signature on install. The Windows installer
+  currently ships on the untrusted-root / unsigned-consent path accepted at the
+  0.7.4 release closeout. Apple builds are signed through App Store Connect.
+  None of this is enforced by anything in this chain.
+- **There is no rollback step.** A failed or rejected update leaves the
+  installed build in place; recovery is reinstalling a prior artifact by hand,
+  and prior artifacts are retained for that reason. Nothing here automates it.
+
+Whether that division is acceptable is a release decision, not an architecture
+one, and it belongs to Release Pipeline and the owner. What this section fixes
+is that the map previously described a download chain without saying which of
+these three it did and did not cover, so a reader could not tell absence from
+omission.
+
+Boundary ownership outside this tracked architecture:
+
+- Release Pipeline owns release orchestration; S&C owns security/compliance
+  interpretation.
+- Credentials and other secret material remain outside tracked documentation.
+- Store submission and approval workflow (Google Play, Apple Store Connect, and
+  other store/channels) is owner-defined and not encoded in this document.
+- Hosting/publication mechanics (object storage target, CDN/site wiring,
+  publication timing, and manual deployment tooling) are outside this release
+  map and must be tracked by the release operator.
+- Device/manual smoke proof remains an operator or QA responsibility and is not a
+  deterministic code path in this chain.
+
+Desktop release-helper builds for Windows, macOS, and Linux run
+`flutter config --enable-windowing` by default through
+`intergalactic/scripts/build_release.dart` before invoking `flutter build`. Do
+not rely on a maintainer's pre-existing local Flutter SDK config state for
+detached call windows, notification companion windows, or other
+`ViewAnchor`-based desktop surfaces.
+
+## Android
+
+### Current responsibilities to inspect
+
+- `intergalactic/android/`
+- `intergalactic/scripts/build_release.dart`
+- public release guidance under `docs/release/`
+- release-specific commands and flags documented in the tracked release
+  guidance; do not assume a repo-root `build_android.bat` exists in this app
+  repository
+
+### Platform expectations
+
+- installable package builds successfully
+- manifest and permission changes are intentional
+- notification registration still works if the release depends on it
+- account restore and encrypted rooms still behave after restart
+
+### Common blockers
+
+- manifest/permission mismatch
+- wrong icon/signing/config resource assumptions
+- push registration regressions
+- plugin startup failures
+
+### Android pre-release checklist
+
+- build succeeds
+- install succeeds on device/emulator
+- login succeeds
+- restart/session restore succeeds
+- notifications and media behavior match expectations for the change
+
+## iOS
+
+### Current responsibilities to inspect
+
+- `intergalactic/ios/`
+- `intergalactic/scripts/build_release.dart`
+- public release guidance under `docs/release/`
+- verify the current distribution path separately before documenting exact
+  commands; signing and store state are not represented by this repository
+
+### Platform expectations
+
+- archive/export path is still valid
+- entitlements/capabilities match the feature set
+- login and encrypted restore remain stable on device
+- native/plugin registration still works for the features included in the build
+
+### Common blockers
+
+- signing/capability mismatch
+- notification or permission flow regressions
+- plugin registration problems
+- feature assumptions that only worked in debug or simulator contexts
+- missing `flutter config --enable-windowing` setup when validating macOS
+  detached call or companion windows from non-helper build paths
+
+### iOS pre-release checklist
+
+- archive/export path verified on macOS/Xcode
+- app launches on device
+- login and restore succeed
+- encrypted rooms remain usable
+- notification/media/plugin paths affected by the change are smoke-tested
+
+## Web
+
+### Current responsibilities to inspect
+
+- `intergalactic/web/`
+- `intergalactic/scripts/prepare-web.sh`
+- `intergalactic/scripts/build_release.dart`
+- web/browser code under `intergalactic/lib/client/.../web/...`
+
+### Platform expectations
+
+- browser build loads cleanly
+- no conditional-import regressions
+- session/restore behavior is acceptable for current browser target assumptions
+- web push/service-worker behavior still matches the intended deployment
+
+### Common blockers
+
+- web-only import leakage into shared code
+- broken service worker or bootstrap assumptions
+- update manifest / hosted asset path mismatch
+- browser storage assumptions that break login or restore
+
+### Web pre-release checklist
+
+- browser build succeeds
+- app loads without import/runtime errors
+- login works
+- refresh/reopen behavior matches expectations
+- notification or media changes are smoke-tested in browser context if applicable
+
+## Desktop
+
+Desktop here means the packaged desktop targets driven by the Flutter runners under:
+
+- `intergalactic/windows/`
+- `intergalactic/linux/`
+- `intergalactic/macos/`
+
+Verify current active desktop release scope before assuming all three are shipped equally.
+
+### Current responsibilities to inspect
+
+- platform runner folders
+- repo-root `windows_installer.iss`
+- `intergalactic/scripts/build_release.dart`
+- update manifest generation if updater behavior changed
+
+### Platform expectations
+
+- packaged app launches from the release artifact
+- updater or release-manifest assumptions still match the actual hosted structure
+- local persistence and encrypted restore remain stable after restart
+- Windows auto-update runs only from a packaged `InterGalactic.exe`, never from
+  a debug/Dart runtime.
+- Windows auto-update requires a trusted HTTPS manifest, installer download URL,
+  and checksum metadata before installer execution.
+- Windows installers with Authenticode `Valid` status can proceed after
+  checksum verification. Unsigned, self-signed, or untrusted-root installers
+  can proceed only when the manifest sets
+  `platforms.windows.allow_unsigned_auto_update: true` and the user approves
+  the updater warning before installer launch; cancelling that warning
+  relaunches Inter Galactic without installing the update.
+- Normal desktop releases publish `platforms.windows.auto_update: true` by
+  default. Disable Windows auto-update only for intentional manual-download
+  releases.
+- Windows updater PowerShell commands must run temp `.ps1` files with `-File`
+  and pass the downloaded installer path as a normal argument. Do not use
+  `$args[0]` or inline scripts after `-Command` for this path.
+- Startup auto-update launches a copied runtime helper before the normal app
+  window/session stack starts; runtime auto-update uses the existing update
+  alert style, then closes the main app and hands off to the updater window.
+
+### Common blockers
+
+- installer or packaging config drift
+- wrong manifest/update URL structure
+- plugin DLL/binary bundling mistakes
+- platform-specific startup regressions
+- missing checksum URL or inline SHA-256 for the Windows installer
+- untrusted or invalid Windows installer signature without explicit manifest
+  opt-in and user approval
+- accidental disabling of `platforms.windows.auto_update` for a normal desktop
+  release after the updater path has become the default
+
+### Desktop pre-release checklist
+
+- packaged artifact launches
+- login works
+- restart/restore works
+- updater paths or `latest.json` assumptions still match runtime code
+- previous packaged Windows build detects a staged newer `latest.json` on
+  startup, shows the updater progress window before the main window, installs,
+  and restarts into the new version
+- running packaged Windows build detects a newly published update during the
+  periodic check, shows the normal update notification, then hands off to the
+  updater progress window after user acceptance
+- corrupt download, wrong checksum, unsigned/untrusted installer, installer
+  approval/cancel, installer failure, no-update, rollback-manifest, and restart
+  paths are verified before enabling `windows.auto_update`
+- affected plugin/media features are smoke-tested from the packaged build
+
+### Windows build toolchain notes
+
+- The Windows release build path must select the intended Flutter SDK before
+  codegen or release build steps.
+- Run `flutter pub get` with the selected SDK before Dart codegen, because
+  workspace `package_config.json` records SDK package roots such as
+  `package:flutter`.
+- `intergalactic/scripts/build_release.dart` honors `FLUTTER_EXE` when it
+  spawns `flutter build`; keep that environment handoff intact when changing
+  the release build path.
+- If a Windows build error references an unexpected Flutter SDK path, treat it
+  as a toolchain selection/cache issue before changing app code.
+- When local automation runs Flutter/Dart/build commands on Windows, use a
+  stable local app-data/cache location. Isolated sandbox profiles can produce
+  false tool-cache failures.
+
+## Release Blockers
+
+Treat these as likely blockers unless the release scope explicitly says otherwise:
+
+- build failure for the target
+- startup crash
+- login failure
+- session restore failure
+- encrypted-room usability failure
+- wrong-account notification or routing behavior
+- updater/manifest mismatch for a target that uses auto-update or hosted downloads
+- plugin initialization crash for a shipped feature
+
+## Pre-Release Checklist
+
+Use this as the shared default checklist:
+
+- confirm target build path
+- confirm packaging path
+- smoke-test startup
+- smoke-test login
+- smoke-test restart/session restore
+- verify encrypted room access
+- verify notifications if the target uses them
+- verify media/plugin paths touched by the change
+- verify release/update metadata assumptions
+
+## Notes On Release Scripts
+
+Do not treat release scripts as isolated build glue.
+
+If changing release scripts, also inspect:
+
+- hosted manifest assumptions such as `latest.json`
+- package/output naming
+- platform-specific artifact paths
+- any companion website/download page expectations
+
+Current build-number rule:
+
+- New hosted release artifacts use the full pubspec identity
+  `{version}+{build}` in filenames and directories, for example
+  `InterGalactic-0.6.5+899.apk`.
+- Windows installer metadata may remain semantic `X.Y.Z`; the hosted installer
+  filename is renamed to include `{version}+{build}` after packaging.
+- `latest.json` publishes `version` as `v{version}+{build}` and also exposes
+  `version_name` plus `build_number` for website and updater consumers.
+- Public changelog files remain semantic-version scoped, for example
+  `/updates/changelog/v0.6.5.md`, unless a release intentionally needs
+  separate notes for each build.
+
+Current environment and signing rule:
+
+- Maintainer batch helpers load environment values from a private, local
+  operator env file. Do not commit env contents or treat repository templates as
+  canonical secret storage.
+- The maintainer release script signs the Windows app executable before packaging and signs
+  the Inno Setup installer before checksum generation when Windows signing is
+  enabled and credentials are configured. The signing certificate path is
+  environment-configured.
+- Keep signing before checksum generation when signing is enabled. For the
+  unsigned/open-source path, generate checksums only after the final installer
+  artifact has been accepted so published checksums describe the exact
+  artifact users download.
+- `windows_installer.iss` is the installer recipe in the repo root; the release
+  machine must still provide Inno Setup's `ISCC.exe`. Nonstandard installs can
+  be pointed at with `IG_INNO_SETUP_COMPILER`, `IG_ISCC`, or
+  `INNO_SETUP_COMPILER` in the configured private env file.
+- Keep Windows signing commands out of parenthesized batch branches. Windows
+  SDK paths often include parentheses, and raw `cmd.exe` parsing can otherwise
+  fail with `\Windows was unexpected at this time`.
+- `WINDOWS_SIGNTOOL` may point either to `signtool.exe` or to the SDK folder
+  that contains it; release tooling should normalize the folder form before
+  signing.
+- Checksum generation should stay independent of optional PowerShell cmdlets;
+  release tooling should not silently produce a bad checksum file when
+  `Get-FileHash` is unavailable.
+- Keep local packaging logs outside committed source so launcher-window
+  failures remain diagnosable.
+- The release flow must copy selected artifacts into the publication target
+  before copying `latest.json` last.
+- Restart or refresh the web service only after the web deployment target has
+  the intended bundle.
+- iOS/macOS release handoffs should carry the current architecture and release
+  notes alongside the app checkout.
+
+GIF provider release rule:
+
+- Public release builds use the configured managed GIF relay by default.
+  `build_release.dart` forwards that relay as `GIF_API_BASE_URL` unless a
+  release operator provides another relay URL or explicitly disables the
+  managed relay for an unmanaged build with `--disable_managed_gif_relay` or
+  `DISABLE_MANAGED_GIF_RELAY=1`.
+- `KLIPY_API_KEY` is ignored by default even when present in the environment.
+  It is embedded only when `--allow_direct_klipy_api_key` or
+  `ALLOW_DIRECT_KLIPY_API_KEY=1` is supplied intentionally.
+- Public/user-setup builds should normally ship with no direct KLIPY key and
+  either the managed relay, an intentional alternate relay URL, or an explicitly
+  unmanaged GIF provider setup so users can add their own relay/API key from
+  General settings.
+
+## Open Release-Policy Questions
+
+- The presence of `intergalactic/linux/` proves only that a Linux runner exists
+  in the tree. It is not evidence that Linux is built, tested, or published,
+  and this document must not be read as claiming Linux support. The release
+  owner must decide and record that policy before this document makes any
+  stronger claim.
+- The exact iOS distribution path depends on current macOS/Xcode, signing, and
+  store state outside this repository. Keep this document at the portable
+  responsibility level until the release owner records the active path.

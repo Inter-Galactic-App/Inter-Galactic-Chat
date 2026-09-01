@@ -1,0 +1,58 @@
+name: tiamat
+description: A new Flutter project.
+
+publish_to: 'none'
+version: 1.0.0+1
+
+environment: 
+  sdk: '>=3.6.0 <4.0.0'
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.2
+  widgetbook_annotation: ^3.0.0
+  dropdown_button2: ^2.0.0
+  just_the_tooltip: ^0.0.12
+  path: ^1.9.0
+  dynamic_color: 
+    git: 
+      url: https://github.com/Airyzz/material-flutter-packages.git
+      ref: f8a2817197fb68bac47bd1067152c46a4ab56cab
+      path: ./packages/dynamic_color
+
+dev_dependencies:
+  build_runner:
+  widgetbook_generator: ^3.1.0
+  widgetbook:
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/placeholder/generic/
+  shaders:
+    - assets/shader/texture_coordinate.frag
+  fonts:
+    # NotoColorEmoji.ttf was declared here as `EmojiFont` and removed on
+    # 2026-08-07. It shipped 23.75 MB into every build and was never drawn.
+    #
+    # A font declared by a package is registered under a namespaced family
+    # (`packages/tiamat/EmojiFont`), while the app declares its own `EmojiFont`
+    # -> TwemojiCOLR.otf. Every emoji request in this repo asks for the bare
+    # name, so the app's font always won and this one was pure payload.
+    # ThemeCommon.fontFamilyFallback() still ends in "EmojiFont" and still
+    # resolves - to the app's font, exactly as before.
+    #
+    # If tiamat is ever consumed by an app that does NOT declare an `EmojiFont`
+    # family, that fallback entry will resolve to nothing and the consumer must
+    # supply its own emoji font. Do not re-add one here to paper over that: a
+    # package font under a shadowed name is invisible in the build log and
+    # only shows up as bundle size.
+    - family: RobotoCustom
+      fonts: 
+        - asset: assets/font/roboto/Roboto-Regular.ttf
+        - asset: assets/font/roboto/Roboto-Bold.ttf
+          weight: 700
+

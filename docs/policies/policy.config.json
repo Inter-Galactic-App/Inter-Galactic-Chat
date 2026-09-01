@@ -1,0 +1,111 @@
+{
+  "$schema": "https://policygen.xyz/schemas/0.6/schema.json",
+  "output": {
+    "fileType": "html",
+    "cssFramework": "classes",
+    "locales": [
+      "en"
+    ],
+    "privacyFilePath": "./_policygen_output/privacy.html",
+    "termsFilePath": "./_policygen_output/terms.html"
+  },
+  "entity": {
+    "name": "Inter Galactic",
+    "website": "https://app.ourgalaxy.space/",
+    "address": "DEFERRED: public operator mailing address not recorded; governing law remains Michigan, United States"
+  },
+  "privacy": {
+    "privacyEmail": "intergalactic@ourgalaxy.space",
+    "platforms": [
+      "web",
+      "mobile",
+      "desktop"
+    ],
+    "locations": [
+      "us",
+      "other"
+    ],
+    "socialSignIn": false,
+    "personalInformation": [
+      "email",
+      "ipAddress",
+      "deviceId",
+      "anonymizedUsageData"
+    ],
+    "sensitiveInformation": [],
+    "thirdPartyData": [
+      "socialMedia",
+      "purchase",
+      "support"
+    ],
+    "paymentData": false,
+    "paymentProcessors": [],
+    "appUsageData": true,
+    "thirdPartyDisclosure": true,
+    "thirdPartyDisclosureEntities": [
+      "Matrix homeserver selected by the user, including Matrix-native report recipients",
+      "Apple Push Notification service",
+      "LiveKit",
+      "Spotify when enabled",
+      "GIF provider or relay when GIF search is used",
+      "URL preview provider or selected homeserver when URL previews are enabled"
+    ],
+    "thirdPartySharing": false,
+    "thirdPartySharingEntities": [],
+    "securityMeasures": true,
+    "webTracking": false,
+    "thirdPartyAnalytics": false,
+    "serviceRequirements": [
+      "accounts",
+      "communication"
+    ],
+    "legalBasis": [
+      "security",
+      "fraudPrevention"
+    ],
+    "dataRetentionPeriod": "Matrix messages, media, and Matrix-native abuse reports are retained by the selected homeserver; local logs remain on device unless shared; direct Inter Galactic support, abuse, diagnostic, and Spotify records are retained only as needed for their stated purpose.",
+    "usStatePrivacyLaws": true,
+    "privacyPage": "https://app.ourgalaxy.space/privacy/",
+    "dpo": false,
+    "cpraCompliance": false,
+    "vcdpaCompliance": false,
+    "cookieConsent": false,
+    "dataBreachNotification": false,
+    "crossBorderTransfers": false,
+    "coppaCompliance": false,
+    "childrenMinAge": 13
+  },
+  "terms": {
+    "supportEmail": "intergalactic@ourgalaxy.space",
+    "underEighteen": true,
+    "underThirteen": false,
+    "purchasableGoods": false,
+    "subscription": false,
+    "freeTrial": false,
+    "autoRenew": false,
+    "refundPolicy": "none",
+    "userContent": true,
+    "userContentLicense": true,
+    "userAccounts": true,
+    "governingLaw": "Michigan, United States",
+    "disputeResolution": "litigation",
+    "mediation": false,
+    "prohibitedUses": [
+      "illegal",
+      "harmful",
+      "infringing",
+      "abusive",
+      "spam",
+      "impersonation"
+    ],
+    "serviceSLA": false,
+    "serviceSLAAmount": 0,
+    "serviceSLARefund": false,
+    "liabilityLimitation": false,
+    "liabilityLimitationAmount": 0,
+    "forceMajeure": true,
+    "dmcaTakedown": true,
+    "dmcaEmail": "intergalactic@ourgalaxy.space",
+    "taxLiability": false
+  }
+}
