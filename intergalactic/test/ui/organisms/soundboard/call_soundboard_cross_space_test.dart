@@ -348,49 +348,6 @@ void main() {
       expect(find.text('Local horn'), findsOneWidget);
       expect(find.text('Remote horn'), findsOneWidget);
     });
-
-    testWidgets('the pre-U7 audibility hint shows only while an external pack '
-        'is on screen', (tester) async {
-      // Temporary sender-side notice: cross-space plays are inaudible to
-      // pre-U7 receivers, so the sender is warned whenever the packs on screen
-      // include an external one - the local space alone must not trip it.
-      //
-      // This test comes out in 0.8.2 with the hint it covers, NOT in 0.8.1.
-      // Deleting it while the hint still ships would remove the only thing
-      // proving the hint is scoped to external packs.
-      const hint =
-          'Sounds from other spaces may not be heard by everyone in '
-          'the call yet.';
-      library.entryList = [entry()];
-      await pumpMenu(tester);
-
-      // Local space is selected first: no external pack visible, no hint.
-      expect(find.text('Local horn'), findsOneWidget);
-      expect(find.text(hint), findsNothing);
-
-      // Selecting the external space brings its packs - and the hint - forward.
-      await tester.tap(
-        find.byKey(const ValueKey('soundboard-space-source-$_sourceSpaceId')),
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('Remote horn'), findsOneWidget);
-      expect(find.text(hint), findsOneWidget);
-
-      // A search surfaces the external match too, so the hint rides along.
-      await tester.enterText(find.byType(TextField), 'horn');
-      await tester.pumpAndSettle();
-      expect(find.text(hint), findsOneWidget);
-    });
-
-    testWidgets('no hint when the call has no external packs at all', (
-      tester,
-    ) async {
-      library.entryList = [];
-      await pumpMenu(tester);
-
-      expect(find.text('Local horn'), findsOneWidget);
-      expect(find.textContaining('may not be heard by everyone'), findsNothing);
-    });
   });
 }
 

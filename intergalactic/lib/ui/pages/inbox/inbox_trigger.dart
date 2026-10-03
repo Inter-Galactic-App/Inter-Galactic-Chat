@@ -107,8 +107,8 @@ class _InboxTriggerState extends State<InboxTrigger> {
         return Semantics(
           button: true,
           label: 'Inbox, $semanticCount',
-          child: Tooltip(
-            message: count == 0 ? 'Inbox' : 'Inbox, $semanticCount',
+          child: tiamat.Tooltip(
+            text: count == 0 ? 'Inbox' : 'Inbox, $semanticCount',
             child: SizedBox(
               width: widget.size,
               height: widget.size,

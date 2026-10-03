@@ -1,4 +1,10 @@
 {
+  "notificationAttachmentSentImage": "ஒரு படத்தை அனுப்பினார்",
+  "notificationAttachmentSentVideo": "ஒரு வீடியோவை அனுப்பினார்",
+  "notificationAttachmentSentAudio": "ஒரு குரல் செய்தியை அனுப்பினார்",
+  "notificationAttachmentSentFile": "ஒரு கோப்பை அனுப்பினார்",
+  "notificationAttachmentSharedLocation": "ஒரு இருப்பிடத்தை பகிர்ந்தார்",
+  "notificationAttachmentSentSticker": "ஒரு ஸ்டிக்கரை அனுப்பினார்",
   "labelMatrixRecoveryKeyCreateExplanation": "செய்தி வரலாற்றை அணுக பயன்படுத்தக்கூடிய பாதுகாப்பு விசையை நாம் அமைக்க வேண்டும். நாங்கள் உங்களுக்காக ஒரு விசையை உருவாக்கலாம், அல்லது உங்கள் சொந்த பாதுகாப்பு சொற்றொடரை நீங்கள் தேர்வு செய்யலாம்",
   "@labelMatrixRecoveryKeyCreateExplanation": {
     "description": "Explains what the matrix recovery key does, and that it can be generated or user input",

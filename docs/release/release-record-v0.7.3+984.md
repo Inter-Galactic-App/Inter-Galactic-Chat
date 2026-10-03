@@ -58,25 +58,20 @@ and `static-analysis` checks on head
 
 ## GitHub Source Closeout
 
-PR #38 is merged:
-
-`https://github.com/Inter-Galactic-App/Inter-Galactic/pull/38`
-
-GitHub tag:
-
-`https://github.com/Inter-Galactic-App/Inter-Galactic/tree/v0.7.3%2B984`
-
-The pushed tag is the canonical GitHub source anchor for this shipped binary
-set. It intentionally points at source commit
+PR #38 was merged and the `v0.7.3+984` tag was pushed to the private-primary
+repository. Neither private-primary URL is a public source link. The tag
+historically pointed at source commit
 `91c4adf072dee05092f24943ee686c4eec91bd7e`, because Windows desktop and
 Android artifacts were built and published from that commit before later
 documentation and review closeout commits landed.
 
-A formal GitHub Release page was deferred. The release tag, this release
-record, the public changelog, and the published artifact URLs are the current
-source/release anchors. Create a formal GitHub Release page later only if the
-project wants the GitHub Releases UI populated; do not retarget the
-`v0.7.3+984` tag away from the exact release source commit.
+On 2026-09-27, the public `Inter-Galactic-Chat` mirror did not advertise this
+tag, and the former website source-archive route returned 404. No equivalent
+public tag or archive was verified. The artifact and endpoint references below
+record release-time publication, not current availability. A formal GitHub
+Release page was deferred. Do not substitute a public-mirror tag URL or
+retarget the historical tag without exact-source verification and release
+review.
 
 ## Published Artifacts
 

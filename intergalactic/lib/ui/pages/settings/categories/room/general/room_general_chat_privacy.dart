@@ -24,33 +24,39 @@ class _RoomGeneralChatPrivacySettings
   bool? typingIndicatorEnabledForRoom;
 
   String labelDefaultReadReceiptsOption(pref) => Intl.message(
-      "Use global preference ($pref)",
-      desc:
-          "Label to use the global preference, showing the current global preference value",
-      name: "labelDefaultReadReceiptsOption",
-      args: [pref]);
+    "Use global preference ($pref)",
+    desc:
+        "Label to use the global preference, showing the current global preference value",
+    name: "labelDefaultReadReceiptsOption",
+    args: [pref],
+  );
 
   String labelDefaultTypingIndicatorsOption(pref) => Intl.message(
-      "Use global preference ($pref)",
-      desc:
-          "Label to use the global preference, showing the current global preference value",
-      name: "labelDefaultTypingIndicatorsOption",
-      args: [pref]);
+    "Use global preference ($pref)",
+    desc:
+        "Label to use the global preference, showing the current global preference value",
+    name: "labelDefaultTypingIndicatorsOption",
+    args: [pref],
+  );
 
-  String get labelReadReceiptsTitle => Intl.message("Read receipts",
-      desc:
-          "Label for the toggle for enabling and disabling public read receipts",
-      name: "labelReadReceiptsTitle");
+  String get labelReadReceiptsTitle => Intl.message(
+    "Read receipts",
+    desc:
+        "Label for the toggle for enabling and disabling public read receipts",
+    name: "labelReadReceiptsTitle",
+  );
 
-  String get labelTypingIndicatorTitle => Intl.message("Typing indicators",
-      desc: "Label for the toggle for enabling and disabling typing indicators",
-      name: "labelTypingIndicatorTitle");
+  String get labelTypingIndicatorTitle => Intl.message(
+    "Typing indicators",
+    desc: "Label for the toggle for enabling and disabling typing indicators",
+    name: "labelTypingIndicatorTitle",
+  );
 
-  String get labelPrivacyTitle => Intl.message(
-        "Privacy",
-        desc: "Header for room privacy notification settings",
-        name: "labelRoomPrivacyNotificationSettings",
-      );
+  String get labelRoomPrivacyNotificationSettings => Intl.message(
+    "Privacy",
+    desc: "Header for room privacy notification settings",
+    name: "labelRoomPrivacyNotificationSettings",
+  );
 
   @override
   void initState() {
@@ -68,7 +74,7 @@ class _RoomGeneralChatPrivacySettings
   @override
   Widget build(BuildContext context) {
     return SettingsSection(
-      title: labelPrivacyTitle,
+      title: labelRoomPrivacyNotificationSettings,
       children: [
         SettingsControlRow(
           title: labelReadReceiptsTitle,
@@ -95,9 +101,11 @@ class _RoomGeneralChatPrivacySettings
       options: [
         _PreferenceDropdownOption(
           value: null,
-          label: labelDefaultReadReceiptsOption(usePublicReadReceipts
-              ? CommonStrings.labelPublic
-              : CommonStrings.labelPrivate),
+          label: labelDefaultReadReceiptsOption(
+            usePublicReadReceipts
+                ? CommonStrings.labelPublic
+                : CommonStrings.labelPrivate,
+          ),
         ),
         _PreferenceDropdownOption(
           value: false,
@@ -121,9 +129,11 @@ class _RoomGeneralChatPrivacySettings
       options: [
         _PreferenceDropdownOption(
           value: null,
-          label: labelDefaultTypingIndicatorsOption(typingIndicatorEnabled
-              ? CommonStrings.labelEnabled
-              : CommonStrings.labelDisabled),
+          label: labelDefaultTypingIndicatorsOption(
+            typingIndicatorEnabled
+                ? CommonStrings.labelEnabled
+                : CommonStrings.labelDisabled,
+          ),
         ),
         _PreferenceDropdownOption(
           value: false,
@@ -154,10 +164,7 @@ class _RoomGeneralChatPrivacySettings
 }
 
 class _PreferenceDropdownOption<T> {
-  const _PreferenceDropdownOption({
-    required this.value,
-    required this.label,
-  });
+  const _PreferenceDropdownOption({required this.value, required this.label});
 
   final T value;
   final String label;
@@ -187,10 +194,8 @@ class _PreferenceDropdown<T> extends StatelessWidget {
         color: Theme.of(context).colorScheme.surfaceContainer,
         value: selected,
         items: options,
-        itemBuilder: (item) => tiamat.Text.label(
-          item.label,
-          overflow: TextOverflow.ellipsis,
-        ),
+        itemBuilder: (item) =>
+            tiamat.Text.label(item.label, overflow: TextOverflow.ellipsis),
         onItemSelected: (item) {
           if (item == null) return;
           onChanged(item.value);

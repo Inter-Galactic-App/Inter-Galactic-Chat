@@ -14,6 +14,7 @@ import 'package:intergalactic/client/components/voip/webrtc_screencapture_source
 import 'package:intergalactic/client/matrix/components/rtc_data_channel/matrix_rtc_data_channel_component.dart';
 import 'package:intergalactic/client/matrix/components/voip/direct_call_camera_release.dart';
 import 'package:intergalactic/client/matrix/components/voip/direct_call_media_operation_gate.dart';
+import 'package:intergalactic/client/matrix/components/voip/direct_call_session_owner.dart';
 import 'package:intergalactic/client/matrix/components/voip/matrix_voip_stream.dart';
 import 'package:intergalactic/client/matrix/matrix_client.dart';
 import 'package:intergalactic/config/platform_utils.dart';
@@ -73,7 +74,7 @@ Future<void> _disposeDirectCallStream(
   }
 }
 
-class MatrixVoipSession implements VoipSession {
+class MatrixVoipSession implements DirectCallSession {
   matrix.CallSession session;
 
   @override
@@ -1087,6 +1088,12 @@ class MatrixVoipSession implements VoipSession {
     _disposeFuture = _disposeCallResourcesOnce();
     return _disposeFuture!;
   }
+
+  /// Releases wrapper-owned direct-call resources without sending a hang-up.
+  ///
+  /// The Matrix SDK invokes its ended callback after it has already finished
+  /// the underlying call. Its owner uses this to release the matching wrapper.
+  Future<void> dispose() => _disposeCallResources();
 
   Future<void> _disposeCallResourcesOnce() async {
     final shareSession = currentShareSession;

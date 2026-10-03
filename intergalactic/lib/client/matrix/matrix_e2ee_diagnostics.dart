@@ -10,17 +10,141 @@ import 'package:matrix/encryption.dart';
 import 'package:matrix/matrix.dart' as matrix;
 import 'package:matrix/matrix_api_lite.dart' as matrix_api;
 
+enum MatrixE2eeBackupProbeOutcome { inBackup, notInBackup, versionUnusable }
+
+class MatrixE2eeBackupProbeSummary {
+  const MatrixE2eeBackupProbeSummary({
+    required this.candidates,
+    required this.inBackup,
+    required this.notInBackup,
+    required this.versionUnusable,
+    required this.skippedBudget,
+  });
+
+  final int candidates;
+  final int inBackup;
+  final int notInBackup;
+  final int versionUnusable;
+  final int skippedBudget;
+}
+
+/// A developer-only, host-side measurement window for E10.
+///
+/// It deliberately owns no key material. The callback only reports whether a
+/// server-side backup lookup succeeded, missed, or could not be evaluated.
+/// The window is opened around the wake's existing sync, so its work is
+/// bounded by the same budget instead of becoming a second wake phase.
+class MatrixE2eeBackupProbeScope {
+  MatrixE2eeBackupProbeScope({
+    required this.enabled,
+    required Duration budget,
+    this.routeClientId,
+    this.routeRoomId,
+    this.routeEventId,
+    DateTime Function()? now,
+  }) : _deadline = (now ?? DateTime.now).call().add(budget),
+       _now = now ?? DateTime.now;
+
+  static const Duration probeTimeout = Duration(milliseconds: 750);
+  static const int maxProbes = 2;
+
+  final bool enabled;
+  final String? routeClientId;
+  final String? routeRoomId;
+  final String? routeEventId;
+  final DateTime _deadline;
+  final DateTime Function() _now;
+  final List<Future<void>> _inFlight = <Future<void>>[];
+  int _started = 0;
+  int _candidates = 0;
+  int _inBackup = 0;
+  int _notInBackup = 0;
+  int _versionUnusable = 0;
+  int _skippedBudget = 0;
+  bool _finished = false;
+
+  Future<void> record(
+    Future<MatrixE2eeBackupProbeOutcome> Function(Duration timeout) probe,
+  ) {
+    if (!enabled || _finished) {
+      return Future<void>.value();
+    }
+    _candidates++;
+
+    final remaining = _deadline.difference(_now());
+    if (_started >= maxProbes || remaining <= probeTimeout) {
+      _skippedBudget++;
+      return Future<void>.value();
+    }
+
+    _started++;
+    final timeout = remaining < probeTimeout ? remaining : probeTimeout;
+    late final Future<void> inFlight;
+    inFlight = () async {
+      MatrixE2eeBackupProbeOutcome outcome;
+      try {
+        outcome = await probe(timeout);
+      } catch (_) {
+        outcome = MatrixE2eeBackupProbeOutcome.versionUnusable;
+      }
+      switch (outcome) {
+        case MatrixE2eeBackupProbeOutcome.inBackup:
+          _inBackup++;
+        case MatrixE2eeBackupProbeOutcome.notInBackup:
+          _notInBackup++;
+        case MatrixE2eeBackupProbeOutcome.versionUnusable:
+          _versionUnusable++;
+      }
+    }();
+    _inFlight.add(inFlight);
+    return inFlight.whenComplete(() => _inFlight.remove(inFlight));
+  }
+
+  /// Records a candidate only when it is the exact APNs-routed event for the
+  /// routed client. The active scope is process-global while all clients sync,
+  /// so this guard prevents an unrelated account's decrypt failure from
+  /// changing this wake's developer-only aggregate.
+  Future<void> recordForRoute({
+    required String clientId,
+    required String roomId,
+    required String eventId,
+    required Future<MatrixE2eeBackupProbeOutcome> Function(Duration timeout)
+    probe,
+  }) {
+    if (clientId != routeClientId ||
+        roomId != routeRoomId ||
+        eventId != routeEventId) {
+      return Future<void>.value();
+    }
+    return record(probe);
+  }
+
+  Future<MatrixE2eeBackupProbeSummary> finish() async {
+    _finished = true;
+    await Future.wait(List<Future<void>>.of(_inFlight));
+    return MatrixE2eeBackupProbeSummary(
+      candidates: _candidates,
+      inBackup: _inBackup,
+      notInBackup: _notInBackup,
+      versionUnusable: _versionUnusable,
+      skippedBudget: _skippedBudget,
+    );
+  }
+}
+
 class MatrixE2eeDiagnostics {
   MatrixE2eeDiagnostics({
     required matrix.Client client,
     required String clientId,
     bool suppressAutomaticRepair = false,
     Future<void> Function()? onPersistentRequestableSessionFailure,
+    Future<void> Function()? onRequestableRoomKeyReceived,
   }) : _client = client,
        _clientId = clientId,
        _suppressAutomaticRepair = suppressAutomaticRepair,
        _onPersistentRequestableSessionFailure =
            onPersistentRequestableSessionFailure,
+       _onRequestableRoomKeyReceived = onRequestableRoomKeyReceived,
        _missingRoomSessionStalenessTracker =
            MatrixMissingRoomSessionStalenessTracker(hash: _hash) {
     _persistentRequestableSessionRepairDispatcher =
@@ -38,6 +162,25 @@ class MatrixE2eeDiagnostics {
             );
           },
         );
+    _receivedRequestableRoomKeyRetryDispatcher =
+        MatrixPersistentRequestableSessionRepairDispatcher(
+          isDisposed: () => _disposed,
+          callback: _onRequestableRoomKeyReceived,
+          onFailure: (error, trace) {
+            Log.onError(
+              error,
+              trace,
+              content: 'Retry after late Matrix E2EE room key did not complete',
+              category: LogCategory.matrix,
+              source: 'matrix-e2ee',
+            );
+          },
+        );
+    _lateRoomKeyRetryCoordinator = MatrixLateRoomKeyRetryCoordinator(
+      tracker: _missingRoomSessionStalenessTracker,
+      dispatcher: _receivedRequestableRoomKeyRetryDispatcher,
+      suppressAutomaticRepair: _suppressAutomaticRepair,
+    );
   }
 
   static const String policyCrossVerifiedIfEnabled =
@@ -61,11 +204,29 @@ class MatrixE2eeDiagnostics {
       MatrixDecryptLogSummarizer(sourceLabel: 'sdk-log');
   static DateTime? _lastIgnoredCallMemberLogAt;
   static int _ignoredCallMemberLogCount = 0;
+  static MatrixE2eeBackupProbeScope? _activeBackupProbeScope;
+
+  static MatrixE2eeBackupProbeScope? get activeBackupProbeScope =>
+      _activeBackupProbeScope;
+
+  static Future<T> withBackupProbeScope<T>(
+    MatrixE2eeBackupProbeScope scope,
+    Future<T> Function() action,
+  ) async {
+    final previous = _activeBackupProbeScope;
+    _activeBackupProbeScope = scope;
+    try {
+      return await action();
+    } finally {
+      _activeBackupProbeScope = previous;
+    }
+  }
 
   final matrix.Client _client;
   final String _clientId;
   final bool _suppressAutomaticRepair;
   final Future<void> Function()? _onPersistentRequestableSessionFailure;
+  final Future<void> Function()? _onRequestableRoomKeyReceived;
   final MatrixMissingRoomSessionStalenessTracker
   _missingRoomSessionStalenessTracker;
   final Map<String, DateTime> _lastTimelineRequestLog = <String, DateTime>{};
@@ -83,6 +244,9 @@ class MatrixE2eeDiagnostics {
   bool _lastOlmRepairIncludedSync = false;
   late final MatrixPersistentRequestableSessionRepairDispatcher
   _persistentRequestableSessionRepairDispatcher;
+  late final MatrixPersistentRequestableSessionRepairDispatcher
+  _receivedRequestableRoomKeyRetryDispatcher;
+  late final MatrixLateRoomKeyRetryCoordinator _lateRoomKeyRetryCoordinator;
 
   /// Set by [dispose] and never cleared: this object is created once per
   /// client and disposed once, from `MatrixClient.close()`.
@@ -502,8 +666,111 @@ class MatrixE2eeDiagnostics {
       canRequestSession: canRequestSession,
     );
 
+    final sessionId = _stringValue(event.content['session_id']);
+    final backupProbeScope = activeBackupProbeScope;
+    if (sessionId != null && backupProbeScope != null) {
+      unawaited(
+        backupProbeScope.recordForRoute(
+          clientId: _clientId,
+          roomId: event.room.id,
+          eventId: event.eventId,
+          probe: (timeout) => _probeServerBackupPresence(
+            client: _client,
+            roomId: event.room.id,
+            sessionId: sessionId,
+            timeout: timeout,
+          ),
+        ),
+      );
+    }
+
     if (canRequestSession) {
       _recordRequestableSessionKey(event, source: source);
+    }
+  }
+
+  /// Reads the pushed encrypted event without decrypting it, then probes only
+  /// the server-side backup presence of its Megolm session. This closes the
+  /// gap where the wake receives the room key before the host emits a
+  /// [matrix.MessageTypes.BadEncrypted] timeline event.
+  static Future<MatrixE2eeBackupProbeOutcome> probePushedEncryptedEvent({
+    required matrix.Client client,
+    required String roomId,
+    required String eventId,
+    required Duration timeout,
+  }) async {
+    final deadline = DateTime.now().add(timeout);
+    Duration remaining() => deadline.difference(DateTime.now());
+
+    try {
+      final event = await client
+          .getOneRoomEvent(roomId, eventId)
+          .timeout(remaining());
+      if (event.type != matrix.EventTypes.Encrypted) {
+        return MatrixE2eeBackupProbeOutcome.versionUnusable;
+      }
+      final sessionId = _stringValue(event.content['session_id']);
+      if (sessionId == null) {
+        return MatrixE2eeBackupProbeOutcome.versionUnusable;
+      }
+      final budget = remaining();
+      if (budget <= Duration.zero) {
+        return MatrixE2eeBackupProbeOutcome.versionUnusable;
+      }
+      return _probeServerBackupPresence(
+        client: client,
+        roomId: roomId,
+        sessionId: sessionId,
+        timeout: budget,
+      );
+    } catch (_) {
+      return MatrixE2eeBackupProbeOutcome.versionUnusable;
+    }
+  }
+
+  static Future<MatrixE2eeBackupProbeOutcome> _probeServerBackupPresence({
+    required matrix.Client client,
+    required String roomId,
+    required String sessionId,
+    required Duration timeout,
+  }) async {
+    final deadline = DateTime.now().add(timeout);
+    Duration remaining() => deadline.difference(DateTime.now());
+
+    matrix_api.GetRoomKeysVersionCurrentResponse version;
+    try {
+      final versionResponse = await client.getRoomKeysVersionCurrent().timeout(
+        remaining(),
+      );
+      if (versionResponse.version.isEmpty) {
+        return MatrixE2eeBackupProbeOutcome.versionUnusable;
+      }
+      version = versionResponse;
+    } on matrix.MatrixException {
+      // A version-level 403/404 is deliberately not a negative key lookup:
+      // the backup cannot be evaluated when its version is unavailable.
+      return MatrixE2eeBackupProbeOutcome.versionUnusable;
+    } catch (_) {
+      return MatrixE2eeBackupProbeOutcome.versionUnusable;
+    }
+
+    if (version.algorithm !=
+        matrix_api.BackupAlgorithm.mMegolmBackupV1Curve25519AesSha2) {
+      return MatrixE2eeBackupProbeOutcome.versionUnusable;
+    }
+
+    try {
+      await client
+          .getRoomKeyBySessionId(roomId, sessionId, version.version)
+          .timeout(remaining());
+      return MatrixE2eeBackupProbeOutcome.inBackup;
+    } on matrix.MatrixException catch (error) {
+      if (error.response?.statusCode == 404) {
+        return MatrixE2eeBackupProbeOutcome.notInBackup;
+      }
+      return MatrixE2eeBackupProbeOutcome.versionUnusable;
+    } catch (_) {
+      return MatrixE2eeBackupProbeOutcome.versionUnusable;
     }
   }
 
@@ -631,11 +898,11 @@ class MatrixE2eeDiagnostics {
           category: LogCategory.matrix,
           source: 'matrix-e2ee',
         );
-        final resolvedSummary = _missingRoomSessionStalenessTracker
+        final resolvedSummary = _lateRoomKeyRetryCoordinator
             .recordRoomKeyReceived(roomId: roomId, sessionId: sessionId);
         if (resolvedSummary != null) {
           Log.i(
-            'E2EE stale missing room session resolved '
+            'E2EE requestable missing room session resolved '
             'room=${resolvedSummary.roomHash} '
             'session=${resolvedSummary.sessionHash} '
             'senders=${resolvedSummary.sendersLabel} '
@@ -644,6 +911,8 @@ class MatrixE2eeDiagnostics {
             category: LogCategory.matrix,
             source: 'matrix-e2ee',
           );
+          // The key arrived after a decrypt failure. It is now available to the
+          // SDK, but the failed timeline event will not retry by itself.
         }
         break;
       case matrix.EventTypes.RoomKeyRequest:
@@ -984,6 +1253,7 @@ class MatrixPersistentRequestableSessionRepairDispatcher {
   final Future<void> Function()? _callback;
   final void Function(Object error, StackTrace trace)? _onFailure;
   Future<void>? _inFlight;
+  bool _followUpRequested = false;
 
   bool get hasCallback => _callback != null;
 
@@ -1009,6 +1279,9 @@ class MatrixPersistentRequestableSessionRepairDispatcher {
 
     final runningDispatch = _inFlight;
     if (runningDispatch != null) {
+      // A newly available key can arrive while the preceding sweep is still
+      // decrypting. Keep one trailing sweep so that key is not stranded.
+      _followUpRequested = true;
       return runningDispatch;
     }
 
@@ -1021,7 +1294,7 @@ class MatrixPersistentRequestableSessionRepairDispatcher {
 
   Future<void> _run(
     Completer<void> completer,
-    Future<void> dispatch,
+    Future<void> dispatchFuture,
     Future<void> Function() callback,
   ) async {
     try {
@@ -1033,11 +1306,47 @@ class MatrixPersistentRequestableSessionRepairDispatcher {
     } catch (error, trace) {
       _onFailure?.call(error, trace);
     } finally {
-      if (identical(_inFlight, dispatch)) {
+      if (identical(_inFlight, dispatchFuture)) {
         _inFlight = null;
+      }
+      if (_followUpRequested && !_isDisposed()) {
+        _followUpRequested = false;
+        unawaited(this.dispatch(suppressAutomaticRepair: false));
       }
       completer.complete();
     }
+  }
+}
+
+/// Couples an already-tracked missing session with the retry that becomes
+/// possible when its matching room key arrives.
+class MatrixLateRoomKeyRetryCoordinator {
+  MatrixLateRoomKeyRetryCoordinator({
+    required MatrixMissingRoomSessionStalenessTracker tracker,
+    required MatrixPersistentRequestableSessionRepairDispatcher dispatcher,
+    required bool suppressAutomaticRepair,
+  }) : _tracker = tracker,
+       _dispatcher = dispatcher,
+       _suppressAutomaticRepair = suppressAutomaticRepair;
+
+  final MatrixMissingRoomSessionStalenessTracker _tracker;
+  final MatrixPersistentRequestableSessionRepairDispatcher _dispatcher;
+  final bool _suppressAutomaticRepair;
+
+  MatrixMissingRoomSessionResolvedSummary? recordRoomKeyReceived({
+    required String? roomId,
+    required String? sessionId,
+  }) {
+    final summary = _tracker.recordRoomKeyReceived(
+      roomId: roomId,
+      sessionId: sessionId,
+    );
+    if (summary != null) {
+      unawaited(
+        _dispatcher.dispatch(suppressAutomaticRepair: _suppressAutomaticRepair),
+      );
+    }
+    return summary;
   }
 }
 
@@ -1144,19 +1453,12 @@ class MatrixMissingRoomSessionStalenessTracker {
       _observations.remove(entry.key);
     }
 
-    final loggedEntries = matchingEntries
-        .map((entry) => entry.value)
-        .where((observation) => observation.loggedStale)
-        .toList(growable: false);
-    if (loggedEntries.isEmpty) {
-      return null;
-    }
-
     final now = _now();
     final senders = <String>{};
     var observations = 0;
-    var earliest = loggedEntries.first.firstSeenAt;
-    for (final observation in loggedEntries) {
+    var earliest = matchingEntries.first.value.firstSeenAt;
+    for (final entry in matchingEntries) {
+      final observation = entry.value;
       senders.add(_hash(observation.senderId));
       observations += observation.observations;
       if (observation.firstSeenAt.isBefore(earliest)) {

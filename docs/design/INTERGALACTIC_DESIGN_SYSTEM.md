@@ -1,7 +1,6 @@
 # Inter Galactic Design System
 
 Status: active design reference
-Owner: DESIGN
 Last updated: 2026-06-23
 
 ## Purpose

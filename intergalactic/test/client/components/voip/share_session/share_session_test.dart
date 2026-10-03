@@ -215,7 +215,12 @@ void main() {
 
       final status = await source.start();
 
-      expect(status.state, SharedAudioState.unavailable);
+      // The state changed when the fallback route was wired in: an
+      // unresolvable process no longer ends the matter, because desktop audio
+      // is available on this machine and is now offered instead of nothing.
+      // What this test is actually about is unchanged - `reason` must stay a
+      // single token whichever state carries it.
+      expect(status.state, SharedAudioState.needsChoice);
       expect(status.reason, 'target_process_unresolved');
       expect(
         status.reason,

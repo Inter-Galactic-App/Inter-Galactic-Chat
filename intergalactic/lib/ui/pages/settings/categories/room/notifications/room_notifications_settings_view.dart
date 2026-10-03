@@ -40,7 +40,7 @@ class RoomNotificationsSettingsView extends StatelessWidget {
     name: "labelPushRuleNotifyAllDescription",
   );
 
-  String get labelPushRuleMentionsAndKeywords => Intl.message(
+  String get labelPushRuleMentionsAndKeywordsRoomNotifications => Intl.message(
     "Mentions, Keywords, & @room",
     desc:
         "Label for the push rule which only notifies for mentions, keywords, and room-wide pings",
@@ -53,7 +53,7 @@ class RoomNotificationsSettingsView extends StatelessWidget {
     name: "labelPushRuleMentionsAndKeywordsDescription",
   );
 
-  String get labelPushRuleNone => Intl.message(
+  String get labelPushRuleNoneRoomNotifications => Intl.message(
     "Mute Everything",
     desc: "Label for the push rule which sends no notifications",
     name: "labelPushRuleNoneRoomNotifications",
@@ -88,14 +88,14 @@ class RoomNotificationsSettingsView extends StatelessWidget {
                 _NotificationModeTile(
                   selected: pushRule == PushRule.mentionsOnly,
                   icon: material.Icons.alternate_email_outlined,
-                  title: labelPushRuleMentionsAndKeywords,
+                  title: labelPushRuleMentionsAndKeywordsRoomNotifications,
                   description: labelPushRuleMentionsAndKeywordsDescription,
                   onTap: () => onPushRuleChanged?.call(PushRule.mentionsOnly),
                 ),
                 _NotificationModeTile(
                   selected: pushRule == PushRule.dontNotify,
                   icon: material.Icons.notifications_off_outlined,
-                  title: labelPushRuleNone,
+                  title: labelPushRuleNoneRoomNotifications,
                   description: labelPushRuleNoneDescription,
                   onTap: () => onPushRuleChanged?.call(PushRule.dontNotify),
                 ),

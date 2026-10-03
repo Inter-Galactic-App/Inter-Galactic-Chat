@@ -15,13 +15,22 @@ Windows desktop is the default contributor path today. After cloning the
 repository, work from the Flutter app directory:
 
 ```powershell
-git clone https://github.com/Inter-Galactic-App/Inter-Galactic.git inter-galactic
+git clone https://github.com/Inter-Galactic-App/Inter-Galactic-Chat.git inter-galactic
 cd inter-galactic
 cd intergalactic
 flutter pub get
 dart run scripts/codegen.dart
 flutter run -d windows --dart-define PLATFORM=windows
 ```
+
+iOS builds require the pinned E8 patched-source preparation. Run
+`prepare.py --resolve-app` as described in the
+[iOS patch recipe](intergalactic/ios/patches/dart-vodozemac/README.md), then
+build from its generated scratch `app` clone, not the original checkout. Set
+`IG_E8_PYTHON`, `IG_E8_SOURCE`, and `IG_E8_APP_COMMIT` for `pod install` and
+Xcode; launch Xcode from the same shell so its build phases inherit them.
+Setting the variables alone does not prepare the required package resolution.
+The Podfile and Xcode targets fail closed when verification is missing.
 
 Useful references:
 

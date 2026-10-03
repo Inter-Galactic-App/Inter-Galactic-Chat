@@ -1,4 +1,10 @@
 {
+  "notificationAttachmentSentImage": "Saatis pildi",
+  "notificationAttachmentSentVideo": "Saatis video",
+  "notificationAttachmentSentAudio": "Saatis helisõnumi",
+  "notificationAttachmentSentFile": "Saatis faili",
+  "notificationAttachmentSharedLocation": "Jagati asukohta",
+  "notificationAttachmentSentSticker": "Saatis kleebise",
   "labelRoomsList": "Jututoad",
   "@labelRoomsList": {
     "description": "Header label for the list of rooms",

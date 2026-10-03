@@ -621,23 +621,31 @@ class _AttachmentProcessorState extends State<AttachmentProcessor> {
         'Prompt text for the option to send a file in its original state, without any further processing such as removing metadata',
   );
 
-  String get promptAttachmentProcessingSendOriginalDescription {
-    if (Mime.videoTypes.contains(widget.attachment.mimeType)) {
-      return Intl.message(
-        'Off prepares video preview details before sending. On sends the selected video as-is and may skip generated preview details.',
-        name: 'promptAttachmentProcessingSendOriginalVideoDescription',
-        desc:
-            'Help text explaining the Send original file option for video uploads',
-      );
-    }
+  String
+  get promptAttachmentProcessingSendOriginalVideoDescription => Intl.message(
+    'Off prepares video preview details before sending. On sends the selected video as-is and may skip generated preview details.',
+    name: 'promptAttachmentProcessingSendOriginalVideoDescription',
+    desc:
+        'Help text explaining the Send original file option for video uploads',
+  );
 
-    return Intl.message(
-      'Off lets Inter Galactic prepare the upload before sending. On sends the selected file as-is.',
-      name: 'promptAttachmentProcessingSendOriginalGenericDescription',
-      desc:
-          'Help text explaining the Send original file option for file uploads',
-    );
-  }
+  String
+  get promptAttachmentProcessingSendOriginalGenericDescription => Intl.message(
+    'Off lets Inter Galactic prepare the upload before sending. On sends the selected file as-is.',
+    name: 'promptAttachmentProcessingSendOriginalGenericDescription',
+    desc: 'Help text explaining the Send original file option for file uploads',
+  );
+
+  /// Picks between the two messages above. Deliberately NOT an `Intl.message`
+  /// itself: this getter used to hold both of them, and `intl_translation`
+  /// keys a message off its declaring member, so the second name could never
+  /// match and BOTH were silently dropped from the ARB. Keep the selection
+  /// here and the messages in their own members - adding an `Intl.message`
+  /// back into this getter would un-extract them again with no error.
+  String get promptAttachmentProcessingSendOriginalDescription =>
+      Mime.videoTypes.contains(widget.attachment.mimeType)
+      ? promptAttachmentProcessingSendOriginalVideoDescription
+      : promptAttachmentProcessingSendOriginalGenericDescription;
 
   String get promptAttachmentProcessingAddFile => Intl.message(
     'Add File',

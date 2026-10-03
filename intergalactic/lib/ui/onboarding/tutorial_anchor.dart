@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 class TutorialAnchorIds {
   const TutorialAnchorIds._();
@@ -45,6 +46,7 @@ class TutorialAnchorRegistry extends ChangeNotifier {
   );
   Size? _viewportSize;
   bool _disposed = false;
+  bool _notificationScheduled = false;
 
   Rect? rectFor(String id) => _rects[id];
 
@@ -73,7 +75,7 @@ class TutorialAnchorRegistry extends ChangeNotifier {
     if (_rects.isNotEmpty) {
       _rects.clear();
     }
-    notifyListeners();
+    _notifyListenersSafely();
   }
 
   void invalidate(String id) {
@@ -82,7 +84,7 @@ class TutorialAnchorRegistry extends ChangeNotifier {
     }
 
     if (_rects.remove(id) != null) {
-      notifyListeners();
+      _notifyListenersSafely();
     }
   }
 
@@ -98,7 +100,7 @@ class TutorialAnchorRegistry extends ChangeNotifier {
     }
 
     _rects[id] = rect;
-    notifyListeners();
+    _notifyListenersSafely();
   }
 
   void remove(String id) {
@@ -107,7 +109,7 @@ class TutorialAnchorRegistry extends ChangeNotifier {
     }
 
     if (_rects.remove(id) != null) {
-      notifyListeners();
+      _notifyListenersSafely();
     }
   }
 
@@ -116,6 +118,32 @@ class TutorialAnchorRegistry extends ChangeNotifier {
     _disposed = true;
     _rects.clear();
     super.dispose();
+  }
+
+  void _notifyListenersSafely() {
+    if (_disposed) {
+      return;
+    }
+
+    // An anchor may be removed while a scene is rebuilding. Deferring that
+    // inherited-notifier update avoids marking the tutorial overlay dirty while
+    // Flutter holds the widget tree lock.
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      if (_notificationScheduled) {
+        return;
+      }
+      _notificationScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _notificationScheduled = false;
+        if (!_disposed) {
+          notifyListeners();
+        }
+      });
+      return;
+    }
+
+    notifyListeners();
   }
 
   bool _nearlyEqual(Rect a, Rect b) {

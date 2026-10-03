@@ -2,7 +2,7 @@
 
 Status: active index
 Maintenance: project documentation contributors
-Last reviewed: 2026-08-06
+Last reviewed: 2026-09-27
 
 Use this index to choose the smallest architecture document that matches a
 change. Start with the stable maps, then open feature-specific docs only when
@@ -72,6 +72,8 @@ the change touches that feature.
   `calls-streaming-audio/stream-receiver-diagnostic-contract.md`, and
   `calls-streaming-audio/stream-bottleneck-classification.md` - stream-test
   reporting and classifier contract.
+- `calls-streaming-audio/true-receiver-probe.md` - the subscribe-only LiveKit
+  probe that proves real subscriber decode/render freshness.
 - `calls-streaming-audio/archive/README.md` - historical milestone, gap, and
   planning docs that were moved out of the live streaming architecture surface.
 - `calls-streaming-audio/local-stream-pipeline-harness.md`,
@@ -82,7 +84,7 @@ the change touches that feature.
 - `calls-streaming-audio/media-and-plugins.md`,
   `calls-streaming-audio/RNNOISE_TUNING_BASELINE.md`, and
   `calls-streaming-audio/rnnoise-native-resampler-plan.md` - media/plugin map
-  and RNNoise follow-up docs. RNNoise behavior belongs to AUDIO.
+  and RNNoise follow-up docs.
 - `calls-streaming-audio/windows-share-session.md` and
   `calls-streaming-audio/voip-soundboard.md` - shared-content audio and call
   soundboard behavior.
@@ -91,7 +93,10 @@ the change touches that feature.
 
 - `features/dm-stories.md` - direct-message stories, story media, notifications, and
   viewer routing.
-- `matrix/space-room-categories.md`, `matrix/room-settings-and-permissions.md`,
+- `features/messaging-composer-drafts.md` - local room/thread message-draft
+  retention, expiry, and privacy boundaries.
+- `matrix/custom-event-identifiers.md`, `matrix/space-room-categories.md`,
+  `matrix/room-settings-and-permissions.md`,
   `matrix/thread-timelines.md`, `matrix/room-interactions.md`,
   `features/settings-information-architecture.md`, `features/settings-ui-map.md`, and
   `features/settings_areas.md` - space/room/timeline/settings structure and

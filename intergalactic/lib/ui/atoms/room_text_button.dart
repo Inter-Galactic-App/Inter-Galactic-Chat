@@ -2,16 +2,21 @@ import 'dart:async';
 
 import 'package:intergalactic/client/components/calendar_room/calendar_room_component.dart';
 import 'package:intergalactic/client/components/direct_messages/direct_message_component.dart';
+import 'package:intergalactic/client/components/invitation/invitation_component.dart';
 import 'package:intergalactic/client/components/voip_room/voip_room_component.dart';
+import 'package:intergalactic/client/favorite_rooms.dart';
 import 'package:intergalactic/client/room.dart';
+import 'package:intergalactic/debug/log.dart';
 import 'package:intergalactic/main.dart';
 import 'package:intergalactic/ui/accessibility/accessible_interactive_region.dart';
 import 'package:intergalactic/ui/atoms/adaptive_context_menu.dart';
 import 'package:intergalactic/ui/atoms/dot_indicator.dart';
+import 'package:intergalactic/ui/atoms/favorite_room_actions.dart';
 import 'package:intergalactic/ui/atoms/notification_badge.dart';
 import 'package:intergalactic/ui/atoms/tiny_pill.dart';
 import 'package:intergalactic/ui/molecules/dm_pin_dialog.dart';
 import 'package:intergalactic/ui/navigation/adaptive_dialog.dart';
+import 'package:intergalactic/ui/organisms/invitation_view/send_invitation.dart';
 import 'package:intergalactic/utils/text_utils.dart';
 import 'package:commet_calendar_widget/calendar.dart';
 import 'package:flutter/material.dart';
@@ -23,11 +28,13 @@ class RoomTextButton extends StatefulWidget {
     this.room, {
     this.highlight = false,
     this.trailingIndicatorInset = 0,
+    this.enableContextMenu = true,
     this.onTap,
     super.key,
   });
   final bool highlight;
   final double trailingIndicatorInset;
+  final bool enableContextMenu;
   final Room room;
   final Function(Room room, {bool bypassSpecialRoomType})? onTap;
 
@@ -42,16 +49,25 @@ class _RoomTextButtonState extends State<RoomTextButton> {
   List<String>? voipRoomParticipants;
   List<MatrixCalendarEventState>? calendarEvents;
 
-  bool get isFavorite => preferences.isRoomFavorite(
-    widget.room.favoriteStorageId,
-    legacyRoomId: widget.room.localId,
-  );
+  bool get isFavorite => favoriteRoomStore.isFavorite(widget.room);
   bool get isDirectMessage =>
       widget.room.client
           .getComponent<DirectMessagesComponent>()
           ?.isRoomDirectMessage(widget.room) ==
       true;
   bool get isLocked => dmLockController.isRoomLocked(widget.room);
+
+  /// Muted means the room raises no notification at all. `mentionsOnly` is a
+  /// third state the room's own notification settings can reach, and this menu
+  /// deliberately does not offer it - a two-way toggle here is the quick
+  /// action; the full choice lives in the room's settings.
+  bool get isMuted => widget.room.pushRule == PushRule.dontNotify;
+
+  InvitationComponent? get invitationComponent =>
+      widget.room.client.getComponent<InvitationComponent>();
+
+  bool get canInvite =>
+      invitationComponent != null && widget.room.permissions.canInviteUser;
 
   @override
   void initState() {
@@ -241,16 +257,28 @@ class _RoomTextButtonState extends State<RoomTextButton> {
         text: isFavorite ? "Remove from Favorites" : "Add to Favorites",
         icon: isFavorite ? Icons.star_outline : Icons.star,
         onPressed: () async {
-          await preferences.setRoomFavorite(
-            widget.room.favoriteStorageId,
-            !isFavorite,
-            legacyRoomId: widget.room.localId,
+          await runFavoriteWrite(
+            context,
+            favoriteRoomStore.setFavorite(widget.room, !isFavorite),
           );
           if (mounted) {
             setState(() {});
           }
         },
       ),
+      ContextMenuItem(
+        text: isMuted ? "Unmute Room" : "Mute Room",
+        icon: isMuted
+            ? Icons.notifications_active_outlined
+            : Icons.notifications_off_outlined,
+        onPressed: () => _setMuted(!isMuted),
+      ),
+      if (canInvite)
+        ContextMenuItem(
+          text: "Invite",
+          icon: Icons.person_add,
+          onPressed: _showInvite,
+        ),
       if (widget.room.isSpecialRoomType)
         ContextMenuItem(
           text: "Open as Text Chat",
@@ -266,9 +294,59 @@ class _RoomTextButtonState extends State<RoomTextButton> {
         ),
     ];
 
-    result = AdaptiveContextMenu(items: items, child: result);
+    if (widget.enableContextMenu) {
+      result = AdaptiveContextMenu(items: items, child: result);
+    }
 
     return result;
+  }
+
+  Future<void> _setMuted(bool muted) async {
+    try {
+      await widget.room.setPushRule(
+        muted ? PushRule.dontNotify : PushRule.notify,
+      );
+    } catch (error, stackTrace) {
+      Log.onError(
+        error,
+        stackTrace,
+        content: "Failed to update the room notification push rule",
+      );
+      // Non-modal: a refused mute does not need acknowledging, only showing.
+      // This draws because `MainPage.build` now wraps the main navigation
+      // path in a Scaffold for the ScaffoldMessenger to present into.
+      if (mounted) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          const SnackBar(
+            content: Text("Room notifications could not be updated."),
+          ),
+        );
+      }
+      return;
+    }
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  void _showInvite() {
+    final invitation = invitationComponent;
+    if (invitation == null) {
+      return;
+    }
+
+    AdaptiveDialog.show(
+      context,
+      title: "Invite",
+      builder: (context) => SendInvitationWidget(
+        widget.room.client,
+        invitation,
+        roomId: widget.room.identifier,
+        displayName: widget.room.displayName,
+        existingMembers: widget.room.memberIds,
+        room: widget.room,
+      ),
+    );
   }
 
   String _semanticLabel() {

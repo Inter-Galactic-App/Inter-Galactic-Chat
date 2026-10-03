@@ -1360,20 +1360,6 @@ class _SoundboardMenuState extends State<CallSoundboardMenu> {
         ),
       );
     }
-    // A temporary hint (2026-07-29): a sound from another space rides a v2
-    // authorized play event that only U7+ clients can parse, so participants on
-    // older builds silently do not hear it. This warns the sender whenever the
-    // packs on screen include an external one.
-    //
-    // REMOVE IN 0.8.2, NOT 0.8.1. The minimum-version floor is 0.8.1 and takes
-    // effect at that release, so "remove once the floor exists" would delete
-    // this a release early - which is the mistake this note exists to stop. The
-    // owner kept it for the whole 0.8.1 window deliberately: the user base is
-    // small and updates take weeks, so 0.8.1 is when people actually migrate
-    // and the warning is still true for most receivers. Decision:
-    // "Cross-Space Soundboard: 0.8.1 Floor, Warning Removed at 0.8.2",
-    // 2026-08-17, in the workspace DECISIONS.md.
-    final hasExternalVisible = visiblePacks.any((pack) => pack.isExternal);
     final emojiPacks = soundboardEmojiPacksForSpace(soundboard.space);
     final soundTileHeight = widget.compact ? 42.0 : 48.0;
     final maxGridHeight =
@@ -1412,8 +1398,6 @@ class _SoundboardMenuState extends State<CallSoundboardMenu> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          if (hasExternalVisible)
-                            const _SoundboardCrossSpaceHint(),
                           Expanded(
                             child: totalSounds == 0
                                 ? _SoundboardEmptyState(
@@ -1510,52 +1494,6 @@ class _SoundboardMenuState extends State<CallSoundboardMenu> {
         ),
       const SliverToBoxAdapter(child: SizedBox(height: _gridSpacing)),
     ];
-  }
-}
-
-/// Temporary sender-side notice shown while any external (cross-space) pack is
-/// on screen: those sounds ride a v2 authorized play event that pre-U7 clients
-/// cannot parse, so participants on older builds do not hear them.
-///
-/// **Remove in 0.8.2, together with its scoped widget coverage - not in 0.8.1.**
-/// The floor is 0.8.1 and is effective at that release, so removing this when
-/// the floor "exists" takes it out a release too early.
-class _SoundboardCrossSpaceHint extends StatelessWidget {
-  const _SoundboardCrossSpaceHint();
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: scheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(
-                Icons.info_outline,
-                size: 16,
-                color: scheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: tiamat.Text.labelLow(
-                  'Sounds from other spaces may not be heard by everyone in '
-                  'the call yet.',
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }
 
@@ -1746,8 +1684,8 @@ class _SoundboardAddButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(6),
           border: Border.all(color: scheme.outline.withValues(alpha: 0.42)),
         ),
-        child: Tooltip(
-          message: 'Add sound',
+        child: tiamat.Tooltip(
+          text: 'Add sound',
           child: IconButton(
             constraints: const BoxConstraints.tightFor(width: 34, height: 34),
             padding: EdgeInsets.zero,
@@ -1995,8 +1933,8 @@ class _CallPanelIconButton extends StatelessWidget {
           ? null
           : (_) => onAlternatePressed?.call(),
       onLongPress: onAlternatePressed,
-      child: Tooltip(
-        message: tooltip,
+      child: tiamat.Tooltip(
+        text: tooltip,
         child: IconButton(
           icon: Icon(icon),
           iconSize: 18,

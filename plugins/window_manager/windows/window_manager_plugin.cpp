@@ -303,15 +303,21 @@ std::optional<LRESULT> WindowManagerPlugin::HandleWindowProc(HWND hWnd,
       rect->bottom = bottom;
     }
   } else if (message == WM_SIZE) {
-    if (window_manager->IsFullScreen() && wParam == SIZE_MAXIMIZED &&
+    if (window_manager->restoring_maximized_from_fullscreen &&
+        wParam == SIZE_RESTORED) {
+      // SW_RESTORE is only an intermediate step before SW_MAXIMIZE. Do not
+      // emit leave-full-screen or let Dart persist its transient normal bounds.
+    } else if (window_manager->IsFullScreen() && wParam == SIZE_MAXIMIZED &&
         window_manager->last_state != STATE_FULLSCREEN_ENTERED) {
       _EmitEvent("enter-full-screen");
       window_manager->last_state = STATE_FULLSCREEN_ENTERED;
-    } else if (!window_manager->IsFullScreen() && wParam == SIZE_RESTORED &&
+    } else if (!window_manager->IsFullScreen() &&
+               (wParam == SIZE_RESTORED || wParam == SIZE_MAXIMIZED) &&
                window_manager->last_state == STATE_FULLSCREEN_ENTERED) {
       window_manager->ForceChildRefresh();
       _EmitEvent("leave-full-screen");
-      window_manager->last_state = STATE_NORMAL;
+      window_manager->last_state =
+          wParam == SIZE_MAXIMIZED ? STATE_MAXIMIZED : STATE_NORMAL;
     } else if (window_manager->last_state != STATE_FULLSCREEN_ENTERED) {
       if (wParam == SIZE_MAXIMIZED) {
         _EmitEvent("maximize");

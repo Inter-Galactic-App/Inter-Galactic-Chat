@@ -1,4 +1,10 @@
 {
+  "notificationAttachmentSentImage": "A envoyé une image",
+  "notificationAttachmentSentVideo": "A envoyé une vidéo",
+  "notificationAttachmentSentAudio": "A envoyé un message audio",
+  "notificationAttachmentSentFile": "A envoyé un fichier",
+  "notificationAttachmentSharedLocation": "A partagé une position",
+  "notificationAttachmentSentSticker": "A envoyé un sticker",
   "promptMatrixVerifySession": "Vérifier",
   "@promptMatrixVerifySession": {
     "description": "Text on the button to verify a session",

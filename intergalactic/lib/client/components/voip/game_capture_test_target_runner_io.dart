@@ -10,6 +10,30 @@ GameCaptureTestTargetLauncher createDefaultGameCaptureTestTargetLauncher() {
   return const GameCaptureTestTargetLauncher();
 }
 
+/// Converts the process wait result into a truthful diagnostic status.
+///
+/// A negative exit code is the local timeout sentinel, not confirmation that
+/// Windows has stopped the helper process.
+({String status, String? reason}) gameCaptureTestTargetStopResult({
+  required int exitCode,
+  required bool stopRequested,
+}) {
+  if (exitCode == -1) {
+    return (
+      status: 'stop_unconfirmed',
+      reason:
+          'capture target did not exit after stop request; process may still be running',
+    );
+  }
+  if (exitCode != 0) {
+    return (
+      status: 'stopped',
+      reason: 'capture target exited with code $exitCode',
+    );
+  }
+  return (status: stopRequested ? 'stopped' : 'completed', reason: null);
+}
+
 class GameCaptureTestTargetLauncher {
   const GameCaptureTestTargetLauncher();
 
@@ -32,8 +56,9 @@ class GameCaptureTestTargetLauncher {
         ),
       );
     }
-    final executablePath =
-        await _resolveExecutablePath(config.executablePathOverride);
+    final executablePath = await _resolveExecutablePath(
+      config.executablePathOverride,
+    );
     if (executablePath == null) {
       return GameCaptureTestTargetSession(
         GameCaptureTestTargetResult.unavailable(
@@ -168,21 +193,13 @@ Future<({int exitCode, bool stopRequested})> _waitForExitOrStop(
       stopRequested: false,
     );
   } on TimeoutException {
+    // Windows ignores the requested signal, so there is no stronger kill step.
     process.kill(ProcessSignal.sigterm);
   }
 
   try {
     return (
       exitCode: await exitCode.timeout(const Duration(seconds: 2)),
-      stopRequested: true,
-    );
-  } on TimeoutException {
-    process.kill(ProcessSignal.sigkill);
-  }
-
-  try {
-    return (
-      exitCode: await exitCode.timeout(const Duration(seconds: 1)),
       stopRequested: true,
     );
   } on TimeoutException {
@@ -219,19 +236,14 @@ class GameCaptureTestTargetSession {
     var reason = launchResult.reason;
     try {
       final exitResult = await _waitForExitOrStop(process);
-      final exited = exitResult.exitCode;
-      if (exitResult.stopRequested) {
-        status = 'stopped';
-      }
-      if (exited != 0 && exited != -1) {
-        status = 'stopped';
-        reason = 'capture target exited with code $exited';
-      } else if (exited == -1) {
-        status = 'stopped';
-        reason = 'capture target did not exit after stop request';
-      }
+      final result = gameCaptureTestTargetStopResult(
+        exitCode: exitResult.exitCode,
+        stopRequested: exitResult.stopRequested,
+      );
+      status = result.status;
+      reason = result.reason ?? reason;
     } catch (error) {
-      status = 'stopped';
+      status = 'stop_failed';
       reason = 'capture target stop failed: $error';
     }
     final afterStop = await _readDiagnostics(
@@ -261,9 +273,7 @@ class GameCaptureTestTargetSession {
             return decoded;
           }
           if (decoded is Map) {
-            return decoded.map(
-              (key, value) => MapEntry(key.toString(), value),
-            );
+            return decoded.map((key, value) => MapEntry(key.toString(), value));
           }
         } catch (_) {
           // The capture target may be mid-write; keep polling until timeout.

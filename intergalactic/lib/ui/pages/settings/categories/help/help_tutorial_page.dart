@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:intergalactic/config/app_globals.dart' as globals;
-import 'package:intergalactic/config/layout_config.dart';
 import 'package:intergalactic/ui/onboarding/onboarding_page.dart';
 import 'package:intergalactic/ui/onboarding/onboarding_service.dart';
 import 'package:intergalactic/ui/onboarding/tutorial_anchor.dart';
@@ -25,13 +24,10 @@ class _HelpTutorialPageState extends State<HelpTutorialPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (Layout.mobile) {
-      return _buildMobileRestrictedPage();
-    }
-
     final state = _service.state;
-    final completedForCurrent =
-        state.isCompletedFor(OnboardingService.currentVersion);
+    final completedForCurrent = state.isCompletedFor(
+      OnboardingService.currentVersion,
+    );
     final completedAt = state.completedAt?.toLocal();
 
     return Align(
@@ -126,36 +122,10 @@ class _HelpTutorialPageState extends State<HelpTutorialPage> {
       ),
     );
   }
-
-  Widget _buildMobileRestrictedPage() {
-    return Align(
-      alignment: Alignment.topLeft,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 760),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              tiamat.Text.largeTitle("Tutorial"),
-              SizedBox(height: 8),
-              tiamat.Text.body(
-                "The guided tutorial is desktop-only for now. Mobile builds hide replay until the mobile tutorial path is ready.",
-                softwrap: true,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class _TutorialSection extends StatelessWidget {
-  const _TutorialSection({
-    required this.title,
-    required this.children,
-  });
+  const _TutorialSection({required this.title, required this.children});
 
   final String title;
   final List<Widget> children;

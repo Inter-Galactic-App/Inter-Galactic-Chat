@@ -276,20 +276,22 @@ class MatrixEmoticonHtmlExtension extends HtmlExtension {
     if (room?.shouldPreviewMedia == false) {
       return WidgetSpan(
         alignment: PlaceholderAlignment.middle,
-        child: Tooltip(
-          padding: const EdgeInsets.all(0),
-          decoration: const BoxDecoration(color: Colors.transparent),
-          richMessage: WidgetSpan(
-            child: EmojiWidget(
-              MatrixEmoticon(
-                uri,
-                client.matrixClient,
-                shortcode: context.attributes["alt"] ?? "",
-                packUsage: EmoticonUsage.all,
-                usage: EmoticonUsage.emoji,
-              ),
-              height: 48,
+        child: tiamat.Tooltip(
+          // The emoji IS the tooltip here - a transparent surface with no
+          // padding, so the image floats. text= carries the announcement the
+          // richMessage never had.
+          text: context.attributes["alt"] ?? "",
+          padding: EdgeInsets.zero,
+          backgroundColor: Colors.transparent,
+          content: EmojiWidget(
+            MatrixEmoticon(
+              uri,
+              client.matrixClient,
+              shortcode: context.attributes["alt"] ?? "",
+              packUsage: EmoticonUsage.all,
+              usage: EmoticonUsage.emoji,
             ),
+            height: 48,
           ),
           child: tiamat.Text.labelLow(context.attributes["alt"] ?? ""),
         ),
@@ -297,8 +299,8 @@ class MatrixEmoticonHtmlExtension extends HtmlExtension {
     }
 
     return WidgetSpan(
-      child: Tooltip(
-        message: context.attributes["alt"] ?? "",
+      child: tiamat.Tooltip(
+        text: context.attributes["alt"] ?? "",
         child: EmojiWidget(
           MatrixEmoticon(
             uri,
@@ -425,7 +427,8 @@ class LineBreakHtmlExtension extends HtmlExtension {
 class CodeHtmlExtension extends HtmlExtension {
   @override
   InlineSpan build(ExtensionContext context) {
-    var color = Theme.of(
+    var color =
+        Theme.of(
           context.buildContext!,
         ).extension<ExtraColors>()?.codeHighlight ??
         Theme.of(context.buildContext!).primaryColor;

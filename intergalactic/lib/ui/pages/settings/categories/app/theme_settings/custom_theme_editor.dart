@@ -1145,8 +1145,8 @@ class ThemeTokenEditorRow extends StatelessWidget {
       children: [
         tiamat.Button.secondary(text: 'Pick', onTap: onPick),
         const SizedBox(width: 8),
-        Tooltip(
-          message: 'Reset to Base Theme',
+        tiamat.Tooltip(
+          text: 'Reset to Base Theme',
           child: tiamat.CircleButton(
             icon: Icons.restart_alt,
             onPressed: onReset,

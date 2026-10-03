@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:collection/collection.dart';
 import 'package:intergalactic/cache/file_cache.dart';
 import 'package:intergalactic/client/client_manager.dart';
@@ -43,16 +44,48 @@ class BackgroundNotificationsManager2 {
 
       final clients = preferences.getRegisteredMatrixClients();
       if (clients != null) {
-        for (var id in clients) {
-          var client = MatrixBackgroundClient(databaseId: id);
-          Log.i("Adding background matrix client: ${id}");
-          await client.init(true, isBackgroundService: true);
-          clientManager!.addClient(client);
-        }
+        await addInitializedBackgroundClients(clientManager!, clients);
       }
     }
 
     await NotificationManager.init(isBackgroundService: true);
+  }
+
+  /// Adds each registered background client that finished initialising.
+  ///
+  /// Split out of [init] only so the skip below is reachable from a test.
+  /// [init] opens the database server, the file cache and the notification
+  /// manager, none of which a unit test can stand up, so the skip previously
+  /// had no coverage at all - removing it left the suite green while the app
+  /// went on to hold an unusable client.
+  ///
+  /// [createClient] exists for that test and defaults to the real construction.
+  @visibleForTesting
+  Future<void> addInitializedBackgroundClients(
+    ClientManager manager,
+    Iterable<String> databaseIds, {
+    Future<MatrixBackgroundClient> Function(String databaseId)? createClient,
+  }) async {
+    final create = createClient ?? _initBackgroundClient;
+    for (final id in databaseIds) {
+      Log.i("Adding background matrix client: ${id}");
+      final client = await create(id);
+      // An account whose persisted credentials are unusable returns early from
+      // init() and stays uninitialised. Adding it anyway puts a client in the
+      // manager that cannot answer anything.
+      if (!client.isInitialized) {
+        continue;
+      }
+      manager.addClient(client);
+    }
+  }
+
+  static Future<MatrixBackgroundClient> _initBackgroundClient(
+    String databaseId,
+  ) async {
+    final client = MatrixBackgroundClient(databaseId: databaseId);
+    await client.init(true, isBackgroundService: true);
+    return client;
   }
 
   void onReceived(Map<String, dynamic>? data) async {
@@ -81,6 +114,23 @@ class BackgroundNotificationsManager2 {
         if (entry != null) {
           Log.i("Current queue length: ${queue.length}");
           queue.remove(entry);
+          // This isolate's preference cache was built when the service
+          // started and does not see what the UI isolate has written since.
+          // Rendering decisions below read preferences, so refresh first or a
+          // setting changed during this service's lifetime is ignored until
+          // the app is fully closed. Guarded on its own, as in the v1 manager:
+          // outside a guard a transient read failure reaches the outer catch,
+          // which abandons the loop and discards every entry still queued.
+          // Rendering against the unrefreshed cache does not leak content: the
+          // failed read is recorded on Preferences and
+          // usePrivateNotificationPreviews fails closed while it stands, so a
+          // preview setting the user has just changed cannot be defeated by an
+          // unreadable preferences file.
+          try {
+            await preferences.refreshFromDisk();
+          } catch (e, s) {
+            Log.onError(e, s);
+          }
           await handleMessage(entry);
         }
       }

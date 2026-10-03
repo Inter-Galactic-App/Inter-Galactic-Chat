@@ -7,24 +7,20 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		01B0B4880BDD04B771090719 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C6919D3F84B3CD8F9EE8148 /* NotificationService.swift */; };
 		1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */ = {isa = PBXBuildFile; fileRef = 1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */; };
+		386EED42B124C4E1FAA4F9BE /* Pods_InterGalactic_Notification_Extension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B9EC8844BE0A0B751C74D4C8 /* Pods_InterGalactic_Notification_Extension.framework */; };
 		3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */; };
 		74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74858FAE1ED2DC5600515810 /* AppDelegate.swift */; };
 		7805D611FD4531031892B31B /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 387D9545FBACCBAD3AAD764C /* Pods_Runner.framework */; };
-		8C1A10050000000000000005 /* InboundShareSessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C1A10040000000000000004 /* InboundShareSessionStore.swift */; };
-		A40000000000000000000002 /* InboundShareSessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C1A10040000000000000004 /* InboundShareSessionStore.swift */; };
-		A40000000000000000000004 /* ShareItemClassifierTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A40000000000000000000014 /* ShareItemClassifierTests.swift */; };
-		A40000000000000000000001 /* InboundShareSessionStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A40000000000000000000011 /* InboundShareSessionStoreTests.swift */; };
+		823F5FB5A0E94EF9650C600A /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3F8436C13EFB0D34FE98EB04 /* Foundation.framework */; };
 		8C1A10010000000000000001 /* CallPiPCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C1A10000000000000000001 /* CallPiPCoordinator.swift */; };
 		8C1A10030000000000000003 /* ImageCutoutChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C1A10020000000000000002 /* ImageCutoutChannel.swift */; };
-		C0D3A0010000000000000001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = C0D3A0000000000000000001 /* PrivacyInfo.xcprivacy */; };
+		8C1A10050000000000000005 /* InboundShareSessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C1A10040000000000000004 /* InboundShareSessionStore.swift */; };
+		9562B38F06E1AD0E3B79991E /* InterGalactic Notification Extension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 125FADF8EE342FA5489499B6 /* InterGalactic Notification Extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		97C146FC1CF9000F007C117D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FA1CF9000F007C117D /* Main.storyboard */; };
 		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
 		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
-		A20000000000000000000003 /* ShareItemClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000013 /* ShareItemClassifier.swift */; };
-		A40000000000000000000003 /* ShareItemClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000013 /* ShareItemClassifier.swift */; };
-		A20000000000000000000001 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000011 /* ShareViewController.swift */; };
-		A20000000000000000000002 /* InterGalactic Share Extension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = A20000000000000000000010 /* InterGalactic Share Extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		A10000000000000000000001 /* ReplayKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A10000000000000000000011 /* ReplayKit.framework */; };
 		A10000000000000000000002 /* InterGalactic Broadcast Extension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = A10000000000000000000010 /* InterGalactic Broadcast Extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		A10000000000000000000003 /* Atomic.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000013 /* Atomic.swift */; };
@@ -32,16 +28,24 @@
 		A10000000000000000000005 /* SampleHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000015 /* SampleHandler.swift */; };
 		A10000000000000000000006 /* SampleUploader.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000016 /* SampleUploader.swift */; };
 		A10000000000000000000007 /* SocketConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000017 /* SocketConnection.swift */; };
+		A20000000000000000000001 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000011 /* ShareViewController.swift */; };
+		A20000000000000000000002 /* InterGalactic Share Extension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = A20000000000000000000010 /* InterGalactic Share Extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		A20000000000000000000003 /* ShareItemClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000013 /* ShareItemClassifier.swift */; };
+		A40000000000000000000001 /* InboundShareSessionStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A40000000000000000000011 /* InboundShareSessionStoreTests.swift */; };
+		A40000000000000000000002 /* InboundShareSessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C1A10040000000000000004 /* InboundShareSessionStore.swift */; };
+		A40000000000000000000003 /* ShareItemClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000013 /* ShareItemClassifier.swift */; };
+		A40000000000000000000004 /* ShareItemClassifierTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A40000000000000000000014 /* ShareItemClassifierTests.swift */; };
 		B817DA11510B9AD989EFE66A /* Pods_InterGalactic_Broadcast_Extension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5ABF530A5963183B5CC04C29 /* Pods_InterGalactic_Broadcast_Extension.framework */; };
+		C0D3A0010000000000000001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = C0D3A0000000000000000001 /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		A20000000000000000000008 /* PBXContainerItemProxy */ = {
+		14812E4452DC9A3A4590F2D4 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 97C146E61CF9000F007C117D /* Project object */;
 			proxyType = 1;
-			remoteGlobalIDString = A20000000000000000000022;
-			remoteInfo = "InterGalactic Share Extension";
+			remoteGlobalIDString = 75C5F0D45CDA635FF919843A;
+			remoteInfo = "InterGalactic Notification Extension";
 		};
 		A10000000000000000000008 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -49,6 +53,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = A10000000000000000000022;
 			remoteInfo = "InterGalactic Broadcast Extension";
+		};
+		A20000000000000000000008 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 97C146E61CF9000F007C117D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A20000000000000000000022;
+			remoteInfo = "InterGalactic Share Extension";
 		};
 /* End PBXContainerItemProxy section */
 
@@ -71,6 +82,7 @@
 			files = (
 				A10000000000000000000002 /* InterGalactic Broadcast Extension.appex in Embed App Extensions */,
 				A20000000000000000000002 /* InterGalactic Share Extension.appex in Embed App Extensions */,
+				9562B38F06E1AD0E3B79991E /* InterGalactic Notification Extension.appex in Embed App Extensions */,
 			);
 			name = "Embed App Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -78,23 +90,25 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		125FADF8EE342FA5489499B6 /* InterGalactic Notification Extension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "InterGalactic Notification Extension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
 		1498D2321E8E86230040F4C2 /* GeneratedPluginRegistrant.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GeneratedPluginRegistrant.h; sourceTree = "<group>"; };
 		1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GeneratedPluginRegistrant.m; sourceTree = "<group>"; };
+		1CCC8BE1B660351CD13C1AC9 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		2C6919D3F84B3CD8F9EE8148 /* NotificationService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		387D9545FBACCBAD3AAD764C /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = AppFrameworkInfo.plist; path = Flutter/AppFrameworkInfo.plist; sourceTree = "<group>"; };
+		3F8436C13EFB0D34FE98EB04 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		5ABF530A5963183B5CC04C29 /* Pods_InterGalactic_Broadcast_Extension.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_InterGalactic_Broadcast_Extension.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		686EC67B39C484C7BFF92B2F /* Pods-Runner.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.release.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"; sourceTree = "<group>"; };
 		74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Runner-Bridging-Header.h"; sourceTree = "<group>"; };
 		74858FAE1ED2DC5600515810 /* AppDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		7754170BCF104B624ABDA5B9 /* Pods-InterGalactic Broadcast Extension.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-InterGalactic Broadcast Extension.profile.xcconfig"; path = "Target Support Files/Pods-InterGalactic Broadcast Extension/Pods-InterGalactic Broadcast Extension.profile.xcconfig"; sourceTree = "<group>"; };
 		7AFA3C8E1D35360C0083082E /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Release.xcconfig; path = Flutter/Release.xcconfig; sourceTree = "<group>"; };
-		8C1A10040000000000000004 /* InboundShareSessionStore.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InboundShareSessionStore.swift; sourceTree = "<group>"; };
-		A40000000000000000000010 /* RunnerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunnerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		A40000000000000000000014 /* ShareItemClassifierTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ShareItemClassifierTests.swift; sourceTree = "<group>"; };
-		A40000000000000000000011 /* InboundShareSessionStoreTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InboundShareSessionStoreTests.swift; sourceTree = "<group>"; };
-		A40000000000000000000012 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		7E906C47AC60149DF7432D20 /* InterGalactic Notification Extension.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = "InterGalactic Notification Extension.entitlements"; sourceTree = "<group>"; };
 		8C1A10000000000000000001 /* CallPiPCoordinator.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CallPiPCoordinator.swift; sourceTree = "<group>"; };
 		8C1A10020000000000000002 /* ImageCutoutChannel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ImageCutoutChannel.swift; sourceTree = "<group>"; };
+		8C1A10040000000000000004 /* InboundShareSessionStore.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InboundShareSessionStore.swift; sourceTree = "<group>"; };
+		8FFE31B820BA366736498E24 /* NotificationExtension-Bridging-Header.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = "NotificationExtension-Bridging-Header.h"; sourceTree = "<group>"; };
 		9740EEB21CF90195004384FC /* Debug.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = Debug.xcconfig; path = Flutter/Debug.xcconfig; sourceTree = "<group>"; };
 		9740EEB31CF90195004384FC /* Generated.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = Generated.xcconfig; path = Flutter/Generated.xcconfig; sourceTree = "<group>"; };
 		9740EEB41CF90195004384FC /* Profile.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = Profile.xcconfig; path = Flutter/Profile.xcconfig; sourceTree = "<group>"; };
@@ -104,11 +118,6 @@
 		97C147001CF9000F007C117D /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		97C147021CF9000F007C117D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		986B4BCFCA9A25776CC8938B /* Pods-InterGalactic Broadcast Extension.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-InterGalactic Broadcast Extension.release.xcconfig"; path = "Target Support Files/Pods-InterGalactic Broadcast Extension/Pods-InterGalactic Broadcast Extension.release.xcconfig"; sourceTree = "<group>"; };
-		A20000000000000000000010 /* InterGalactic Share Extension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "InterGalactic Share Extension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
-		A20000000000000000000013 /* ShareItemClassifier.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ShareItemClassifier.swift; sourceTree = "<group>"; };
-		A20000000000000000000011 /* ShareViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
-		A20000000000000000000012 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		A20000000000000000000018 /* InterGalactic Share Extension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "InterGalactic Share Extension.entitlements"; sourceTree = "<group>"; };
 		A10000000000000000000010 /* InterGalactic Broadcast Extension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "InterGalactic Broadcast Extension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000011 /* ReplayKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ReplayKit.framework; path = System/Library/Frameworks/ReplayKit.framework; sourceTree = SDKROOT; };
 		A10000000000000000000012 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -118,10 +127,23 @@
 		A10000000000000000000016 /* SampleUploader.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SampleUploader.swift; sourceTree = "<group>"; };
 		A10000000000000000000017 /* SocketConnection.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SocketConnection.swift; sourceTree = "<group>"; };
 		A10000000000000000000018 /* InterGalactic Broadcast Extension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "InterGalactic Broadcast Extension.entitlements"; sourceTree = "<group>"; };
-		C0D3A0000000000000000001 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		A20000000000000000000010 /* InterGalactic Share Extension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "InterGalactic Share Extension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A20000000000000000000011 /* ShareViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
+		A20000000000000000000012 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A20000000000000000000013 /* ShareItemClassifier.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ShareItemClassifier.swift; sourceTree = "<group>"; };
+		A20000000000000000000018 /* InterGalactic Share Extension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "InterGalactic Share Extension.entitlements"; sourceTree = "<group>"; };
+		A40000000000000000000010 /* RunnerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunnerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A40000000000000000000011 /* InboundShareSessionStoreTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = InboundShareSessionStoreTests.swift; sourceTree = "<group>"; };
+		A40000000000000000000012 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A40000000000000000000014 /* ShareItemClassifierTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ShareItemClassifierTests.swift; sourceTree = "<group>"; };
+		B40D5445D18E6A0FC6DA8AC5 /* Pods-InterGalactic Notification Extension.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-InterGalactic Notification Extension.debug.xcconfig"; path = "Target Support Files/Pods-InterGalactic Notification Extension/Pods-InterGalactic Notification Extension.debug.xcconfig"; sourceTree = "<group>"; };
 		B4DC11DA7E8AE65298E60C82 /* Pods-Runner.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.debug.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"; sourceTree = "<group>"; };
+		B5962A2C98987A37E4226DA5 /* Pods-InterGalactic Notification Extension.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-InterGalactic Notification Extension.profile.xcconfig"; path = "Target Support Files/Pods-InterGalactic Notification Extension/Pods-InterGalactic Notification Extension.profile.xcconfig"; sourceTree = "<group>"; };
+		B9EC8844BE0A0B751C74D4C8 /* Pods_InterGalactic_Notification_Extension.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_InterGalactic_Notification_Extension.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		BEBB87CC424C1DAC7EB926F7 /* Pods-InterGalactic Broadcast Extension.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-InterGalactic Broadcast Extension.debug.xcconfig"; path = "Target Support Files/Pods-InterGalactic Broadcast Extension/Pods-InterGalactic Broadcast Extension.debug.xcconfig"; sourceTree = "<group>"; };
+		C0D3A0000000000000000001 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		D63A8A2A7A520531230CF9DC /* Pods-Runner.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.profile.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.profile.xcconfig"; sourceTree = "<group>"; };
+		DB30E4956A47D0E6AACC01DB /* Pods-InterGalactic Notification Extension.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-InterGalactic Notification Extension.release.xcconfig"; path = "Target Support Files/Pods-InterGalactic Notification Extension/Pods-InterGalactic Notification Extension.release.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -130,6 +152,15 @@
 			buildActionMask = 2147483647;
 			files = (
 				7805D611FD4531031892B31B /* Pods_Runner.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A10000000000000000000019 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000001 /* ReplayKit.framework in Frameworks */,
+				B817DA11510B9AD989EFE66A /* Pods_InterGalactic_Broadcast_Extension.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -147,18 +178,26 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		A10000000000000000000019 /* Frameworks */ = {
+		FFF63D69219E1BE4B61FE895 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A10000000000000000000001 /* ReplayKit.framework in Frameworks */,
-				B817DA11510B9AD989EFE66A /* Pods_InterGalactic_Broadcast_Extension.framework in Frameworks */,
+				823F5FB5A0E94EF9650C600A /* Foundation.framework in Frameworks */,
+				386EED42B124C4E1FAA4F9BE /* Pods_InterGalactic_Notification_Extension.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		45E7DB604298F5AD5051C478 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				3F8436C13EFB0D34FE98EB04 /* Foundation.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
 		7E8E034DC8A8633EC9F261F4 /* Pods */ = {
 			isa = PBXGroup;
 			children = (
@@ -168,6 +207,9 @@
 				B4DC11DA7E8AE65298E60C82 /* Pods-Runner.debug.xcconfig */,
 				686EC67B39C484C7BFF92B2F /* Pods-Runner.release.xcconfig */,
 				D63A8A2A7A520531230CF9DC /* Pods-Runner.profile.xcconfig */,
+				DB30E4956A47D0E6AACC01DB /* Pods-InterGalactic Notification Extension.release.xcconfig */,
+				B40D5445D18E6A0FC6DA8AC5 /* Pods-InterGalactic Notification Extension.debug.xcconfig */,
+				B5962A2C98987A37E4226DA5 /* Pods-InterGalactic Notification Extension.profile.xcconfig */,
 			);
 			path = Pods;
 			sourceTree = "<group>";
@@ -195,6 +237,7 @@
 				97C146EF1CF9000F007C117D /* Products */,
 				A10000000000000000000021 /* Frameworks */,
 				7E8E034DC8A8633EC9F261F4 /* Pods */,
+				EDC325A18CB9C0A74555A72C /* InterGalactic Notification Extension */,
 			);
 			sourceTree = "<group>";
 		};
@@ -205,6 +248,7 @@
 				A10000000000000000000010 /* InterGalactic Broadcast Extension.appex */,
 				A40000000000000000000010 /* RunnerTests.xctest */,
 				A20000000000000000000010 /* InterGalactic Share Extension.appex */,
+				125FADF8EE342FA5489499B6 /* InterGalactic Notification Extension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -228,6 +272,32 @@
 			path = Runner;
 			sourceTree = "<group>";
 		};
+		A10000000000000000000020 /* InterGalactic Broadcast Extension */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000018 /* InterGalactic Broadcast Extension.entitlements */,
+				A10000000000000000000013 /* Atomic.swift */,
+				A10000000000000000000014 /* DarwinNotificationCenter.swift */,
+				A10000000000000000000015 /* SampleHandler.swift */,
+				A10000000000000000000016 /* SampleUploader.swift */,
+				A10000000000000000000017 /* SocketConnection.swift */,
+				A10000000000000000000012 /* Info.plist */,
+			);
+			path = "InterGalactic Broadcast Extension";
+			sourceTree = "<group>";
+		};
+		A10000000000000000000021 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000011 /* ReplayKit.framework */,
+				5ABF530A5963183B5CC04C29 /* Pods_InterGalactic_Broadcast_Extension.framework */,
+				387D9545FBACCBAD3AAD764C /* Pods_Runner.framework */,
+				45E7DB604298F5AD5051C478 /* iOS */,
+				B9EC8844BE0A0B751C74D4C8 /* Pods_InterGalactic_Notification_Extension.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		A20000000000000000000020 /* InterGalactic Share Extension */ = {
 			isa = PBXGroup;
 			children = (
@@ -249,37 +319,46 @@
 			path = RunnerTests;
 			sourceTree = "<group>";
 		};
-		A10000000000000000000020 /* InterGalactic Broadcast Extension */ = {
+		EDC325A18CB9C0A74555A72C /* InterGalactic Notification Extension */ = {
 			isa = PBXGroup;
 			children = (
-				A10000000000000000000018 /* InterGalactic Broadcast Extension.entitlements */,
-				A10000000000000000000013 /* Atomic.swift */,
-				A10000000000000000000014 /* DarwinNotificationCenter.swift */,
-				A10000000000000000000015 /* SampleHandler.swift */,
-				A10000000000000000000016 /* SampleUploader.swift */,
-				A10000000000000000000017 /* SocketConnection.swift */,
-				A10000000000000000000012 /* Info.plist */,
+				2C6919D3F84B3CD8F9EE8148 /* NotificationService.swift */,
+				1CCC8BE1B660351CD13C1AC9 /* Info.plist */,
+				8FFE31B820BA366736498E24 /* NotificationExtension-Bridging-Header.h */,
+				7E906C47AC60149DF7432D20 /* InterGalactic Notification Extension.entitlements */,
 			);
-			path = "InterGalactic Broadcast Extension";
-			sourceTree = "<group>";
-		};
-		A10000000000000000000021 /* Frameworks */ = {
-			isa = PBXGroup;
-			children = (
-				A10000000000000000000011 /* ReplayKit.framework */,
-				5ABF530A5963183B5CC04C29 /* Pods_InterGalactic_Broadcast_Extension.framework */,
-				387D9545FBACCBAD3AAD764C /* Pods_Runner.framework */,
-			);
-			name = Frameworks;
-			sourceTree = "<group>";
+			name = "InterGalactic Notification Extension";
+			path = "InterGalactic Notification Extension";
+			sourceTree = SOURCE_ROOT;
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		75C5F0D45CDA635FF919843A /* InterGalactic Notification Extension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 523805A4A23B9766159BE8CC /* Build configuration list for PBXNativeTarget "InterGalactic Notification Extension" */;
+			buildPhases = (
+				E8E8A0010000000000000002 /* Verify E8 Patched Source */,
+				82D7A7D9799743F006F9568C /* [CP] Check Pods Manifest.lock */,
+				E5896B46A00F67E088178310 /* Sources */,
+				FFF63D69219E1BE4B61FE895 /* Frameworks */,
+				6CACD5088A6DE0040374ABE4 /* Resources */,
+				A8A8B0010000000000000001 /* Generate NSE Localizable.strings */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "InterGalactic Notification Extension";
+			productName = "InterGalactic Notification Extension";
+			productReference = 125FADF8EE342FA5489499B6 /* InterGalactic Notification Extension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		97C146ED1CF9000F007C117D /* Runner */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 97C147051CF9000F007C117D /* Build configuration list for PBXNativeTarget "Runner" */;
 			buildPhases = (
+				E8E8A0010000000000000001 /* Verify E8 Patched Source */,
 				2F85FF841CB92DF7049D0965 /* [CP] Check Pods Manifest.lock */,
 				9740EEB61CF901F6004384FC /* Run Script */,
 				97C146EA1CF9000F007C117D /* Sources */,
@@ -297,11 +376,30 @@
 			dependencies = (
 				A10000000000000000000025 /* PBXTargetDependency */,
 				A20000000000000000000025 /* PBXTargetDependency */,
+				012BDF3C6A1CB7620FA8898E /* PBXTargetDependency */,
 			);
 			name = Runner;
 			productName = Runner;
 			productReference = 97C146EE1CF9000F007C117D /* Runner.app */;
 			productType = "com.apple.product-type.application";
+		};
+		A10000000000000000000022 /* InterGalactic Broadcast Extension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A10000000000000000000029 /* Build configuration list for PBXNativeTarget "InterGalactic Broadcast Extension" */;
+			buildPhases = (
+				6BE4EBC29793ED5C61E28AC8 /* [CP] Check Pods Manifest.lock */,
+				A10000000000000000000024 /* Sources */,
+				A10000000000000000000019 /* Frameworks */,
+				A10000000000000000000023 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "InterGalactic Broadcast Extension";
+			productName = "InterGalactic Broadcast Extension";
+			productReference = A10000000000000000000010 /* InterGalactic Broadcast Extension.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 		A20000000000000000000022 /* InterGalactic Share Extension */ = {
 			isa = PBXNativeTarget;
@@ -337,24 +435,6 @@
 			productReference = A40000000000000000000010 /* RunnerTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		A10000000000000000000022 /* InterGalactic Broadcast Extension */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = A10000000000000000000029 /* Build configuration list for PBXNativeTarget "InterGalactic Broadcast Extension" */;
-			buildPhases = (
-				6BE4EBC29793ED5C61E28AC8 /* [CP] Check Pods Manifest.lock */,
-				A10000000000000000000024 /* Sources */,
-				A10000000000000000000019 /* Frameworks */,
-				A10000000000000000000023 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			name = "InterGalactic Broadcast Extension";
-			productName = "InterGalactic Broadcast Extension";
-			productReference = A10000000000000000000010 /* InterGalactic Broadcast Extension.appex */;
-			productType = "com.apple.product-type.app-extension";
-		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -371,10 +451,10 @@
 					A10000000000000000000022 = {
 						CreatedOnToolsVersion = 16.0;
 					};
-					A40000000000000000000022 = {
+					A20000000000000000000022 = {
 						CreatedOnToolsVersion = 16.0;
 					};
-					A20000000000000000000022 = {
+					A40000000000000000000022 = {
 						CreatedOnToolsVersion = 16.0;
 					};
 				};
@@ -396,11 +476,19 @@
 				A40000000000000000000022 /* RunnerTests */,
 				A20000000000000000000022 /* InterGalactic Share Extension */,
 				97C146ED1CF9000F007C117D /* Runner */,
+				75C5F0D45CDA635FF919843A /* InterGalactic Notification Extension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		6CACD5088A6DE0040374ABE4 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		97C146EC1CF9000F007C117D /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -410,6 +498,13 @@
 				97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */,
 				C0D3A0010000000000000001 /* PrivacyInfo.xcprivacy in Resources */,
 				97C146FC1CF9000F007C117D /* Main.storyboard in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A10000000000000000000023 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -427,16 +522,57 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		A10000000000000000000023 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		A8A8B0010000000000000001 /* Generate NSE Localizable.strings */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Generate NSE Localizable.strings";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -eu\n\"${IG_E8_PYTHON}\" \"${SRCROOT}/scripts/generate_nse_localizable.py\" --arb-dir \"${SRCROOT}/../assets/l10n\" --output-dir \"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		E8E8A0010000000000000001 /* Verify E8 Patched Source */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Verify E8 Patched Source";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "IG_E8_REQUIRE_POD_LINK=1 /bin/sh \"${SRCROOT}/scripts/verify_e8_patched_source.sh\"";
+			showEnvVarsInLog = 0;
+		};
+		E8E8A0010000000000000002 /* Verify E8 Patched Source */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Verify E8 Patched Source";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "IG_E8_REQUIRE_POD_LINK=1 /bin/sh \"${SRCROOT}/scripts/verify_e8_patched_source.sh\"";
+			showEnvVarsInLog = 0;
+		};
 		2F85FF841CB92DF7049D0965 /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -514,6 +650,28 @@
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
+		82D7A7D9799743F006F9568C /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-InterGalactic Notification Extension-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
 		9740EEB61CF901F6004384FC /* Run Script */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
@@ -576,6 +734,18 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A10000000000000000000024 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000003 /* Atomic.swift in Sources */,
+				A10000000000000000000004 /* DarwinNotificationCenter.swift in Sources */,
+				A10000000000000000000005 /* SampleHandler.swift in Sources */,
+				A10000000000000000000006 /* SampleUploader.swift in Sources */,
+				A10000000000000000000007 /* SocketConnection.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A20000000000000000000024 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -596,30 +766,32 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		A10000000000000000000024 /* Sources */ = {
+		E5896B46A00F67E088178310 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A10000000000000000000003 /* Atomic.swift in Sources */,
-				A10000000000000000000004 /* DarwinNotificationCenter.swift in Sources */,
-				A10000000000000000000005 /* SampleHandler.swift in Sources */,
-				A10000000000000000000006 /* SampleUploader.swift in Sources */,
-				A10000000000000000000007 /* SocketConnection.swift in Sources */,
+				01B0B4880BDD04B771090719 /* NotificationService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		A20000000000000000000025 /* PBXTargetDependency */ = {
+		012BDF3C6A1CB7620FA8898E /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = A20000000000000000000022 /* InterGalactic Share Extension */;
-			targetProxy = A20000000000000000000008 /* PBXContainerItemProxy */;
+			name = "InterGalactic Notification Extension";
+			target = 75C5F0D45CDA635FF919843A /* InterGalactic Notification Extension */;
+			targetProxy = 14812E4452DC9A3A4590F2D4 /* PBXContainerItemProxy */;
 		};
 		A10000000000000000000025 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = A10000000000000000000022 /* InterGalactic Broadcast Extension */;
 			targetProxy = A10000000000000000000008 /* PBXContainerItemProxy */;
+		};
+		A20000000000000000000025 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A20000000000000000000022 /* InterGalactic Share Extension */;
+			targetProxy = A20000000000000000000008 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -718,6 +890,41 @@
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Profile;
+		};
+		8FD5FEF49965A35890A33287 /* Profile */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = B5962A2C98987A37E4226DA5 /* Pods-InterGalactic Notification Extension.profile.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = "InterGalactic Notification Extension/InterGalactic Notification Extension.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1008;
+				DEVELOPMENT_TEAM = 8RSRT93XU9;
+				ENABLE_DEBUG_DYLIB = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"${PODS_ROOT}/../.symlinks/plugins/flutter_vodozemac/ios/Classes\"",
+				);
+				INFOPLIST_FILE = "InterGalactic Notification Extension/Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = "0.8.2";
+				OTHER_LDFLAGS = (
+					"-force_load",
+					"${PODS_CONFIGURATION_BUILD_DIR}/flutter_vodozemac/libvodozemac_bindings_dart.a",
+					"-lsqlite3",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = chat.intergalactic.app.nse;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "InterGalactic Notification Extension/NotificationExtension-Bridging-Header.h";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
 			};
 			name = Profile;
 		};
@@ -884,6 +1091,84 @@
 			};
 			name = Release;
 		};
+		A10000000000000000000026 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = BEBB87CC424C1DAC7EB926F7 /* Pods-InterGalactic Broadcast Extension.debug.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = "InterGalactic Broadcast Extension/InterGalactic Broadcast Extension.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1008;
+				ENABLE_DEBUG_DYLIB = NO;
+				INFOPLIST_FILE = "InterGalactic Broadcast Extension/Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = "0.8.2";
+				PRODUCT_BUNDLE_IDENTIFIER = chat.intergalactic.app.broadcast;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A10000000000000000000027 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 986B4BCFCA9A25776CC8938B /* Pods-InterGalactic Broadcast Extension.release.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = "InterGalactic Broadcast Extension/InterGalactic Broadcast Extension.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1008;
+				INFOPLIST_FILE = "InterGalactic Broadcast Extension/Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = "0.8.2";
+				PRODUCT_BUNDLE_IDENTIFIER = chat.intergalactic.app.broadcast;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		A10000000000000000000028 /* Profile */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 7754170BCF104B624ABDA5B9 /* Pods-InterGalactic Broadcast Extension.profile.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = "InterGalactic Broadcast Extension/InterGalactic Broadcast Extension.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1008;
+				DEVELOPMENT_TEAM = 8RSRT93XU9;
+				INFOPLIST_FILE = "InterGalactic Broadcast Extension/Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = "0.8.2";
+				PRODUCT_BUNDLE_IDENTIFIER = chat.intergalactic.app.broadcast;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Profile;
+		};
 		A20000000000000000000026 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -892,7 +1177,7 @@
 				CODE_SIGN_ENTITLEMENTS = "InterGalactic Share Extension/InterGalactic Share Extension.entitlements";
 				DEVELOPMENT_TEAM = 8RSRT93XU9;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1004;
+				CURRENT_PROJECT_VERSION = 1008;
 				ENABLE_DEBUG_DYLIB = NO;
 				INFOPLIST_FILE = "InterGalactic Share Extension/Info.plist";
 				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
@@ -901,7 +1186,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = "0.8.1";
+				MARKETING_VERSION = "0.8.2";
 				PRODUCT_BUNDLE_IDENTIFIER = chat.intergalactic.app.share;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -919,7 +1204,7 @@
 				CODE_SIGN_ENTITLEMENTS = "InterGalactic Share Extension/InterGalactic Share Extension.entitlements";
 				DEVELOPMENT_TEAM = 8RSRT93XU9;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1004;
+				CURRENT_PROJECT_VERSION = 1008;
 				ENABLE_DEBUG_DYLIB = NO;
 				INFOPLIST_FILE = "InterGalactic Share Extension/Info.plist";
 				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
@@ -928,7 +1213,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = "0.8.1";
+				MARKETING_VERSION = "0.8.2";
 				PRODUCT_BUNDLE_IDENTIFIER = chat.intergalactic.app.share;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -946,7 +1231,7 @@
 				CODE_SIGN_ENTITLEMENTS = "InterGalactic Share Extension/InterGalactic Share Extension.entitlements";
 				DEVELOPMENT_TEAM = 8RSRT93XU9;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1004;
+				CURRENT_PROJECT_VERSION = 1008;
 				ENABLE_DEBUG_DYLIB = NO;
 				INFOPLIST_FILE = "InterGalactic Share Extension/Info.plist";
 				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
@@ -955,7 +1240,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = "0.8.1";
+				MARKETING_VERSION = "0.8.2";
 				PRODUCT_BUNDLE_IDENTIFIER = chat.intergalactic.app.share;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -1010,87 +1295,88 @@
 			};
 			name = Profile;
 		};
-		A10000000000000000000026 /* Debug */ = {
+		C43DC324D6664BA94C5E4987 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = BEBB87CC424C1DAC7EB926F7 /* Pods-InterGalactic Broadcast Extension.debug.xcconfig */;
+			baseConfigurationReference = DB30E4956A47D0E6AACC01DB /* Pods-InterGalactic Notification Extension.release.xcconfig */;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
-				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_ENTITLEMENTS = "InterGalactic Broadcast Extension/InterGalactic Broadcast Extension.entitlements";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = "InterGalactic Notification Extension/InterGalactic Notification Extension.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1004;
+				CURRENT_PROJECT_VERSION = 1008;
+				DEVELOPMENT_TEAM = 8RSRT93XU9;
 				ENABLE_DEBUG_DYLIB = NO;
-				INFOPLIST_FILE = "InterGalactic Broadcast Extension/Info.plist";
-				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
-				LD_RUNPATH_SEARCH_PATHS = (
+				GENERATE_INFOPLIST_FILE = NO;
+				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
+					"\"${PODS_ROOT}/../.symlinks/plugins/flutter_vodozemac/ios/Classes\"",
 				);
-				MARKETING_VERSION = "0.8.1";
-				PRODUCT_BUNDLE_IDENTIFIER = chat.intergalactic.app.broadcast;
+				INFOPLIST_FILE = "InterGalactic Notification Extension/Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = "0.8.2";
+				OTHER_LDFLAGS = (
+					"-force_load",
+					"${PODS_CONFIGURATION_BUILD_DIR}/flutter_vodozemac/libvodozemac_bindings_dart.a",
+					"-lsqlite3",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = chat.intergalactic.app.nse;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
-				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_OBJC_BRIDGING_HEADER = "InterGalactic Notification Extension/NotificationExtension-Bridging-Header.h";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		F0788EE255D696B6974E30C9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = B40D5445D18E6A0FC6DA8AC5 /* Pods-InterGalactic Notification Extension.debug.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = "InterGalactic Notification Extension/InterGalactic Notification Extension.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1008;
+				DEVELOPMENT_TEAM = 8RSRT93XU9;
+				ENABLE_DEBUG_DYLIB = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"${PODS_ROOT}/../.symlinks/plugins/flutter_vodozemac/ios/Classes\"",
+				);
+				INFOPLIST_FILE = "InterGalactic Notification Extension/Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = "0.8.2";
+				OTHER_LDFLAGS = (
+					"-force_load",
+					"${PODS_CONFIGURATION_BUILD_DIR}/flutter_vodozemac/libvodozemac_bindings_dart.a",
+					"-lsqlite3",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = chat.intergalactic.app.nse;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "InterGalactic Notification Extension/NotificationExtension-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
 		};
-		A10000000000000000000027 /* Release */ = {
-			isa = XCBuildConfiguration;
-			baseConfigurationReference = 986B4BCFCA9A25776CC8938B /* Pods-InterGalactic Broadcast Extension.release.xcconfig */;
-			buildSettings = {
-				APPLICATION_EXTENSION_API_ONLY = YES;
-				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_ENTITLEMENTS = "InterGalactic Broadcast Extension/InterGalactic Broadcast Extension.entitlements";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1004;
-				INFOPLIST_FILE = "InterGalactic Broadcast Extension/Info.plist";
-				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				MARKETING_VERSION = "0.8.1";
-				PRODUCT_BUNDLE_IDENTIFIER = chat.intergalactic.app.broadcast;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SKIP_INSTALL = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Release;
-		};
-		A10000000000000000000028 /* Profile */ = {
-			isa = XCBuildConfiguration;
-			baseConfigurationReference = 7754170BCF104B624ABDA5B9 /* Pods-InterGalactic Broadcast Extension.profile.xcconfig */;
-			buildSettings = {
-				APPLICATION_EXTENSION_API_ONLY = YES;
-				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_ENTITLEMENTS = "InterGalactic Broadcast Extension/InterGalactic Broadcast Extension.entitlements";
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1004;
-				DEVELOPMENT_TEAM = 8RSRT93XU9;
-				INFOPLIST_FILE = "InterGalactic Broadcast Extension/Info.plist";
-				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				MARKETING_VERSION = "0.8.1";
-				PRODUCT_BUNDLE_IDENTIFIER = chat.intergalactic.app.broadcast;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SKIP_INSTALL = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Profile;
-		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		523805A4A23B9766159BE8CC /* Build configuration list for PBXNativeTarget "InterGalactic Notification Extension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C43DC324D6664BA94C5E4987 /* Release */,
+				F0788EE255D696B6974E30C9 /* Debug */,
+				8FD5FEF49965A35890A33287 /* Profile */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		97C146E91CF9000F007C117D /* Build configuration list for PBXProject "Runner" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -1111,6 +1397,16 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		A10000000000000000000029 /* Build configuration list for PBXNativeTarget "InterGalactic Broadcast Extension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A10000000000000000000026 /* Debug */,
+				A10000000000000000000027 /* Release */,
+				A10000000000000000000028 /* Profile */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		A20000000000000000000029 /* Build configuration list for PBXNativeTarget "InterGalactic Share Extension" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -1127,16 +1423,6 @@
 				A40000000000000000000026 /* Debug */,
 				A40000000000000000000027 /* Release */,
 				A40000000000000000000028 /* Profile */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		A10000000000000000000029 /* Build configuration list for PBXNativeTarget "InterGalactic Broadcast Extension" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				A10000000000000000000026 /* Debug */,
-				A10000000000000000000027 /* Release */,
-				A10000000000000000000028 /* Profile */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

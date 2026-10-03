@@ -1,7 +1,6 @@
 # UI Guidelines
 
 Status: active design reference
-Owner: DESIGN
 Last updated: 2026-06-23
 
 ## Scope

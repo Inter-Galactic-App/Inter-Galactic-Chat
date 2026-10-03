@@ -4,8 +4,7 @@ Status: manual COMMUNITY helper
 Last updated: 2026-06-16
 
 Use these snippets for beta Matrix rooms, email replies, GitHub issue updates,
-or release-testing notes. Keep them short, edit details before sending, and do
-not promise a release date unless RELEASE PIPELINE has already scheduled it.
+or release-testing notes. Keep them short, edit details before sending.
 
 ## v0.7.4+985 Beta Update Post
 

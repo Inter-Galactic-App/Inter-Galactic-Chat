@@ -280,6 +280,13 @@ class MatrixBackgroundRoom implements Room {
   }
 
   @override
+  Future<RoomTimelineLease> getTimelineForEventContext(
+    String contextEventId,
+  ) async => RoomTimelineLease.shared(
+    await getTimeline(contextEventId: contextEventId),
+  );
+
+  @override
   int get highlightedNotificationCount => throw UnimplementedError();
 
   @override

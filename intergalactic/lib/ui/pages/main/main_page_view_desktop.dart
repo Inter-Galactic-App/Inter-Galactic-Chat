@@ -957,8 +957,8 @@ class _CompactUserRailPanelState extends State<_CompactUserRailPanel> {
               padding: const EdgeInsets.only(bottom: 6),
               child: CompositedTransformTarget(
                 link: _activityLayerLink,
-                child: Tooltip(
-                  message: "Account",
+                child: tiamat.Tooltip(
+                  text: "Account",
                   child: InkResponse(
                     radius: 22,
                     onTap: _toggleActivityPopover,
@@ -1256,8 +1256,8 @@ class _HoverRevealPanelState extends State<_HoverRevealPanel> {
                 top: 96,
                 left: widget.side == _HoverPanelSide.left ? 0 : null,
                 right: widget.side == _HoverPanelSide.right ? 0 : null,
-                child: Tooltip(
-                  message: widget.tooltip,
+                child: tiamat.Tooltip(
+                  text: widget.tooltip,
                   child: Builder(
                     builder: (context) {
                       final radius = BorderRadius.horizontal(

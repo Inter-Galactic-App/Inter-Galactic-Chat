@@ -6,6 +6,8 @@ import 'package:intergalactic/client/components/invitation/invitation_component.
 import 'package:intergalactic/client/components/pinned_messages/pinned_messages_component.dart';
 import 'package:intergalactic/client/components/voip/voip_component.dart';
 import 'package:intergalactic/client/timeline_events/timeline_event_encrypted.dart';
+import 'package:intergalactic/client/matrix/matrix_client.dart';
+import 'package:intergalactic/client/matrix/vodozemac_single_flight.dart';
 import 'package:intergalactic/config/layout_config.dart';
 import 'package:intergalactic/main.dart';
 import 'package:intergalactic/ui/navigation/adaptive_dialog.dart';
@@ -31,6 +33,55 @@ IconData _roomQuickAccessPanelToggleIcon({
 }) {
   final sidePanelVisible = forceSidePanelVisible || !hideSidePanel;
   return sidePanelVisible ? Icons.chevron_right : Icons.chevron_left;
+}
+
+/// The one spelling of the Retry Decrypt entry's identity.
+///
+/// Named because three places match on it - the side panel's dedicated
+/// padlock selects by it, the widget key derives from it, and the desktop
+/// view attaches the encrypted-room tutorial anchor by comparing it.
+const String retryDecryptActionName = "Retry Decrypt";
+
+/// The Retry Decrypt entry, gated on encryption readiness (CodeRabbit #8).
+///
+/// This is a DIRECT encryption action: it asks the crypto stack to decrypt
+/// again. Offered while vodozemac is still initializing it cannot work, and
+/// offered after initialization has finally failed it can never work - in
+/// both cases the user presses it, nothing happens, and nothing says why.
+///
+/// Returns the entry rather than a flag on purpose. The caller inserts what
+/// this builds, so the disabled action and the label that explains it cannot
+/// drift apart from the decision that produced them.
+RoomQuickAccessMenuEntry retryDecryptMenuEntry({
+  required EncryptionAvailability availability,
+  required void Function(BuildContext context) onRetry,
+}) {
+  switch (availability) {
+    case EncryptionAvailability.ready:
+      return RoomQuickAccessMenuEntry(
+        name: retryDecryptActionName,
+        icon: Icons.lock_open,
+        action: onRetry,
+      );
+    case EncryptionAvailability.pending:
+      return RoomQuickAccessMenuEntry(
+        name: retryDecryptActionName,
+        icon: Icons.lock_clock,
+        action: null,
+        disabledReason: "Retry Decrypt: preparing encryption",
+        semanticLabel:
+            "Retry Decrypt is unavailable while encryption is preparing",
+      );
+    case EncryptionAvailability.unavailable:
+      return RoomQuickAccessMenuEntry(
+        name: retryDecryptActionName,
+        icon: Icons.lock_outline,
+        action: null,
+        disabledReason: "Retry Decrypt: encryption unavailable",
+        semanticLabel:
+            "Retry Decrypt is unavailable because encryption did not start",
+      );
+  }
 }
 
 class RoomQuickAccessMenu {
@@ -64,10 +115,9 @@ class RoomQuickAccessMenu {
         room.timeline?.events.any((e) => e is TimelineEventEncrypted) == true;
     actions = [
       if (hasEncryptedEvents)
-        RoomQuickAccessMenuEntry(
-          name: "Retry Decrypt",
-          icon: Icons.lock_open,
-          action: (context) => room.retryDecryptAll(),
+        retryDecryptMenuEntry(
+          availability: MatrixClient.encryptionAvailability.value,
+          onRetry: (context) => room.retryDecryptAll(),
         ),
       if (invitation != null)
         RoomQuickAccessMenuEntry(
@@ -129,11 +179,23 @@ class RoomQuickAccessMenu {
 }
 
 class RoomQuickAccessMenuEntry {
+  /// IDENTITY, not display copy. Callers select a single entry by exact name
+  /// (`RoomQuickAccessMenuViewDesktop.onlyActionName`), the widget key is
+  /// derived from it, and the desktop view attaches the tutorial anchor by
+  /// comparing it. Changing it to say something to the user removes the entry
+  /// from those surfaces instead of relabelling it - which is how a disabled
+  /// Retry Decrypt briefly became a missing padlock.
   final String name;
+
   final Function(BuildContext context)? action;
   final IconData icon;
   final bool selected;
   final String? semanticLabel;
+
+  /// Why this entry cannot be used, when it cannot. Display copy: it replaces
+  /// the tooltip and is announced, and it is deliberately NOT [name], so
+  /// nothing that matches on identity is affected by it.
+  final String? disabledReason;
 
   RoomQuickAccessMenuEntry({
     required this.name,
@@ -141,5 +203,6 @@ class RoomQuickAccessMenuEntry {
     required this.icon,
     this.selected = false,
     this.semanticLabel,
+    this.disabledReason,
   });
 }

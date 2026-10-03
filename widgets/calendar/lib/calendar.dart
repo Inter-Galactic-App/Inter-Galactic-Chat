@@ -945,7 +945,6 @@ class MatrixCalendar {
   Future<void> redactEvent(String eventId) async {
     await widgetApi.sendAction(FromWidgetAction.sendEvent, {
       "type": "m.room.redaction",
-      "chat.commet.calendar.redaction": "edit",
       "content": {"redacts": eventId}
     });
     _markEventRedacted(eventId);

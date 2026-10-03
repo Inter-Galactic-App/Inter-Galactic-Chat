@@ -51,7 +51,7 @@ class _MessageAttachmentState extends State<MessageAttachment> {
   bool spoilerRevealed = false;
   var controller = VideoPlayerController();
 
-  String get spoilerLabel => Intl.message(
+  String get attachmentSpoilerLabel => Intl.message(
     'Spoiler',
     name: 'attachmentSpoilerLabel',
     desc: 'Label shown over an image attachment that is hidden as a spoiler',
@@ -168,7 +168,9 @@ class _MessageAttachmentState extends State<MessageAttachment> {
                                   children: [
                                     const Icon(Icons.visibility_off, size: 18),
                                     const SizedBox(width: 8),
-                                    tiamat.Text.labelEmphasised(spoilerLabel),
+                                    tiamat.Text.labelEmphasised(
+                                      attachmentSpoilerLabel,
+                                    ),
                                   ],
                                 ),
                               ),

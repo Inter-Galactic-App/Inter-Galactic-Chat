@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intergalactic/client/client_manager.dart';
 import 'package:intergalactic/config/app_globals.dart' as globals;
+import 'package:intergalactic/main.dart' as app_globals;
 import 'package:intergalactic/config/preferences.dart';
 import 'package:intergalactic/ui/onboarding/demo_tutorial_content.dart';
+import 'package:intergalactic/ui/onboarding/mobile_tutorial_content.dart';
 import 'package:intergalactic/ui/onboarding/onboarding_page.dart';
 import 'package:intergalactic/ui/onboarding/onboarding_service.dart';
 import 'package:intergalactic/ui/onboarding/onboarding_step.dart';
@@ -20,6 +23,13 @@ void main() {
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
+    final previousClientManager = app_globals.clientManager;
+    final clientManager = ClientManager();
+    app_globals.clientManager = clientManager;
+    addTearDown(() {
+      app_globals.clientManager = previousClientManager;
+      return clientManager.close();
+    });
     preferences = Preferences();
     await preferences.init();
     await globals.preferences.init();
@@ -105,14 +115,138 @@ void main() {
     expect(find.text('Skip'), findsOneWidget);
   });
 
-  testWidgets('mobile layout does not open tutorial route', (tester) async {
+  testWidgets('mobile layout opens the guided tutorial route', (tester) async {
     await globals.preferences.layoutOverride.set('mobile');
 
-    await _pumpTutorialLauncher(tester, service: service);
+    await _pumpTutorialLauncher(
+      tester,
+      service: service,
+      mode: TutorialMode.demoPreview,
+    );
 
-    expect(find.text('Welcome to Inter Galactic'), findsNothing);
-    expect(find.text('Open tutorial'), findsOneWidget);
+    expect(find.text('Welcome to Inter Galactic'), findsWidgets);
+    expect(find.byKey(const ValueKey('mobile-tutorial-sheet')), findsOneWidget);
     expect(service.state.completed, isFalse);
+  });
+
+  testWidgets('guided mobile tutorial keeps the sheet compact', (tester) async {
+    await globals.preferences.layoutOverride.set('mobile');
+
+    await _pumpTutorialLauncher(
+      tester,
+      service: service,
+      mode: TutorialMode.demoPreview,
+      steps: [mobileTutorialSteps.first],
+    );
+
+    expect(find.byKey(const ValueKey('mobile-tutorial-sheet')), findsOneWidget);
+    expect(
+      tester
+          .getSize(find.byKey(const ValueKey('mobile-tutorial-sheet')))
+          .height,
+      lessThanOrEqualTo(180),
+    );
+    expect(find.text('Next'), findsNothing);
+    expect(find.text('Skip'), findsNothing);
+    expect(find.text('Back'), findsNothing);
+  });
+
+  testWidgets('guided mobile tutorial grows only for a wrapping title', (
+    tester,
+  ) async {
+    await globals.preferences.layoutOverride.set('mobile');
+    final messagingStep = mobileTutorialSteps.firstWhere(
+      (step) => step.id == 'messaging-1',
+    );
+
+    await _pumpTutorialLauncher(
+      tester,
+      service: service,
+      mode: TutorialMode.demoPreview,
+      steps: [messagingStep],
+      guidedPreviewSize: const Size(360, 800),
+    );
+
+    expect(tester.widget<Text>(find.text(messagingStep.title)).maxLines, 2);
+    expect(
+      tester
+          .getSize(find.byKey(const ValueKey('mobile-tutorial-sheet')))
+          .height,
+      greaterThan(180),
+    );
+  });
+
+  testWidgets('guided mobile tutorial uses tap and swipe navigation', (
+    tester,
+  ) async {
+    await globals.preferences.layoutOverride.set('mobile');
+
+    await _pumpTutorialLauncher(
+      tester,
+      service: service,
+      mode: TutorialMode.demoPreview,
+      steps: mobileTutorialSteps.take(2).toList(),
+    );
+
+    final sheet = find.byKey(const ValueKey('mobile-tutorial-sheet'));
+    await tester.tap(sheet);
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text(mobileTutorialSteps.first.title), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 1000));
+    await tester.pump();
+    expect(find.text(mobileTutorialSteps[1].title), findsOneWidget);
+
+    await tester.drag(sheet, const Offset(180, 0));
+    await tester.pump();
+    expect(find.text(mobileTutorialSteps.first.title), findsOneWidget);
+  });
+
+  testWidgets('system Back cancels a pending mobile advance', (tester) async {
+    await globals.preferences.layoutOverride.set('mobile');
+
+    await _pumpTutorialLauncher(
+      tester,
+      service: service,
+      mode: TutorialMode.demoPreview,
+      steps: mobileTutorialSteps.take(3).toList(),
+    );
+
+    final sheet = find.byKey(const ValueKey('mobile-tutorial-sheet'));
+    await tester.tap(sheet);
+    await tester.pump(const Duration(milliseconds: 1200));
+    await tester.pump();
+    expect(find.text(mobileTutorialSteps[1].title), findsOneWidget);
+
+    await tester.tap(sheet);
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+    expect(find.text(mobileTutorialSteps.first.title), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 1200));
+    expect(find.text(mobileTutorialSteps.first.title), findsOneWidget);
+  });
+
+  testWidgets('guided mobile tutorial skips on an upward swipe', (
+    tester,
+  ) async {
+    await globals.preferences.layoutOverride.set('mobile');
+
+    await _pumpTutorialLauncher(
+      tester,
+      service: service,
+      mode: TutorialMode.demoPreview,
+      steps: mobileTutorialSteps.take(2).toList(),
+    );
+
+    await tester.drag(
+      find.byKey(const ValueKey('mobile-tutorial-sheet')),
+      const Offset(0, -260),
+    );
+    await _pumpTutorialAnimation(tester);
+
+    expect(find.text('Open tutorial'), findsOneWidget);
   });
 
   testWidgets('Next advances progress and Back returns', (tester) async {
@@ -239,10 +373,11 @@ Future<void> _pumpTutorialLauncher(
   bool replay = false,
   TutorialMode mode = TutorialMode.realAccount,
   List<OnboardingStep>? steps,
+  Size guidedPreviewSize = const Size(1600, 1000),
 }) async {
   if (mode.usesGuidedDemoBackdrop) {
     tester.view
-      ..physicalSize = const Size(1600, 1000)
+      ..physicalSize = guidedPreviewSize
       ..devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);

@@ -62,8 +62,9 @@ class _HelpSafetyPageState extends State<HelpSafetyPage> {
     if (!identical(scopedClient, _selectedClient)) {
       _selectedClient = scopedClient;
       _selectedRoom = null;
-      _ignoredUserIds =
-          scopedClient == null ? <String>[] : _ignoredUsersFor(scopedClient);
+      _ignoredUserIds = scopedClient == null
+          ? <String>[]
+          : _ignoredUsersFor(scopedClient);
     }
   }
 
@@ -489,8 +490,11 @@ class _HelpSafetyPageState extends State<HelpSafetyPage> {
     });
 
     try {
-      await client.matrixClient
-          .submitMatrixEventReport(_roomId, _eventId, reason: _reason);
+      await client.matrixClient.submitMatrixEventReport(
+        _roomId,
+        _eventId,
+        reason: _reason,
+      );
       _showSuccess("Message report sent to the selected homeserver.");
     } catch (exception) {
       _showError("Message report failed: $exception");
@@ -633,9 +637,7 @@ class _HelpSafetyPageState extends State<HelpSafetyPage> {
 
   void _showSnackBar(String message) {
     ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-      SnackBar(
-        content: tiamat.Text.label(message, softwrap: true),
-      ),
+      SnackBar(content: tiamat.Text.label(message, softwrap: true)),
     );
   }
 }
@@ -643,12 +645,39 @@ class _HelpSafetyPageState extends State<HelpSafetyPage> {
 class HelpPoliciesPage extends StatelessWidget {
   const HelpPoliciesPage({super.key});
 
+  /// The policy bodies, by title, so a test can assert what they SAY.
+  ///
+  /// These are the only place in the app that tells a user where end-to-end
+  /// encryption stops, and until BUG-335's follow-up they omitted calls
+  /// entirely. An omission from an enumeration cannot be caught by banning a
+  /// wrong string - it needs a test that requires a right one, and that test
+  /// needs to read the text.
+  @visibleForTesting
+  static Map<String, String> get policyBodiesForTesting => {
+    for (final document in _documents) document.title: document.body,
+  };
+
   static const List<_PolicyDocument> _documents = [
     _PolicyDocument(
       title: "Privacy Policy",
       link: PublicReleaseLinks.privacy,
       body:
-          "Inter Galactic is a Matrix client. Messages, media, room membership, account details, and account deletion are primarily controlled by the homeserver selected by the user. End-to-end encrypted messages are designed so Inter Galactic and homeserver operators cannot read message contents, but metadata, push notification routing, backups, bridges, URL previews, GIF search, diagnostics, and third-party integrations can involve separate services.",
+          // BUG-335 follow-up, found by S&C. "Calls" was missing from the list
+          // of things end-to-end encryption does NOT cover, and this is the one
+          // page in the app that tells a user where encryption stops - so a
+          // reader who came here asking exactly that question left with the
+          // wrong answer, from the text written to give them the right one.
+          //
+          // Different shape from the three claims removed on the call surface:
+          // nothing here was FALSE. It was an omission from an enumeration, and
+          // an enumeration is read as complete, because that is what an
+          // enumeration is for.
+          //
+          // Calls get their own sentence rather than another entry in the
+          // "can involve separate services" list: that list is about services
+          // touching data around an encrypted message, and this is a stronger
+          // statement - the media is not end-to-end encrypted at all.
+          "Inter Galactic is a Matrix client. Messages, media, room membership, account details, and account deletion are primarily controlled by the homeserver selected by the user. End-to-end encrypted messages are designed so Inter Galactic and homeserver operators cannot read message contents. Calls are not end-to-end encrypted: audio and video are relayed by a call server that can access them. Metadata, push notification routing, backups, bridges, URL previews, GIF search, diagnostics, and third-party integrations can also involve separate services.",
     ),
     _PolicyDocument(
       title: "Terms / EULA",
@@ -743,10 +772,7 @@ class HelpPoliciesPage extends StatelessWidget {
 }
 
 class _HelpSection extends StatelessWidget {
-  const _HelpSection({
-    required this.title,
-    required this.children,
-  });
+  const _HelpSection({required this.title, required this.children});
 
   final String title;
   final List<Widget> children;
@@ -823,10 +849,10 @@ class _DeepRedButton extends StatelessWidget {
             : Text(
                 text,
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: foreground,
-                      fontWeight: FontWeight.w400,
-                      letterSpacing: 0,
-                    ),
+                  color: foreground,
+                  fontWeight: FontWeight.w400,
+                  letterSpacing: 0,
+                ),
               ),
       ),
     );

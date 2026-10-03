@@ -1,42 +1,14 @@
 # Corresponding Source — the Apple media_kit bundle
 
-Prepared by REVIEW, 2026-08-15, on the Windows host.
-
 **PUBLISHED 2026-08-15 and verified served.** All nine artefacts below are live
 under `https://app.ourgalaxy.space/source/`. Each was fetched back over HTTPS and
 re-hashed against the table: **9/9 HTTP 200, 9/9 digests match**. See "How it was
 published, and how that was verified" below.
 
-> This file first read **"STAGED, NOT PUBLISHED"** with a section titled *"The
-> blocker"* asserting that no agent host could upload. Both were true when
-> written and stopped being true the same day. Corrected here rather than left to
-> age, because this project's recurring defect is a state claim written as a fact
-> — see `docs/agent-control/cleanup.md`, *"not published" describes a moment*.
-
-> **SUPERSEDED LATER THE SAME DAY — the offer pages now list the archives.**
-> Corrected by S&C 2026-08-15, re-verified live rather than relayed: the
-> rendered `/source/` page returns hits for `mpv-0.36.0-source`,
-> `fribidi-1.0.13-source`, `uchardet-0.0.8-source`, `libmpv-darwin-build`,
-> `ffmpeg-fix-vp9`, `darwin` and `xcframework`, and carries the macOS
-> bundled-not-distributed paragraph; `/third-party-notices/` carries the Apple
-> component sections including the FreeType *"based in part"* disclaimer. The
-> paragraph below is preserved as an accurate record of the state at the time it
-> was written. See "What is still open" at the end of this file for the current
-> position.
-
-**Published is not the same as offered.** The `/source/` and
-`/third-party-notices/` **pages do not yet list these archives** — verified live,
-zero hits for `mpv-0.36.0-source`, `fribidi-1.0.13-source`,
-`uchardet-0.0.8-source`, `libmpv-darwin-build`, `ffmpeg-fix-vp9`, `darwin` and
-`xcframework` on the rendered `/source/` page, against a positive control that
-finds `ffmpeg-n6.0-source` four times. The bytes are reachable; the offer page
-that names them is a separate, still-open limb. Do not summarise this as "the
-Apple offer is discharged".
-
-The archives were also staged at `Corresponding_Source/source/apple-media-kit/`
-with a `MANIFEST.json` carrying the same digests. That directory is gitignored,
-so **this file remains the durable record**: the digests here are what let anyone
-re-obtain the same bytes from upstream without trusting this project's server.
+The `/source/` page lists the archives and the `/third-party-notices/` page
+contains the Apple component sections, including the FreeType disclaimer. The
+digests in this record let a recipient obtain and compare the same upstream
+bytes without relying solely on this project's server.
 
 ## Why this exists
 
@@ -46,9 +18,7 @@ so the published upstream archives do not describe what ships. The shipped
 notices already say the patches are part of the corresponding source the offer
 covers, and the notices point at `https://app.ourgalaxy.space/source/`.
 
-**That address now delivers what the notices name.** This was an ordering
-constraint on the next iOS archive; as of 2026-08-15 it no longer blocks one.
-The residual is the offer *page*, which does not yet list these files.
+**That address delivers the artefacts named by the notices.**
 
 ## What was verified, and how
 
@@ -104,7 +74,7 @@ was deleted out from under this project's FFmpeg provenance once already.
 
 ## The patch inventory was re-verified here, not relayed
 
-The handoff stated which patches apply. Read from
+The build definition identifies the applied patches. Read from
 `scripts/ffmpeg/build.sh` and `scripts/mpv/build.sh` in the staged definition:
 
 ```
@@ -145,29 +115,11 @@ Windows libmpv one.** The Windows notice's *"upstream FFmpeg, unmodified, so
 there is no accompanying patch"* is true of the Windows artefact and false of
 this one.
 
-*This scoping is an engineering judgement recorded for the owner, not a legal
-conclusion. If the owner prefers to publish all eleven regardless, the six
-permissive archives are cheap to add and their pins are in the definition
-archive's `downloads.lock`.*
+*This is a technical source-scope description, not a legal conclusion. The six
+permissive component archives are outside the corresponding-source scope
+described above; their pins are in the definition archive's `downloads.lock`.*
 
-## How it was published, and how that was verified
-
-`app.ourgalaxy.space` is served from `/srv/docker/matrix/www/intergalactic/` on
-`192.168.4.109`. The nine files were placed into `source/` there through the
-**Syncthing mirror at `Linux_Matrix_Build/www/intergalactic/source/`**, and they
-appear in that directory dated 2026-08-15.
-
-**That mirror is the publish path for `/source/` archives.** This is the
-correction that unblocked the limb, and it is worth stating precisely because the
-earlier record got it half right: the mirror is *not* an authoring surface for
-rendered **pages** — a page edited there is overwritten by the next site build —
-but static archives dropped under `source/` are exactly what it carries. The
-existing `tools/release/third-party-source.json` had said so all along; every
-`localPath` in it is
-`Linux_Matrix_Build/www/intergalactic/source/<archive>`. The blocker note that
-this file previously carried generalised "cannot edit rendered output there" into
-"cannot publish anything there", and that generalisation was the whole of the
-blocker.
+## Served-copy verification
 
 Verification, done against the **served** copies rather than the staged ones,
 which is the reusable ordering from the `ffmpeg-n6.0` publication record:
@@ -180,17 +132,7 @@ which is the reusable ordering from the `ffmpeg-n6.0` publication record:
   returns **404**, while `ffmpeg-n6.0-source.tar.gz` returns 200 at 14,751,707
   bytes. The check distinguishes published from unpublished.
 
-The earlier blocker finding is preserved as accurate history: on this host
-`IG_RELEASE_SSH_KEY` was empty in `B:/matrix/.env` and
-`ssh nick@192.168.4.109` returned `Permission denied (publickey,password)`. SSH
-was never the only route; it was the only route that had been tried.
-
-## What is still open
-
-**Updated by S&C 2026-08-15, later the same day. The deployed-page limb is
-CLOSED; the in-repo one was closed by the same pass.** The original text is kept
-beneath, because "not published" describes a moment and the record of that moment
-is what makes the sequence legible.
+## Current coverage
 
 Re-verified live rather than relayed, and the ten artefacts were re-fetched from
 the **served** copies and re-hashed as part of the same check — 10/10 HTTP 200,
@@ -205,9 +147,8 @@ the **served** copies and re-hashed as part of the same check — 10/10 HTTP 200
   component inventory and the FreeType *"based in part of the work"* disclaimer.
 - **The three in-repo policy documents** — `docs/policies/SOURCE_OFFER.md`,
   `docs/policies/THIRD_PARTY_NOTICES.md` and
-  `docs/release/THIRD_PARTY_NOTICES.md` — had **zero** Apple coverage while the
-  site had all of it. That was the real residual and it is closed in the same
-  change as this correction.
+  `docs/release/THIRD_PARTY_NOTICES.md` — describe the Apple components and
+  source route.
 
 What remains owed on this artefact is the **licence-text packaging**, not the
 source or the offer: the FTL text is captured at
@@ -217,22 +158,5 @@ PNG-v2 texts are neither held nor shipped. The three texts that do ship —
 `LGPL-2.1.txt`, `LGPL-3.0.txt`, `GPL-3.0.txt` — cover FFmpeg, mpv, FriBidi and
 uchardet.
 
-### The original, preserved
-
-The archives are published. **The offer pages are not updated.**
-
-- `/source/` does not list any of the nine — verified live, zero hits for
-  `mpv-0.36.0-source`, `fribidi-1.0.13-source`, `uchardet-0.0.8-source`,
-  `libmpv-darwin-build`, `ffmpeg-fix-vp9`, `darwin`, `xcframework`, against a
-  positive control that finds `ffmpeg-n6.0-source` four times.
-- `/third-party-notices/` has no Apple sections.
-
-So the files are served but **unlinked**. Authoring those two sections is the
-remaining limb and is in progress in `inter-galactic-website`. The rule that
-governed the ordering has now been satisfied in the safe direction: the archives
-existed before the page names them, so deploying the sections cannot create a
-404 in a compliance document.
-
-macOS remains deferred by owner decision (`docs/DECISIONS.md`, 2026-08-15,
-*"The Source Offer Names macOS As Bundled-But-Not-Distributed"*). Nothing here
-changes that.
+This record covers the Apple artefacts identified above. It makes no claim about
+any separately built macOS distribution.

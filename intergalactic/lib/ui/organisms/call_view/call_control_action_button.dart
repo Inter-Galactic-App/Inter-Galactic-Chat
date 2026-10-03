@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intergalactic/ui/accessibility/accessibility_scope.dart';
 import 'package:intergalactic/ui/accessibility/accessible_interactive_region.dart';
+import 'package:tiamat/tiamat.dart' as tiamat;
 
 class CallControlActionButton extends StatelessWidget {
   const CallControlActionButton({
@@ -24,7 +25,8 @@ class CallControlActionButton extends StatelessWidget {
     final enabled = onPressed != null;
     final borderRadius = BorderRadius.circular(12);
     final compactLabel = persistentLabel?.trim();
-    final showPersistentLabel = settings.persistentActionLabels &&
+    final showPersistentLabel =
+        settings.persistentActionLabels &&
         compactLabel != null &&
         compactLabel.isNotEmpty;
 
@@ -56,10 +58,7 @@ class CallControlActionButton extends StatelessWidget {
       child: visual,
     );
 
-    return Tooltip(
-      message: tooltip ?? semanticLabel,
-      child: region,
-    );
+    return tiamat.Tooltip(text: tooltip ?? semanticLabel, child: region);
   }
 }
 
@@ -117,7 +116,8 @@ class _PersistentLabel extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.right,
-              style: style?.copyWith(
+              style:
+                  style?.copyWith(
                     color: Colors.white.withAlpha(232),
                     fontWeight: FontWeight.w600,
                   ) ??

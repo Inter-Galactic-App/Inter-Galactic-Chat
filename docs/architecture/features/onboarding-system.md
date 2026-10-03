@@ -65,10 +65,10 @@ flowchart LR
 | Service | `lib/ui/onboarding/onboarding_service.dart` | `Preferences` |
 | Mode model | `lib/ui/onboarding/tutorial_mode.dart` | production completion writes vs no-write preview modes |
 | Controller/UI | `lib/ui/onboarding/onboarding_controller.dart`, `onboarding_page.dart`, `onboarding_content.dart` | Flutter navigation |
-| Guided backdrop | `lib/ui/onboarding/tutorial_demo_backdrop.dart`, `demo_tutorial_content.dart`, `tutorial_scene.dart`, `tutorial_anchor.dart` | isolated `DemoClient`, measured tutorial anchors, scene choreography |
-| Startup trigger | `lib/ui/pages/main/main_page.dart` | first frame, logged-in client manager, desktop layout gate |
+| Guided backdrop | `lib/ui/onboarding/tutorial_demo_backdrop.dart`, `demo_tutorial_content.dart`, `mobile_tutorial_content.dart`, `tutorial_scene.dart`, `tutorial_anchor.dart` | isolated `DemoClient`, layout-specific step tables, measured tutorial anchors, and desktop/mobile scene choreography |
+| Startup trigger | `lib/ui/pages/main/main_page.dart` | first frame, logged-in client manager, layout-specific guided tutorial |
 | Preferences | `lib/config/preferences.dart` | `onboarding.completed`, `onboarding.version`, `onboarding.completedAt` |
-| Replay | `lib/ui/pages/settings/categories/help/help_tutorial_page.dart` | Help settings, hidden in mobile layout |
+| Replay | `lib/ui/pages/settings/categories/help/help_tutorial_page.dart` | Help settings on desktop and mobile |
 | Post-login setup | `lib/utils/first_time_setup.dart`, setup pages | setup menu availability |
 
 ## Ownership Assumptions
@@ -105,9 +105,10 @@ flowchart LR
 - Do not show first-run onboarding for demo-only clients.
 - Do not let demo preview, legacy placeholder, or the offline backdrop mutate a
   real Matrix account, register pushers, or start Matrix sync.
-- Keep the current guided tutorial desktop-only. Mobile layout skips automatic
-  launch, hides Help replay, and should stay restricted until a mobile-specific
-  tutorial path is ready.
+- Keep one tutorial engine with layout-specific content and scene tables.
+  Mobile uses its own touch-oriented step list, panel reveal state, top/bottom
+  sheet placement, and measured anchors; desktop behavior remains on its
+  existing table.
 - Bump `OnboardingService.currentVersion` only when old completed users should
   see the tutorial again.
 - Keep post-login setup menus after onboarding so recovery/push setup can still

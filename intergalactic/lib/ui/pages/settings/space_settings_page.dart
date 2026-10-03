@@ -7,9 +7,15 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 class SpaceSettingsPage extends StatefulWidget {
-  const SpaceSettingsPage({super.key, required this.space, this.initialTabId});
+  const SpaceSettingsPage({
+    super.key,
+    required this.space,
+    this.initialTabId,
+    this.initialTabInline = false,
+  });
   final Space space;
   final String? initialTabId;
+  final bool initialTabInline;
 
   @override
   State<SpaceSettingsPage> createState() => _SpaceSettingsPageState();
@@ -34,6 +40,7 @@ class _SpaceSettingsPageState extends State<SpaceSettingsPage> {
     return SettingsPage(
       contextAccount: widget.space.client,
       initialTabId: widget.initialTabId,
+      initialTabInline: widget.initialTabInline,
       settings: [SettingsCategorySpace(widget.space)],
       buttons: [
         SettingsButton(

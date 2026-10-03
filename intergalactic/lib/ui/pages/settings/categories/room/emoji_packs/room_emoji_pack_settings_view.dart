@@ -722,7 +722,8 @@ class _EmoticonCreatorState extends State<EmoticonCreator> {
                         height: 50,
                         child: EmoticonImagePickTile(
                           image: image,
-                          tooltip: EmoticonCreatorStrings.promptSelectPhoto,
+                          tooltip: EmoticonCreatorStrings
+                              .promptEmoticonCreatorSelectPhoto,
                           onTap: _pickPackImage,
                         ),
                       ),

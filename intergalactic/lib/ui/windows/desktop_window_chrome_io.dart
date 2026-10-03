@@ -11,7 +11,73 @@ import 'package:intergalactic/ui/pages/settings/app_settings_page.dart';
 import 'package:intergalactic/ui/pages/settings/categories/help/settings_category_help.dart';
 import 'package:intergalactic/ui/pages/settings/settings_navigation.dart';
 import 'package:intergalactic/ui/windows/developer_title_bar_menu.dart';
+import 'package:intergalactic/utils/common_strings.dart';
+import 'package:intl/intl.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:tiamat/tiamat.dart' as tiamat;
+
+/// Strings for the desktop title bar's back/forward pair.
+///
+/// The two enabled labels are the generic [CommonStrings.promptBack] and
+/// [CommonStrings.promptForward]; everything here is specific to this title
+/// bar, so it lives with it rather than in the shared catalogue.
+///
+/// Each string is its own member on purpose. `canGoBack ? a : b` written as
+/// one getter puts two `Intl.message` calls in one member, and the extractor
+/// silently drops BOTH.
+class DesktopWindowNavigationStrings {
+  static String get tooltipNavigateBackUnavailable => Intl.message(
+    "Back unavailable",
+    name: "tooltipNavigateBackUnavailable",
+    desc:
+        "Hover tooltip on the desktop title bar's back button while there is "
+        "nowhere to go back to, so the button is disabled",
+  );
+
+  static String get tooltipNavigateForwardUnavailable => Intl.message(
+    "Forward unavailable",
+    name: "tooltipNavigateForwardUnavailable",
+    desc:
+        "Hover tooltip on the desktop title bar's forward button while there "
+        "is nowhere to go forward to, so the button is disabled. This is "
+        "navigation, NOT forwarding a message",
+  );
+
+  static String get semanticsNavigateBack => Intl.message(
+    "Go back",
+    name: "semanticsNavigateBack",
+    desc:
+        "Accessibility label READ ALOUD by a screen reader for the desktop "
+        "title bar's back button when it is enabled. Phrase it as the action "
+        "the button performs, not as a bare noun",
+  );
+
+  static String get semanticsNavigateBackUnavailable => Intl.message(
+    "Go back unavailable",
+    name: "semanticsNavigateBackUnavailable",
+    desc:
+        "Accessibility label READ ALOUD by a screen reader for the desktop "
+        "title bar's back button while it is disabled",
+  );
+
+  static String get semanticsNavigateForward => Intl.message(
+    "Go forward",
+    name: "semanticsNavigateForward",
+    desc:
+        "Accessibility label READ ALOUD by a screen reader for the desktop "
+        "title bar's forward button when it is enabled. This is navigation, "
+        "NOT forwarding a message",
+  );
+
+  static String get semanticsNavigateForwardUnavailable => Intl.message(
+    "Go forward unavailable",
+    name: "semanticsNavigateForwardUnavailable",
+    desc:
+        "Accessibility label READ ALOUD by a screen reader for the desktop "
+        "title bar's forward button while it is disabled. This is navigation, "
+        "NOT forwarding a message",
+  );
+}
 
 class DesktopWindowFrame extends StatefulWidget {
   const DesktopWindowFrame({
@@ -334,17 +400,27 @@ class _NavigationButtons extends StatelessWidget {
           children: [
             _TitleBarButton(
               icon: Icons.arrow_back_rounded,
-              tooltip: canGoBack ? 'Back' : 'Back unavailable',
-              semanticLabel: canGoBack ? 'Go back' : 'Go back unavailable',
+              tooltip: canGoBack
+                  ? CommonStrings.promptBack
+                  : DesktopWindowNavigationStrings
+                        .tooltipNavigateBackUnavailable,
+              semanticLabel: canGoBack
+                  ? DesktopWindowNavigationStrings.semanticsNavigateBack
+                  : DesktopWindowNavigationStrings
+                        .semanticsNavigateBackUnavailable,
               onPressed: canGoBack ? _goBack : null,
               width: 38,
             ),
             _TitleBarButton(
               icon: Icons.arrow_forward_rounded,
-              tooltip: canGoForward ? 'Forward' : 'Forward unavailable',
+              tooltip: canGoForward
+                  ? CommonStrings.promptForward
+                  : DesktopWindowNavigationStrings
+                        .tooltipNavigateForwardUnavailable,
               semanticLabel: canGoForward
-                  ? 'Go forward'
-                  : 'Go forward unavailable',
+                  ? DesktopWindowNavigationStrings.semanticsNavigateForward
+                  : DesktopWindowNavigationStrings
+                        .semanticsNavigateForwardUnavailable,
               onPressed: canGoForward
                   ? DesktopNavigationHistoryController.instance.goForward
                   : null,
@@ -478,6 +554,6 @@ class _TitleBarButtonState extends State<_TitleBarButton> {
       ),
     );
 
-    return Tooltip(message: widget.tooltip, child: result);
+    return tiamat.Tooltip(text: widget.tooltip, child: result);
   }
 }

@@ -36,9 +36,9 @@ void main() {
   group('matrixHistorySessionPayloadIsShareable', () {
     test('recognizes MSC3061 shared-history room-key payloads', () {
       expect(
-        matrixHistorySessionPayloadIsShareable(
-          const {matrixSharedHistoryFlag: true},
-        ),
+        matrixHistorySessionPayloadIsShareable(const {
+          matrixSharedHistoryFlag: true,
+        }),
         isTrue,
       );
       expect(
@@ -46,9 +46,9 @@ void main() {
         isTrue,
       );
       expect(
-        matrixHistorySessionPayloadIsShareable(
-          const {matrixSharedHistoryFlag: false},
-        ),
+        matrixHistorySessionPayloadIsShareable(const {
+          matrixSharedHistoryFlag: false,
+        }),
         isFalse,
       );
       expect(matrixHistorySessionPayloadIsShareable(const {}), isFalse);
@@ -58,30 +58,24 @@ void main() {
   group('matrixHistoryBundleDeclaredFileSizesAreSafe', () {
     test('requires bounded plaintext and encrypted sizes', () {
       expect(
-        matrixHistoryBundleDeclaredFileSizesAreSafe(
-          const {
-            'size': 1024,
-            'encrypted_size': 2048,
-          },
-        ),
+        matrixHistoryBundleDeclaredFileSizesAreSafe(const {
+          'size': 1024,
+          'encrypted_size': 2048,
+        }),
         isTrue,
       );
       expect(
-        matrixHistoryBundleDeclaredFileSizesAreSafe(
-          const {
-            'size': 6 * 1024 * 1024,
-            'encrypted_size': 2048,
-          },
-        ),
+        matrixHistoryBundleDeclaredFileSizesAreSafe(const {
+          'size': 6 * 1024 * 1024,
+          'encrypted_size': 2048,
+        }),
         isFalse,
       );
       expect(
-        matrixHistoryBundleDeclaredFileSizesAreSafe(
-          const {
-            'size': 1024,
-            'encrypted_size': 6 * 1024 * 1024,
-          },
-        ),
+        matrixHistoryBundleDeclaredFileSizesAreSafe(const {
+          'size': 1024,
+          'encrypted_size': 6 * 1024 * 1024,
+        }),
         isFalse,
       );
       expect(
@@ -223,6 +217,60 @@ void main() {
         ),
         'requester_is_self',
       );
+    });
+  });
+
+  group('MatrixHistoryShareReport deferrals', () {
+    // The break-glass flow prompts the user to approve an ineligible device
+    // and only then attempts the send. A deferral there is not a decision
+    // about that device - the encryption store was released and did not come
+    // back - so it must not be counted with, or read like, the refusals. The
+    // report is what the user is shown when the dialog closes.
+    MatrixHistoryShareReport report() =>
+        MatrixHistoryShareReport(targetUserIds: <String>['@a:example.org']);
+
+    test('a deferral is counted and explained, apart from the refusals', () {
+      final text = (report()..deferredRequests = 2).toMultilineString();
+
+      expect(text, contains('Deferred (storage resuming): 2'));
+      expect(
+        text,
+        contains('Nothing was refused'),
+        reason:
+            'the count alone reads as another kind of ignored request; the '
+            'user needs to know a retry will work',
+      );
+      expect(text, contains('request the keys again'));
+    });
+
+    test('explains nothing about deferrals when there were none', () {
+      final text = report().toMultilineString();
+
+      // The count line is always printed - it is the explanation that is
+      // conditional, so the name says "explains", not "says".
+      expect(text, contains('Deferred (storage resuming): 0'));
+      expect(text, isNot(contains('Nothing was refused')));
+      expect(
+        text,
+        isNot(contains('request the keys again')),
+        reason:
+            'the remediation sentence is the actionable half of the note; a '
+            'report that always printed it would tell the user to retry when '
+            'nothing was deferred and there is nothing to retry for',
+      );
+    });
+
+    test('a deferral is not an ignored request', () {
+      final text =
+          (report()
+                ..deferredRequests = 1
+                ..ineligibleRequestsIgnored = 0
+                ..blockedRequestsIgnored = 0)
+              .toMultilineString();
+
+      expect(text, contains('Ineligible requests ignored: 0'));
+      expect(text, contains('Blocked requests ignored:    0'));
+      expect(text, contains('Deferred (storage resuming): 1'));
     });
   });
 

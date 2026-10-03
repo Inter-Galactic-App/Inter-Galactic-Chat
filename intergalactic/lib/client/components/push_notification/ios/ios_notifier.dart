@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:intergalactic/client/components/push_notification/ios/ios_remote_wake.dart';
 import 'package:intergalactic/client/components/push_notification/notification_content.dart';
 import 'package:intergalactic/client/components/push_notification/notification_identity.dart';
 import 'package:intergalactic/client/components/push_notification/notification_response_handler.dart';
@@ -79,6 +80,7 @@ class IosNotifier with WidgetsBindingObserver implements Notifier {
   bool? _lastReconcileSucceeded;
   bool _pusherRefreshDroppedBeforeClientReady = false;
   Future<void>? _reconcileInFlight;
+  Future<void>? _remoteWakeInFlight;
 
   @override
   bool get hasPermission =>
@@ -98,6 +100,61 @@ class IosNotifier with WidgetsBindingObserver implements Notifier {
 
   static void onResponse(NotificationResponse details) {
     unawaited(NotificationResponseHandler.handle(details));
+  }
+
+  /// Event ids of remote notifications the extension has delivered and the
+  /// user has not yet cleared. Empty on any failure: the caller's fallback is
+  /// to show its own notification, which is the pre-extension behaviour.
+  static Future<Set<String>> deliveredRemoteEventIds() async {
+    try {
+      final ids = await _channel.invokeMethod<List<Object?>>(
+        "deliveredRemoteEventIds",
+      );
+      return {
+        for (final id in ids ?? const <Object?>[])
+          if (id is String && id.isNotEmpty) id,
+      };
+    } on PlatformException {
+      return const {};
+    } on MissingPluginException {
+      return const {};
+    }
+  }
+
+  /// Removes the extension's notification for [eventId], rendered or
+  /// generic, because the app is about to post its own. The generic case is
+  /// the one that matters: a push the extension could not decrypt (no room
+  /// key yet) shows the gateway's fallback, and once the app has the key its
+  /// decrypted notification should replace that, not sit beside it.
+  static Future<void> removeDeliveredRemoteNotification(String eventId) async {
+    try {
+      await _channel.invokeMethod<bool>("removeDeliveredRemoteNotification", {
+        "event_id": eventId,
+      });
+    } on PlatformException {
+      return;
+    } on MissingPluginException {
+      return;
+    }
+  }
+
+  /// Clears extension-rendered and generic APNs alerts for one exact account
+  /// and room after that room is read. Other rooms remain in Notification Center.
+  static Future<void> removeDeliveredRemoteNotificationsForRoom({
+    required String clientId,
+    required String roomId,
+  }) async {
+    if (clientId.isEmpty || roomId.isEmpty) return;
+    try {
+      await _channel.invokeMethod<int>(
+        "removeDeliveredRemoteNotificationsForRoom",
+        {"client_id": clientId, "room_id": roomId},
+      );
+    } on PlatformException {
+      return;
+    } on MissingPluginException {
+      return;
+    }
   }
 
   static Future<bool> replaySavedApnsPayloadForDebug(String payload) async {
@@ -206,6 +263,7 @@ class IosNotifier with WidgetsBindingObserver implements Notifier {
     _channel.setMethodCallHandler(_handlePlatformCallbacks);
     await _handleNotificationLaunchDetails();
     await _handlePendingPlatformNotificationResponse();
+    unawaited(_drainPendingRemoteWake());
     await _refreshPermissionStatus();
     await _refreshApnsEnvironment();
     if (_permissionStatus == "not_determined") {
@@ -520,8 +578,173 @@ class IosNotifier with WidgetsBindingObserver implements Notifier {
           acknowledgeResponse: _acknowledgePlatformNotificationResponse,
         );
         break;
+      case "remoteWakeReceived":
+        final wakeId = (call.arguments as Map?)?['wake_id'];
+        if (wakeId is String && wakeId.isNotEmpty) {
+          await _runRemoteWake(
+            wakeId,
+            nativeElapsed: IosRemoteWake.nativeElapsedFrom(call.arguments),
+            route: IosRemoteWakeRoute.fromPlatformPayload(
+              (call.arguments as Map?)?['route'],
+            ),
+          );
+        }
+        break;
       default:
         break;
+    }
+  }
+
+  /// A wake iOS handed to native before this engine was listening (a cold
+  /// background launch): take it now, once the client manager exists.
+  Future<void> _drainPendingRemoteWake() async {
+    try {
+      final pending = await _channel.invokeMapMethod<String, Object?>(
+        "takePendingRemoteWake",
+      );
+      final wakeId = pending?['wake_id'];
+      if (wakeId is String && wakeId.isNotEmpty) {
+        // This is the path the elapsed value exists for: native has been
+        // holding the wake since before the engine started.
+        await _runRemoteWake(
+          wakeId,
+          nativeElapsed: IosRemoteWake.nativeElapsedFrom(pending),
+          route: IosRemoteWakeRoute.fromPlatformPayload(pending?['route']),
+        );
+      }
+    } on MissingPluginException {
+      return;
+    } on PlatformException {
+      return;
+    }
+  }
+
+  /// One catch-up owns the database at a time.
+  ///
+  /// Two callers can arrive here together: `init()` starts
+  /// `_drainPendingRemoteWake()` unawaited, and a `remoteWakeReceived`
+  /// callback is awaited only inside `_handlePlatformCallbacks`. Overlapping
+  /// runs each drive resume/sync/suspend on the shared
+  /// [DatabaseReleaseTrigger], so the first run's release lands while the
+  /// second is still syncing - the 0xdead10cc case [RemoteWakeCatchUp]
+  /// documents. It also repeats the same work inside native's deadline.
+  Future<void> _runRemoteWake(
+    String wakeId, {
+    Duration nativeElapsed = Duration.zero,
+    IosRemoteWakeRoute? route,
+  }) async {
+    final inFlight = _remoteWakeInFlight;
+    if (inFlight != null) {
+      // Wait it out, then still answer native for THIS wake id - the in-flight
+      // run only completes its own, and an unanswered wake holds the
+      // background assertion until the deadline expires.
+      await inFlight;
+      await _completeRemoteWake(wakeId, "no_data");
+      return;
+    }
+
+    final run = _runRemoteWakeInternal(
+      wakeId,
+      nativeElapsed: nativeElapsed,
+      route: route,
+    );
+    _remoteWakeInFlight = run;
+    try {
+      await run;
+    } finally {
+      if (identical(_remoteWakeInFlight, run)) {
+        _remoteWakeInFlight = null;
+      }
+    }
+  }
+
+  Future<void> _runRemoteWakeInternal(
+    String wakeId, {
+    Duration nativeElapsed = Duration.zero,
+    IosRemoteWakeRoute? route,
+  }) async {
+    var result = "no_data";
+    // Started BEFORE init, not before the catch-up. A cold background launch
+    // spends the expensive part here, and native's deadline is running the
+    // whole time.
+    final sinceWake = Stopwatch()..start();
+    var spentBeforeDart = nativeElapsed;
+    try {
+      ensureBindingInit();
+      // Ask native how long it has ACTUALLY been holding this wake, now that
+      // Dart is here. The number that arrived with the wake was measured when
+      // native sent it, and on a cold launch Flutter buffers that message
+      // until this handler exists - so the engine boot sits between the two
+      // and would otherwise be charged to neither. Native's own answer covers
+      // everything up to this round trip, so the stopwatch restarts from here
+      // rather than counting the same milliseconds twice.
+      final queried = await _remoteWakeElapsedFromNative(wakeId);
+      if (queried != null && queried > spentBeforeDart) {
+        spentBeforeDart = queried;
+        sinceWake.reset();
+      }
+      loading ??= initNecessary();
+      await loading;
+      final manager = clientManager;
+      if (manager != null) {
+        final outcome = await IosRemoteWake.handle(
+          manager: manager,
+          budget: IosRemoteWake.syncBudgetAfter(
+            spentBeforeDart + sinceWake.elapsed,
+          ),
+          // Two different quantities on purpose: `nativeElapsed` is native's
+          // share, reported in the log so a capture can tell the halves
+          // apart, while `spent` is the whole of the deadline already gone,
+          // which is what the release window has to be measured against.
+          nativeElapsed: spentBeforeDart,
+          spent: spentBeforeDart + sinceWake.elapsed,
+          route: route,
+        );
+        result = switch (outcome) {
+          RemoteWakeOutcome.caughtUp => "new_data",
+          RemoteWakeOutcome.failed => "failed",
+          _ => "no_data",
+        };
+      }
+    } catch (error) {
+      result = "failed";
+      Log.w(
+        'remote_wake handler error=${error.runtimeType}',
+        category: LogCategory.notifications,
+        source: 'ios-notifier',
+      );
+    } finally {
+      await _completeRemoteWake(wakeId, result);
+    }
+  }
+
+  /// Native's elapsed time for [wakeId], measured when it answers. `null`
+  /// when native has no such wake any more (it completed on the deadline or
+  /// the assertion expired) or the platform has no such method, in which case
+  /// the caller keeps the value the wake arrived with.
+  Future<Duration?> _remoteWakeElapsedFromNative(String wakeId) async {
+    try {
+      final raw = await _channel.invokeMethod<Object?>("remoteWakeElapsed", {
+        "wake_id": wakeId,
+      });
+      return IosRemoteWake.clampNativeElapsed(raw);
+    } on MissingPluginException {
+      return null;
+    } on PlatformException {
+      return null;
+    }
+  }
+
+  Future<void> _completeRemoteWake(String wakeId, String result) async {
+    try {
+      await _channel.invokeMethod<bool>("completeRemoteWake", {
+        "wake_id": wakeId,
+        "result": result,
+      });
+    } on MissingPluginException {
+      // Nothing to complete on this platform.
+    } on PlatformException {
+      // Native already completed it (deadline or expiry).
     }
   }
 
@@ -626,6 +849,10 @@ class IosNotifier with WidgetsBindingObserver implements Notifier {
                     attachmentType == NotificationAttachmentType.sticker)
             ? await _prepareRichImageAttachment(notification.attachedImage)
             : null;
+        // The dedupe modifier let this through, so either the extension never
+        // delivered this event or it delivered the generic fallback; in the
+        // second case the app's copy replaces it.
+        await removeDeliveredRemoteNotification(notification.eventId);
         return _showNotification(
           id: NotificationIdentity.messageNotificationId(notification),
           title: notification.senderName,
@@ -646,6 +873,11 @@ class IosNotifier with WidgetsBindingObserver implements Notifier {
           attachments: attachment == null ? null : [attachment],
         );
       case StoryNotificationContent _:
+        // An encrypted story event can reach the NSE before the host sync has
+        // resolved story policy and content. Once the policy-approved story
+        // notification is ready, replace that remote generic for the same
+        // event instead of leaving both in Notification Center.
+        await removeDeliveredRemoteNotification(notification.eventId);
         return _showNotification(
           id: NotificationIdentity.storyNotificationId(notification),
           title: notification.title,
@@ -849,6 +1081,10 @@ class IosNotifier with WidgetsBindingObserver implements Notifier {
 
   @override
   Future<void> clearNotifications(Room room) async {
+    await removeDeliveredRemoteNotificationsForRoom(
+      clientId: room.client.identifier,
+      roomId: room.identifier,
+    );
     final notifications = await _plugin?.getActiveNotifications() ?? const [];
 
     for (final notification in notifications) {
@@ -874,6 +1110,10 @@ class IosNotifier with WidgetsBindingObserver implements Notifier {
     required String clientId,
     required String roomId,
   }) async {
+    await removeDeliveredRemoteNotificationsForRoom(
+      clientId: clientId,
+      roomId: roomId,
+    );
     final notifications = await _plugin?.getActiveNotifications() ?? const [];
 
     for (final notification in notifications) {

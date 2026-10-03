@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:intergalactic/client/components/component.dart';
+import 'package:intergalactic/client/components/voip/client_close_call_teardown.dart';
 import 'package:intergalactic/client/components/voip/voip_session.dart';
 import 'package:intergalactic/client/components/voip_room/voip_room_component.dart';
 import 'package:intergalactic/client/matrix/components/matrix_sync_listener.dart';
@@ -74,9 +75,19 @@ class MatrixVoipRoomComponent
   MatrixLivekitCallJoinTransientNetworkException? _lastTransientJoinError;
   bool _disposed = false;
 
-  MatrixVoipRoomComponent(this.client, this.room) {
+  MatrixVoipRoomComponent(
+    this.client,
+    this.room, {
+    this.hangUpBoundOnClose = clientCloseHangUpBound,
+  }) {
     backend = MatrixLivekitBackend(room);
   }
+
+  /// How long [dispose] waits for this room's call to hang up.
+  ///
+  /// [clientCloseHangUpBound] in production; a parameter only so a test can
+  /// prove the bound fires without waiting the full five seconds.
+  final Duration hangUpBoundOnClose;
 
   static bool isVoipRoom(MatrixRoom room) {
     return room.matrixRoom.getState(EventTypes.RoomCreate)?.content['type'] ==
@@ -121,7 +132,7 @@ class MatrixVoipRoomComponent
     }
 
     if (participantsChanged) {
-      _notifyParticipantsChanged();
+      _notifyParticipantsChanged(trigger: 'call_member_sync');
     }
   }
 
@@ -691,11 +702,16 @@ class MatrixVoipRoomComponent
     _notifyParticipantsChanged();
   }
 
-  void _notifyParticipantsChanged() {
+  void _notifyParticipantsChanged({String trigger = 'call_state_change'}) {
     if (_disposed) {
       return;
     }
 
+    Log.d(
+      'call_focus_refresh trigger=$trigger',
+      category: LogCategory.livekit,
+      source: 'matrix-voip-room-component',
+    );
     _onParticipantsChanged.add(null);
     _scheduleParticipantExpiryRefresh(
       room.matrixRoom.states[callMemberStateEvent]?.values ?? const [],
@@ -735,7 +751,10 @@ class MatrixVoipRoomComponent
     final delay = Duration(
       milliseconds: (nextExpiry - now + 1000).clamp(1000, 2147483647),
     );
-    _participantExpiryTimer = Timer(delay, _notifyParticipantsChanged);
+    _participantExpiryTimer = Timer(
+      delay,
+      () => _notifyParticipantsChanged(trigger: 'membership_expiry'),
+    );
   }
 
   void _listenToCurrentSession(VoipSession? session) {
@@ -769,17 +788,36 @@ class MatrixVoipRoomComponent
       return;
     }
 
+    // Set before anything is awaited: a join still in flight checks this when
+    // it lands and hangs up the session it produced, which is how a call that
+    // did not exist yet at close is still ended rather than left unowned.
     _disposed = true;
     _participantExpiryTimer?.cancel();
     _participantExpiryTimer = null;
     final sessionConnectionSubscription = _currentSessionConnectionSubscription;
     _currentSessionConnectionSubscription = null;
+    // Taken before the field is cleared. Clearing it without hanging up was
+    // the leak: this was the only reference to a live LiveKit call, and room
+    // close deliberately skips this component so calls can outlive the room
+    // view, which left nothing that would ever end it.
+    final session = currentSession;
     currentSession = null;
     _locallyClearedStateKeys.clear();
 
     await _cancelMatrixVoipRoomSessionConnectionSubscription(
       sessionConnectionSubscription,
     );
+
+    // A leaving session is hung up too: its hangUpCall returns the teardown
+    // already running, and awaiting it lets that finish while the client it
+    // needs still exists.
+    if (session != null && session.state != VoipState.ended) {
+      await hangUpBeforeClientClose(
+        [session.hangUpCall],
+        context: 'room call',
+        bound: hangUpBoundOnClose,
+      );
+    }
 
     await _onParticipantsChanged.close();
   }

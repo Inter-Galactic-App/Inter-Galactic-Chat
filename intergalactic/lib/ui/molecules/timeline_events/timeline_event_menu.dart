@@ -9,7 +9,12 @@ import 'package:intergalactic/client/components/pinned_messages/pinned_messages_
 import 'package:intergalactic/client/components/polls/poll_component.dart';
 import 'package:intergalactic/client/components/push_notification/notification_content.dart';
 import 'package:intergalactic/client/components/push_notification/notification_manager.dart';
+import 'package:intergalactic/client/matrix/components/message_forwarding/matrix_message_forwarder.dart';
 import 'package:intergalactic/client/matrix/timeline_events/matrix_timeline_event.dart';
+import 'package:intergalactic/client/matrix/timeline_events/matrix_timeline_event_message.dart';
+import 'package:intergalactic/client/matrix/matrix_client.dart';
+import 'package:intergalactic/client/matrix/matrix_room.dart';
+import 'package:intergalactic/client/matrix/vodozemac_single_flight.dart';
 import 'package:intergalactic/client/timeline.dart';
 import 'package:intergalactic/client/timeline_events/timeline_event.dart';
 import 'package:intergalactic/client/timeline_events/timeline_event_emote.dart';
@@ -19,6 +24,7 @@ import 'package:intergalactic/client/timeline_events/timeline_event_sticker.dart
 import 'package:intergalactic/main.dart';
 import 'package:intergalactic/ui/atoms/code_block.dart';
 import 'package:intergalactic/ui/molecules/emoji_picker.dart';
+import 'package:intergalactic/ui/molecules/forward_message/forward_message_dialog.dart';
 import 'package:intergalactic/ui/navigation/adaptive_dialog.dart';
 import 'package:intergalactic/utils/autofill_utils.dart';
 import 'package:intergalactic/utils/common_strings.dart';
@@ -28,6 +34,64 @@ import 'package:intergalactic/utils/event_bus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+
+/// Why the timeline's Retry Decrypt entry cannot run, or null when it can.
+///
+/// THE SILENCE THIS EXISTS TO END. The entry's action is `Event.requestKey`,
+/// which reaches `Room.requestSessionKey`, which returns without doing
+/// anything when `client.encryptionEnabled` is false and calls through a
+/// null-aware `client.encryption?.` when it is not. Both are silent. So with
+/// vodozemac still initializing, or failed for the session, the user presses
+/// Retry Decrypt, no request is sent, no error is raised, and the message
+/// stays undecryptable with nothing said. `encryptionAvailability` is
+/// documented as fail-closed for exactly this - "a surface that acts on
+/// encryption must not offer itself as operable in either" state - and this
+/// surface was still offering itself.
+///
+/// WHY A MESSAGE AND NOT A DISABLED ENTRY, which is what the room quick
+/// access menu's sibling gate does. `TimelineEventMenuEntry.action` is not a
+/// disable: three of the four renderers wrap it as `() => e.action?.call(...)`
+/// so a null action still builds an enabled control that does nothing when
+/// pressed, and tiamat's `ContextMenuItem` takes its tap handler from the
+/// menu rather than from the entry, so it has no disabled state to give.
+/// Passing null here would reproduce the silence rather than fix it. The
+/// entry therefore stays enabled and the ACTION explains itself, through the
+/// `ErrorUtils.tryRun` wrapper the action already ran inside - the same path
+/// the SDK's own "Session key not requestable" refusal takes.
+String? timelineRetryDecryptUnavailableReason(
+  EncryptionAvailability availability,
+) {
+  switch (availability) {
+    case EncryptionAvailability.ready:
+      return null;
+    case EncryptionAvailability.pending:
+      return "Encryption is still preparing, so the key cannot be requested "
+          "yet. Try again in a moment.";
+    case EncryptionAvailability.unavailable:
+      return "Encryption did not start for this session, so the key cannot be "
+          "requested. Restart the app to try again.";
+  }
+}
+
+/// Runs the timeline's Retry Decrypt action, refusing audibly when
+/// encryption cannot serve it.
+///
+/// Separate from the menu so the refusal can be tested where it decides. The
+/// assertion that matters is that `requestKey` is NOT REACHED - a test that
+/// only checked the thrown message would pass against a version that threw
+/// and sent the request anyway.
+Future<void> runTimelineRetryDecrypt({
+  required EncryptionAvailability availability,
+  required Future<void> Function() requestKey,
+}) async {
+  final unavailable = timelineRetryDecryptUnavailableReason(availability);
+  // Thrown rather than returned: the caller already runs this inside
+  // `ErrorUtils.tryRun`, which is the surface that shows the user a reason,
+  // and it is the same path the SDK's own "Session key not requestable"
+  // refusal takes out of `Event.requestKey`.
+  if (unavailable != null) throw unavailable;
+  await requestKey();
+}
 
 class TimelineEventMenu {
   final Timeline timeline;
@@ -117,6 +181,7 @@ class TimelineEventMenu {
     bool canReply = false;
     bool canDeleteEvent = false;
     bool canEndPoll = false;
+    bool canForward = false;
 
     bool canRetrySend = event.status != TimelineEventStatus.synced;
     bool canCancelSend = event.status != TimelineEventStatus.synced;
@@ -160,6 +225,13 @@ class TimelineEventMenu {
       canReplyInThread = !isThreadTimeline && event is TimelineEventMessage;
 
       canCopy = event is TimelineEventMessage;
+
+      canForward =
+          timeline.room is MatrixRoom &&
+          event is MatrixTimelineEventMessage &&
+          MatrixMessageForwarder.isForwardableMessage(
+            event as MatrixTimelineEventMessage,
+          );
 
       if (polls?.isPollEvent(event) == true &&
           polls?.canEndPoll(timeline.room, event, timeline) == true) {
@@ -253,9 +325,15 @@ class TimelineEventMenu {
           action: (context) {
             var mx = (event as MatrixTimelineEvent).event;
 
-            ErrorUtils.tryRun(context, () async {
-              await mx.requestKey();
-            });
+            ErrorUtils.tryRun(
+              context,
+              // Availability is read at PRESS time, not at menu-build time, so
+              // the reason describes the state the press actually met.
+              () => runTimelineRetryDecrypt(
+                availability: MatrixClient.encryptionAvailability.value,
+                requestKey: mx.requestKey,
+              ),
+            );
           },
         ),
       if (canRetrySend)
@@ -300,6 +378,19 @@ class TimelineEventMenu {
           icon: Icons.reply,
           action: (BuildContext context) {
             setReplyingEvent?.call(event);
+            onActionFinished?.call();
+          },
+        ),
+      if (canForward)
+        TimelineEventMenuEntry(
+          name: CommonStrings.promptForwardMessage,
+          icon: Icons.forward,
+          action: (BuildContext context) async {
+            await ForwardMessageDialog.show(
+              context,
+              sourceRoom: timeline.room as MatrixRoom,
+              source: event as MatrixTimelineEventMessage,
+            );
             onActionFinished?.call();
           },
         ),

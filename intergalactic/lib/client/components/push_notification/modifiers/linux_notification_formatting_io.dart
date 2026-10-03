@@ -186,7 +186,8 @@ class NotificationModifierLinuxFormatting implements NotificationModifier {
 
     final preview = room.client.getComponent<UrlPreviewComponent>();
 
-    bool shouldGetPreview = preview?.shouldGetPreviewsInRoom(room) == true &&
+    bool shouldGetPreview =
+        preview?.shouldGetPreviewsInRoom(room) == true &&
         preferences.previewUrlInNotifications.value;
 
     if (!shouldGetPreview) {
@@ -290,7 +291,10 @@ class NotificationModifierLinuxFormatting implements NotificationModifier {
       await image.fetchFullRes();
     }
 
-    var i = await ImageUtils.imageProviderToImage(image);
+    var i = await ImageUtils.imageProviderToImage(
+      image,
+      timeout: const Duration(seconds: 10),
+    );
 
     var recorder = ui.PictureRecorder();
     Canvas c = Canvas(recorder);
@@ -320,12 +324,10 @@ class NotificationModifierLinuxFormatting implements NotificationModifier {
   }
 
   Future<String?> convertPlainText(String formattedContent, Room room) async {
-    final html = markdownToHtml(formattedContent,
-        extensionSet: ExtensionSet(
-          [],
-          [AutolinkExtensionSyntax()],
-        ));
+    final html = markdownToHtml(
+      formattedContent,
+      extensionSet: ExtensionSet([], [AutolinkExtensionSyntax()]),
+    );
     return convertMatrixHtml(html, room);
   }
 }
-

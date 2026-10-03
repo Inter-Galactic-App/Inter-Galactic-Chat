@@ -1,8 +1,6 @@
 # LiveKit Gameplay Streaming
 
 Status: Active architecture reference
-Owner: EXPERIMENTAL for streaming behavior; DOCUMENTATION for structure
-Last reviewed: 2026-07-03 by EXPERIMENTAL for call connection health
 
 This note records the client-side streaming defaults for Inter Galactic's
 gameplay-heavy LiveKit rooms.
@@ -51,13 +49,13 @@ same remote-audio reconciliation policy used for active remote microphone
 repair. Direct Matrix 1:1 sessions map only their session lifecycle into the
 same model; they do not synthesize LiveKit participant quality. This layer must
 not change LiveKit connection behavior, stream subscription policy, audio
-routing, mute persistence, volume persistence, or AUDIO-owned microphone
+routing, mute persistence, volume persistence, or existing microphone
 suppression behavior.
 
 UI consumers should subscribe to `VoipSession.onDiagnosticsChanged` rather than
 adding a second call-state stream. Rebuilt two-client smoke should verify the
 indicator across stable, degraded, reconnecting, disconnected, and remote-audio
-issue states before closing the integration queue follow-up.
+issue states.
 
 ## Current D3D11 Gameplay Status
 
@@ -127,6 +125,14 @@ track into the existing direct-call usermedia stream. Direct-call camera
 enable/disable requests are serialized for the same reason as the LiveKit path:
 async track teardown must not be allowed to remove a camera track after a newer
 re-enable request has already observed the old track and unmuted metadata.
+
+`MatrixVoipComponent` owns one `MatrixVoipSession` wrapper per active SDK call.
+The Matrix SDK marks a call ended before it invokes `handleCallEnded`, so the
+component reuses the start wrapper for the end notification and releases it
+afterward. This guarantees that wrapper-owned timers, subscriptions, streams,
+and controllers are released even though a newly created ended wrapper would
+not observe a later state transition. Component disposal releases any wrapper
+that remains after bounded SDK hang-up.
 
 ## Screen-Share Profiles
 
@@ -317,6 +323,21 @@ PTT mute application is desired-state driven in `CallManager`: session-state
 notifications from LiveKit, participants, tracks, or the mute completion itself
 must not reapply the same mute state. Keep one PTT mute operation in flight per
 session and coalesce rapid press/release changes to the latest desired state.
+On Windows, an unmuted LiveKit microphone whose native capture frame counter
+stalls is recreated once through the serialized capture-refresh path. The
+recovery is limited to one attempt for the current microphone enable generation
+and resolved capture device, so a missing or unavailable device cannot create a
+continuous mute/unmute loop. A user mute/unmute or device switch creates a new
+capture state and may receive one new attempt. This is a client capture repair;
+it does not change the saved input-device preference, LiveKit subscription
+policy, or RNNoise configuration.
+Capture-profile refreshes keep that current call intent separate from the
+profile token captured for one refresh operation. If a newer profile is queued
+while removal of the old publication awaits, the old operation re-enables a
+microphone whenever the call still wants one, but does not mark its stale token
+as applied. The queued refresh then captures and applies the newer profile.
+This prevents a profile change from leaving an active user silently unpublished
+without claiming that the earlier profile won.
 Non-Windows PTT can continue through the normal session mute/unmute path unless
 platform smoke shows the same native failure shape.
 
@@ -837,6 +858,15 @@ runner must discard the prepared session/default track target when PiP entry is
 rejected before a real start attempt or when an already-active PiP start is
 reused; attempted starts still clear prepared targets through normal content
 cleanup on failure, timeout, stop, or teardown.
+
+The background-call controller serializes its method-channel updates, but each
+native request is bounded to eight seconds so one missing reply cannot block
+later session changes indefinitely. A timed-out method call can still complete
+in the native runner, so the controller tracks the latest desired signature and
+generation. If a stale call finishes after a newer state was requested, it
+queues one final application of that newer state; an old late reply therefore
+cannot reactivate background retention after the last call ends.
+
 The source view must be attached to a real visible UIKit hierarchy before
 `startPictureInPicture`; an orphan source can render frames and report
 `isPictureInPicturePossible == true` but AVKit will still fail activation. The
@@ -952,6 +982,18 @@ renderer does not expose, and delaying video without delaying call audio would
 desync voice, soundboard, and shared-content audio. Treat choppy gameplay
 streams as a sender/receiver/network/SFU diagnostics problem before considering
 a custom delayed-viewer architecture.
+
+## Call Tile Geometry
+
+Desktop call tiles use a 16:9 frame in equal grids, focused stages, and compact
+call surfaces. The equal grid chooses columns from the available area, then
+sizes every tile to fit both width and height without stretching it; incomplete
+rows are centered. The focused rail retains its separate thumbnail sizing.
+On mobile, participant camera/audio tiles are square while screenshare tiles
+are 16:9 and span the compact grid width. Focused tiles and secondary strips
+follow the same per-tile ratio. `VoipStreamView` still uses cover fit for
+camera video and contain fit for screenshare content inside those frames;
+this layout rule does not alter published capture dimensions or subscriptions.
 
 ## Guardrails
 

@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import 'package:intergalactic/client/matrix/components/emoticon/canonical_space_ancestry.dart';
 import 'package:intergalactic/client/components/emoticon/emoji_pack.dart';
 import 'package:intergalactic/client/components/emoticon/emoticon.dart';
 import 'package:intergalactic/client/components/emoticon/emoticon_component.dart';
@@ -10,6 +12,8 @@ import 'package:intergalactic/client/matrix/matrix_client.dart';
 import 'package:intergalactic/client/matrix/matrix_mxc_file_provider.dart';
 import 'package:intergalactic/client/matrix/matrix_mxc_image_provider.dart';
 import 'package:intergalactic/client/matrix/matrix_room.dart';
+import 'package:intergalactic/client/matrix/matrix_space.dart';
+import 'package:intergalactic/client/matrix/matrix_space_link_validation.dart';
 import 'package:intergalactic/client/matrix/matrix_timeline.dart';
 import 'package:intergalactic/client/timeline_events/timeline_event.dart';
 import 'package:intergalactic/main.dart';
@@ -49,9 +53,7 @@ class MatrixRoomEmoticonComponent extends MatrixEmoticonComponent
   List<EmoticonPack> get availablePacks {
     List<EmoticonPack> packs = List.from(ownedPacks, growable: true);
 
-    for (var space in room.client.spaces.where(
-      (element) => element.containsRoom(room.identifier),
-    )) {
+    for (final space in canonicalSpaceAncestors()) {
       var component = space.getComponent<SpaceEmoticonComponent>();
       if (component == null) continue;
       packs.addAll(component.ownedPacks);
@@ -143,9 +145,7 @@ class MatrixRoomEmoticonComponent extends MatrixEmoticonComponent
   List<EmoticonPack> _getAvailablePacks({bool includeUnicode = false}) {
     var result = List<EmoticonPack>.of(ownedPacks);
 
-    for (var space in room.client.spaces.where(
-      (element) => element.containsRoom(room.identifier),
-    )) {
+    for (final space in canonicalSpaceAncestors()) {
       var component = space.getComponent<MatrixSpaceEmoticonComponent>();
       if (component != null) {
         result.addAll(component.ownedPacks.where((e) => !result.contains(e)));
@@ -170,6 +170,59 @@ class MatrixRoomEmoticonComponent extends MatrixEmoticonComponent
     if (includeUnicode) result.addAll(UnicodeEmojis.packs!);
 
     return orderPacks(result);
+  }
+
+  /// The Spaces this room inherits image packs from, canonical ancestry first.
+  ///
+  /// MSC2545 scopes Space packs to this exact hierarchy. Room-local and
+  /// account-global packs are added by the callers above and are deliberately
+  /// outside this selection rule. A parent must have usable `via` data and
+  /// either reciprocate the child link or authorize the parent-link sender.
+  @visibleForTesting
+  Iterable<MatrixSpace> canonicalSpaceAncestors() {
+    final allSpaces = room.client.spaces.whereType<MatrixSpace>().toList(
+      growable: false,
+    );
+    final spacesById = <String, MatrixSpace>{
+      for (final space in allSpaces) space.identifier: space,
+    };
+
+    final ancestorIds = canonicalSpaceAncestorIds(
+      roomId: room.identifier,
+      canonicalParentIdsFor: (roomId) {
+        final matrixRoom = roomId == room.identifier
+            ? room.matrixRoom
+            : spacesById[roomId]?.matrixRoom;
+        return canonicalSpaceParentIds(
+          parentState: matrixRoom?.states[matrix.EventTypes.SpaceParent],
+          isCanonical: (state) => state.content['canonical'] == true,
+          hasValidVia: (state) => hasValidSpaceVia(state.content['via']),
+          isLegitimateParent: (parentId, state) {
+            final parent = spacesById[parentId]?.matrixRoom;
+            if (parent == null) return false;
+
+            final childLink = parent.getState(
+              matrix.EventTypes.SpaceChild,
+              roomId,
+            );
+            if (hasValidSpaceVia(childLink?.content['via'])) return true;
+
+            final senderId = state.senderId;
+            final membership = parent.getState(
+              matrix.EventTypes.RoomMember,
+              senderId,
+            );
+            if (membership?.content['membership'] != 'join') return false;
+            return parent.getPowerLevelByUserId(senderId) >=
+                parent.powerForChangingStateEvent(matrix.EventTypes.SpaceChild);
+          },
+        );
+      },
+    );
+
+    return ancestorIds
+        .map((identifier) => spacesById[identifier])
+        .whereType<MatrixSpace>();
   }
 
   @override

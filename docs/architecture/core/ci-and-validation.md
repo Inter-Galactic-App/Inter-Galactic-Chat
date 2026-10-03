@@ -67,7 +67,8 @@ A PR with no reviewable Dart changes skips format/analyze/test gates.
 ## Transcript boundary
 
 - command output is captured by `scripts/ci/forgejo-transcript.sh`
-- transcript reference: `docs/ci/forgejo-ci-transcripts.md`
+- transcript path/retention/redaction detail is internal (private runner
+  concern, not published in this repo)
 - captures only `ci_capture` / `ci_capture_script` commands
 - excludes checkout/action internals and runner/system output
 - best-effort publishing; never gates job status
@@ -89,4 +90,3 @@ A PR with no reviewable Dart changes skips format/analyze/test gates.
 - `.flutter-version`
 - `scripts/ci/check-flutter-pin.sh`
 - `scripts/ci/forgejo-transcript.sh`
-- `docs/ci/forgejo-ci-transcripts.md`

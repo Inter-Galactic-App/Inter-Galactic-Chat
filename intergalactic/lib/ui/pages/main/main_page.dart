@@ -40,14 +40,18 @@ import 'package:intergalactic/ui/pages/get_or_create_room/get_or_create_room.dar
 import 'package:intergalactic/ui/pages/inbound_share/inbound_share_review_launcher.dart';
 import 'package:intergalactic/ui/pages/inbox/inbox_navigation.dart';
 import 'package:intergalactic/ui/pages/inbox/inbox_page.dart';
+import 'package:intergalactic/ui/pages/setup/menus/global_mute_push_rule_setup.dart';
+import 'package:intergalactic/ui/pages/setup/post_login_setup_menus.dart';
 import 'package:intergalactic/ui/pages/setup/setup_page.dart';
 import 'package:intergalactic/utils/event_bus.dart';
 import 'package:intergalactic/ui/navigation/navigation_utils.dart';
+import 'package:intergalactic/ui/molecules/overlapping_panels.dart';
 import 'package:intergalactic/ui/pages/main/main_page_view_desktop.dart';
 import 'package:intergalactic/ui/pages/main/main_page_view_mobile.dart';
 import 'package:intergalactic/ui/pages/settings/categories/room/settings_category_room.dart';
 import 'package:intergalactic/ui/pages/settings/room_settings_page.dart';
 import 'package:intergalactic/ui/pages/settings/settings_navigation.dart';
+import 'package:intergalactic/ui/pages/main/stream_lab_call_join_retry.dart';
 import 'package:intergalactic/utils/first_time_setup.dart';
 import 'package:intergalactic/utils/image/lod_image.dart';
 import 'package:flutter/material.dart';
@@ -70,6 +74,7 @@ class MainPage extends StatefulWidget {
     this.forceCallPanelVisible = false,
     this.forceActivityPanelVisible = false,
     this.tutorialActivityService,
+    this.initialMobileRevealSide,
   });
   final ClientManager clientManager;
   final String? initialRoom;
@@ -83,6 +88,10 @@ class MainPage extends StatefulWidget {
   final bool forceCallPanelVisible;
   final bool forceActivityPanelVisible;
   final ActivityService? tutorialActivityService;
+
+  /// Tutorial-only: which mobile panel the guided backdrop reveals first.
+  /// Null keeps the normal resolution (forced call rail, else main).
+  final RevealSide? initialMobileRevealSide;
 
   @override
   State<MainPage> createState() => MainPageState();
@@ -145,6 +154,7 @@ class MainPageState extends State<MainPage> {
     milliseconds: 500,
   );
   static const int _streamLabOpenRoomRetryLimit = 40;
+  static const int _streamLabTrustRetryLimit = 4;
   static const Duration _streamLabOpenRoomRetryDelay = Duration(
     milliseconds: 500,
   );
@@ -189,10 +199,13 @@ class MainPageState extends State<MainPage> {
   StreamSubscription? onOpenRoomSubscription;
   StreamSubscription? onOpenStorySubscription;
   StreamSubscription? onOpenSpaceSubscription;
+  StreamSubscription? _setFilterClientSubscription;
+  StreamSubscription? _openUserProfileSubscription;
   bool _postLoginFlowStarted = false;
   final Map<String, int> _notificationOpenRoomRetryCounts = {};
   final Map<String, Timer> _notificationOpenRoomRetryTimers = {};
   final Map<String, int> _streamLabOpenRoomRetryCounts = {};
+  final Map<String, int> _streamLabTrustRetryCounts = {};
   final Map<String, Timer> _streamLabOpenRoomRetryTimers = {};
   int _inboxNavigationRequestId = 0;
 
@@ -224,6 +237,7 @@ class MainPageState extends State<MainPage> {
   bool get forceActivityPanelVisible => widget.forceActivityPanelVisible;
   ActivityService? get tutorialActivityService =>
       widget.tutorialActivityService;
+  RevealSide? get initialMobileRevealSide => widget.initialMobileRevealSide;
 
   @override
   void initState() {
@@ -319,7 +333,9 @@ class MainPageState extends State<MainPage> {
       EventBus.openSpace.add(pendingOpenSpace);
     }
 
-    EventBus.setFilterClient.stream.listen(setFilterClient);
+    _setFilterClientSubscription = EventBus.setFilterClient.stream.listen(
+      setFilterClient,
+    );
     _inboundShareDraftSubscription = EventBus.inboundShareDraft.stream.listen(
       (draft) => unawaited(_onInboundShareDraft(draft)),
     );
@@ -343,7 +359,9 @@ class MainPageState extends State<MainPage> {
       }
     });
 
-    EventBus.openUserProfile.stream.listen(onOpenUserProfileSignal);
+    _openUserProfileSubscription = EventBus.openUserProfile.stream.listen(
+      onOpenUserProfileSignal,
+    );
 
     onDesktopNavigationSubscription = DesktopNavigationHistoryController
         .instance
@@ -429,7 +447,7 @@ class MainPageState extends State<MainPage> {
     _postLoginFlowStarted = true;
     try {
       final onboardingService = OnboardingService(preferences);
-      if (!Layout.mobile && onboardingService.shouldShow(isLoggedIn: true)) {
+      if (onboardingService.shouldShow(isLoggedIn: true)) {
         await OnboardingPage.show(context, service: onboardingService);
 
         if (!mounted) {
@@ -437,7 +455,15 @@ class MainPageState extends State<MainPage> {
         }
       }
 
-      var menus = FirstTimeSetup.postLogin;
+      final menus = buildPostLoginSetupMenus(
+        registered: FirstTimeSetup.postLogin,
+        perAccount: [
+          for (final client
+              in widget.clientManager.clients.whereType<MatrixClient>())
+            if (!preferences.isGlobalMutePushRuleMigrated(client.identifier))
+              GlobalMutePushRuleSetup(client, preferences: preferences),
+        ],
+      );
       if (menus.isNotEmpty) {
         NavigationUtils.navigateTo(context, SetupPage(menus));
       }
@@ -473,6 +499,8 @@ class MainPageState extends State<MainPage> {
     onOpenRoomSubscription?.cancel();
     onOpenStorySubscription?.cancel();
     onOpenSpaceSubscription?.cancel();
+    _setFilterClientSubscription?.cancel();
+    _openUserProfileSubscription?.cancel();
     for (final timer in _notificationOpenRoomRetryTimers.values) {
       timer.cancel();
     }
@@ -526,11 +554,23 @@ class MainPageState extends State<MainPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (Layout.mobile) {
-      return MainPageViewMobile(this);
-    } else {
-      return MainPageViewDesktop(this);
-    }
+    final view = Layout.mobile
+        ? MainPageViewMobile(this)
+        : MainPageViewDesktop(this);
+
+    // A Scaffold ONLY so ScaffoldMessenger has somewhere to draw a SnackBar on
+    // the main navigation path; it contributes no chrome of its own. The path
+    // registered no Scaffold before this, so every `showSnackBar` reaching it
+    // was queued and drawn nowhere - see `RoomTextButton._setMuted`, which
+    // reports a refused mute this way. Transparent so the view's own
+    // `Foundation` keeps painting the background, and
+    // `resizeToAvoidBottomInset: false` so the keyboard keeps overlaying the
+    // panels exactly as it did before this wrapper existed.
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      resizeToAvoidBottomInset: false,
+      body: view,
+    );
   }
 
   void selectSpace(Space? space, {bool recordHistory = true}) {
@@ -584,12 +624,17 @@ class MainPageState extends State<MainPage> {
       InboxPage(
         clientManager: clientManager,
         filterClient: filterClient,
-        onOpen: _openInboxSnapshot,
+        onOpen: openInboxSnapshot,
       ),
     );
   }
 
-  Future<bool> _openInboxSnapshot(
+  /// Opens [snapshot] and jumps to [event], returning whether both succeeded.
+  ///
+  /// Public only so `main_page_inbox_open_test.dart` can drive the real method;
+  /// the Inbox reaches it through the `onOpen` callback.
+  @visibleForTesting
+  Future<bool> openInboxSnapshot(
     InboxRoomSnapshot snapshot,
     InboxEventSnapshot event,
   ) async {
@@ -628,6 +673,7 @@ class MainPageState extends State<MainPage> {
         roomIdentifier: room.identifier,
         eventId: event.eventId,
       )) {
+        _surfaceInboxRoomSelection();
         return true;
       }
       await Future<void>.delayed(_inboxJumpListenerRetryDelay);
@@ -820,7 +866,7 @@ class MainPageState extends State<MainPage> {
     _drainInboundShareDeliveryGate();
   }
 
-  String get _inboundSharePermissionDeniedMessage => Intl.message(
+  String get inboundSharePermissionDenied => Intl.message(
     "Couldn't read what was shared. The app you shared from didn't grant "
     "access to it - try sharing a link instead.",
     name: 'inboundSharePermissionDenied',
@@ -829,21 +875,21 @@ class MainPageState extends State<MainPage> {
         'to the file. Sharing a link from the same app usually works.',
   );
 
-  String get _inboundShareTooLargeMessage => Intl.message(
+  String get inboundShareTooLarge => Intl.message(
     'That share is too large. Files are limited to 100 MB each, and 250 MB '
     'per share.',
     name: 'inboundShareTooLarge',
     desc: 'Shown when a share is refused for exceeding the size limits.',
   );
 
-  String get _inboundShareUnreadableMessage => Intl.message(
+  String get inboundShareUnreadable => Intl.message(
     "Couldn't read what was shared.",
     name: 'inboundShareUnreadable',
     desc:
         'Shown when a share fails for a reason with no more specific message.',
   );
 
-  String get _inboundShareFailedTitle => Intl.message(
+  String get inboundShareFailedTitle => Intl.message(
     'Share failed',
     name: 'inboundShareFailedTitle',
     desc: 'Title of the dialog shown when an incoming share could not be read.',
@@ -858,13 +904,15 @@ class MainPageState extends State<MainPage> {
   /// nothing at all while the same image from the gallery worked.
   ///
   /// Uses [AdaptiveDialog] rather than a SnackBar, and that is not a style
-  /// preference. A SnackBar is drawn by a Scaffold registered with the
-  /// ScaffoldMessenger, and there is no Scaffold anywhere on this page - the
-  /// whole app contains 14 and none are on the main navigation path. So
-  /// `ScaffoldMessenger.maybeOf(context)?.showSnackBar(...)` here is a silent
-  /// no-op: on device it logged `failure_shown` and drew nothing, reproducing
-  /// the exact silent failure this exists to remove. AdaptiveDialog presents a
-  /// route - bottom sheet on mobile, popup on desktop - and needs no Scaffold.
+  /// preference. Historically a SnackBar drew nothing here: a SnackBar is
+  /// presented by a Scaffold registered with the ScaffoldMessenger, and this
+  /// page registered none, so `showSnackBar` was queued and dropped - on
+  /// device it logged `failure_shown` and drew nothing, reproducing the exact
+  /// silent failure this exists to remove. [build] now wraps the page in a
+  /// chrome-free Scaffold so the room-list mute failure can use a SnackBar,
+  /// which means a SnackBar would draw here too; this surface is deliberately
+  /// left modal, because a share the app threw away is worth an
+  /// acknowledgement rather than a message that times out unseen.
   Future<void> _showInboundShareFailure(InboundShareFailure failure) async {
     // Claimed before displaying so a replacement MainPage does not repeat a
     // message this one already showed.
@@ -872,14 +920,13 @@ class MainPageState extends State<MainPage> {
     if (!mounted) return;
     Log.w('inbound_share event=failure_shown reason=${failure.name}');
     final message = switch (failure) {
-      InboundShareFailure.permissionDenied =>
-        _inboundSharePermissionDeniedMessage,
-      InboundShareFailure.tooLarge => _inboundShareTooLargeMessage,
-      InboundShareFailure.unreadable => _inboundShareUnreadableMessage,
+      InboundShareFailure.permissionDenied => inboundSharePermissionDenied,
+      InboundShareFailure.tooLarge => inboundShareTooLarge,
+      InboundShareFailure.unreadable => inboundShareUnreadable,
     };
     await AdaptiveDialog.show(
       context,
-      title: _inboundShareFailedTitle,
+      title: inboundShareFailedTitle,
       initialHeightMobile: 0.25,
       builder: (_) => tiamat.Text.body(message),
     );
@@ -1340,7 +1387,6 @@ class MainPageState extends State<MainPage> {
 
     if (room != null) {
       _clearNotificationOpenRoomRetry(strings);
-      _clearStreamLabOpenRoomRetry(strings);
       if (preferences.automaticallyOpenSpace.value) {
         var spacesWithRoom = room.client.spaces.where(
           (space) => space.containsRoom(room.identifier),
@@ -1387,7 +1433,7 @@ class MainPageState extends State<MainPage> {
         }
       }
       if (shouldAutoJoinCall) {
-        await _joinShortcutCallRoom(
+        final retryScheduled = await _joinShortcutCallRoom(
           room,
           logSource: isStreamLabOpen
               ? 'stream-lab-open-room'
@@ -1395,7 +1441,12 @@ class MainPageState extends State<MainPage> {
           streamLab: isStreamLabOpen,
           streamLabRequestNonce: streamLabMetadata?.requestNonce,
           streamLabRoomHash: streamLabMetadata?.roomHash,
+          streamLabRoute: isStreamLabOpen ? strings : null,
+          streamLabMetadata: streamLabMetadata,
         );
+        if (isStreamLabOpen && !retryScheduled) {
+          _clearStreamLabOpenRoomRetry(strings);
+        }
       }
     } else if (isNotificationOpen) {
       _scheduleNotificationOpenRoomRetry(strings);
@@ -1552,12 +1603,14 @@ class MainPageState extends State<MainPage> {
     return Colors.primaries[hash % Colors.primaries.length].shade400;
   }
 
-  Future<void> _joinShortcutCallRoom(
+  Future<bool> _joinShortcutCallRoom(
     Room room, {
     String logSource = 'main-page-shortcut',
     bool streamLab = false,
     String? streamLabRequestNonce,
     String? streamLabRoomHash,
+    (String, String?)? streamLabRoute,
+    StreamLabOpenRoomMetadata? streamLabMetadata,
   }) async {
     final sourceLabel = streamLab ? 'Stream-lab' : 'Shortcut';
     final voipRoom = room.getComponent<VoipRoomComponent>();
@@ -1567,7 +1620,7 @@ class MainPageState extends State<MainPage> {
         category: LogCategory.livekit,
         source: logSource,
       );
-      return;
+      return false;
     }
 
     if (!voipRoom.canJoinCall) {
@@ -1576,7 +1629,7 @@ class MainPageState extends State<MainPage> {
         category: LogCategory.livekit,
         source: logSource,
       );
-      return;
+      return false;
     }
 
     try {
@@ -1592,18 +1645,37 @@ class MainPageState extends State<MainPage> {
         source: logSource,
       );
       if (!mounted) {
-        return;
+        return false;
       }
       setState(() {});
+      return false;
     } catch (error, stackTrace) {
       if (error is MatrixLivekitCallJoinPreflightException) {
+        final client = room.client;
+        if (streamLabRoute != null && client is MatrixClient) {
+          final status = client.e2eeTrustStatus;
+          if (shouldRetryStreamLabTrustPreflight(
+            encryptionAvailable: status.encryptionAvailable,
+            currentDeviceKnown: status.currentDeviceKnown,
+            currentDeviceBlocked: status.currentDeviceBlocked,
+          )) {
+            if (_scheduleStreamLabOpenRoomRetry(
+              streamLabRoute,
+              reason: 'own device keys are not ready for call trust preflight',
+              metadata: streamLabMetadata,
+              trustPreflight: true,
+            )) {
+              return true;
+            }
+          }
+        }
         Log.w(
           '$sourceLabel call auto-join blocked by local E2EE trust preflight.',
           category: LogCategory.livekit,
           source: logSource,
         );
         if (!mounted) {
-          return;
+          return false;
         }
         await AdaptiveDialog.show(
           context,
@@ -1613,7 +1685,7 @@ class MainPageState extends State<MainPage> {
             children: [tiamat.Text.body(error.message)],
           ),
         );
-        return;
+        return false;
       }
 
       Log.onError(
@@ -1626,9 +1698,10 @@ class MainPageState extends State<MainPage> {
         source: logSource,
       );
       if (!mounted) {
-        return;
+        return false;
       }
       await AdaptiveDialog.showError(context, error, stackTrace);
+      return false;
     }
   }
 
@@ -1686,27 +1759,34 @@ class MainPageState extends State<MainPage> {
     );
   }
 
-  void _scheduleStreamLabOpenRoomRetry(
+  bool _scheduleStreamLabOpenRoomRetry(
     (String, String?) room, {
     required String reason,
     StreamLabOpenRoomMetadata? metadata,
+    bool trustPreflight = false,
   }) {
     final retryKey = _streamLabOpenRoomRetryKey(room);
     final roomDiagnostic = MatrixClient.hash(room.$1).substring(0, 12);
-    final attempts = _streamLabOpenRoomRetryCounts[retryKey] ?? 0;
-    if (attempts >= _streamLabOpenRoomRetryLimit) {
+    final retryCounts = trustPreflight
+        ? _streamLabTrustRetryCounts
+        : _streamLabOpenRoomRetryCounts;
+    final retryLimit = trustPreflight
+        ? _streamLabTrustRetryLimit
+        : _streamLabOpenRoomRetryLimit;
+    final attempts = retryCounts[retryKey] ?? 0;
+    if (attempts >= retryLimit) {
       Log.w(
         'Giving up stream-lab room open for $roomDiagnostic '
-        'after $_streamLabOpenRoomRetryLimit attempts; reason=$reason',
+        'after $retryLimit attempts; reason=$reason',
         category: LogCategory.livekit,
         source: 'stream-lab-open-room',
       );
       _clearStreamLabOpenRoomRetry(room);
-      return;
+      return false;
     }
 
     if (_streamLabOpenRoomRetryTimers.containsKey(retryKey)) {
-      return;
+      return true;
     }
 
     if (attempts == 0) {
@@ -1718,7 +1798,7 @@ class MainPageState extends State<MainPage> {
       );
     }
 
-    _streamLabOpenRoomRetryCounts[retryKey] = attempts + 1;
+    retryCounts[retryKey] = attempts + 1;
     _streamLabOpenRoomRetryTimers[retryKey] = Timer(
       _streamLabOpenRoomRetryDelay,
       () {
@@ -1733,6 +1813,7 @@ class MainPageState extends State<MainPage> {
         );
       },
     );
+    return true;
   }
 
   void _scheduleNotificationOpenStoryRetry(StoryOpenRequest request) {
@@ -1788,6 +1869,7 @@ class MainPageState extends State<MainPage> {
   void _clearStreamLabOpenRoomRetry((String, String?) room) {
     final retryKey = _streamLabOpenRoomRetryKey(room);
     _streamLabOpenRoomRetryCounts.remove(retryKey);
+    _streamLabTrustRetryCounts.remove(retryKey);
     _streamLabOpenRoomRetryTimers.remove(retryKey)?.cancel();
   }
 
@@ -1801,6 +1883,33 @@ class MainPageState extends State<MainPage> {
 
   String _notificationOpenStoryRetryKey(StoryOpenRequest request) {
     return "story\u0000${request.routeKey}";
+  }
+
+  /// Brings the destination timeline to the front after an Inbox open.
+  ///
+  /// Selecting a room is not the same thing as showing it. On mobile the shell
+  /// is an [OverlappingPanels], and the only thing that reveals the timeline
+  /// panel is [EventBus.focusTimeline] - so without this, opening a row
+  /// selected the right room underneath and left the user looking at the
+  /// space/room sidebar they tapped from.
+  ///
+  /// Unlike [_surfaceNotificationRoomSelection] this must NOT pop routes: the
+  /// Inbox pops its own route once this returns true, and popping to the first
+  /// route here would take the main page with it. The post-frame repeat is for
+  /// the same reason as the notification path - the reveal can land while the
+  /// panel state is still settling, and the second emit catches that case.
+  void _surfaceInboxRoomSelection() {
+    if (!mounted) {
+      return;
+    }
+
+    EventBus.focusTimeline.add(null);
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      EventBus.focusTimeline.add(null);
+    });
   }
 
   void _surfaceNotificationRoomSelection() {

@@ -58,6 +58,114 @@ import '../../client/components/emoticon/emoticon.dart';
 
 enum MessageInputSendResult { success, unhandled }
 
+/// Keeps unsent room-composer text available while the app is running without
+/// persisting it to disk. This is deliberately local-only because drafts can
+/// contain sensitive, including encrypted-room, message content.
+///
+/// THE WHOLE DISCLOSURE BOUNDARY, in one place because it is three separate
+/// decisions and a reader who finds only the first will draw the wrong
+/// conclusion about the other two:
+///
+/// * **Never written to disk.** Nothing here is persisted, so a draft cannot
+///   outlive the process or be recovered from storage.
+/// * **Dropped per account when a client is removed.** Sign-out, local
+///   disposal and the replace-an-existing-client path all funnel through
+///   `ClientManager`, which calls [clearForClient]. That was deliberately NOT
+///   part of wiring the cache up - it is a lifecycle decision, was filed and
+///   decided separately, and the answer was to clear by account prefix rather
+///   than the whole map, so a multi-account user does not lose the other
+///   accounts' drafts.
+/// * **Not retained at all for one-off composers.** A reply, an edit and an
+///   inbound share get a null key from [composerDraftCacheKey], so the feature
+///   is off for them by construction rather than by a clearing rule.
+///
+/// Expiry ([retention]) and the [_maximumDrafts] cap bound how much is held at
+/// once; they are not privacy controls, and neither is a substitute for the
+/// three rules above.
+class ComposerDraftCache {
+  static const retention = Duration(days: 7);
+  static const _maximumDrafts = 100;
+
+  static final Map<String, _ComposerDraftEntry> _drafts = {};
+
+  static TextEditingValue? read(String cacheKey, {DateTime? now}) {
+    final currentTime = now ?? DateTime.now();
+    _removeExpired(currentTime);
+    return _drafts[cacheKey]?.value;
+  }
+
+  static void save(String cacheKey, TextEditingValue value, {DateTime? now}) {
+    final currentTime = now ?? DateTime.now();
+    _removeExpired(currentTime);
+    if (value.text.isEmpty) {
+      _drafts.remove(cacheKey);
+      return;
+    }
+
+    _drafts[cacheKey] = _ComposerDraftEntry(
+      value.copyWith(composing: TextRange.empty),
+      currentTime,
+    );
+    while (_drafts.length > _maximumDrafts) {
+      final oldestKey = _drafts.entries
+          .reduce(
+            (first, next) =>
+                first.value.updatedAt.isBefore(next.value.updatedAt)
+                ? first
+                : next,
+          )
+          .key;
+      _drafts.remove(oldestKey);
+    }
+  }
+
+  static void clear(String cacheKey) => _drafts.remove(cacheKey);
+
+  /// Drops every draft belonging to one account. Call this when a client is
+  /// removed so plaintext from that account's encrypted rooms does not outlive
+  /// the session. The prefix is the leading segment of the key built by
+  /// [composerDraftCacheKey].
+  static void clearForClient(String clientId) {
+    _drafts.removeWhere((key, _) => key.startsWith('$clientId:'));
+  }
+
+  static void clearForTesting() => _drafts.clear();
+
+  static void _removeExpired(DateTime now) {
+    _drafts.removeWhere(
+      (_, entry) => now.difference(entry.updatedAt) >= retention,
+    );
+  }
+}
+
+/// The cache key for a room composer, or null when this composer must not
+/// retain a draft.
+///
+/// A reply, an edit and an inbound share all borrow the same composer widget
+/// for a one-off piece of text. Retaining those would restore someone else's
+/// quoted message, or a share payload, into a later plain composer - so the
+/// absence of a key IS the feature being off for them, and that is the half a
+/// test of [ComposerDraftCache] cannot see.
+String? composerDraftCacheKey({
+  required String clientId,
+  required String roomId,
+  String? threadId,
+  required bool isInteraction,
+  required bool hasInboundShareDraft,
+}) {
+  if (isInteraction || hasInboundShareDraft) {
+    return null;
+  }
+  return '$clientId:$roomId:${threadId ?? 'room'}';
+}
+
+class _ComposerDraftEntry {
+  const _ComposerDraftEntry(this.value, this.updatedAt);
+
+  final TextEditingValue value;
+  final DateTime updatedAt;
+}
+
 TextEditingValue insertEmoticonIntoComposerValue(
   TextEditingValue value,
   Emoticon emote,
@@ -386,6 +494,13 @@ const composerMessageEffects = [
     kind: ComposerEffectKind.prefixMessage,
     prefix: "### ",
     emptyDraftText: "### ",
+  ),
+  ComposerEffectOption(
+    emoji: "🤫",
+    label: "Whisper",
+    kind: ComposerEffectKind.prefixMessage,
+    prefix: "###### ",
+    emptyDraftText: "###### ",
   ),
 ];
 
@@ -933,6 +1048,7 @@ class MessageInput extends StatefulWidget {
     this.processAutofill,
     this.onHeightChanged,
     this.cancelReply,
+    required this.draftCacheKey,
   });
   final double maxHeight;
   final double size;
@@ -981,8 +1097,39 @@ class MessageInput extends StatefulWidget {
   final List<AutofillSearchResult> Function(String text)? processAutofill;
   final ValueChanged<double>? onHeightChanged;
 
+  /// Required, and nullable, on purpose. A composer either retains a draft or
+  /// deliberately does not, and both are decisions - so an omitted argument
+  /// must not be able to silently turn the feature off at one call site. Use
+  /// [composerDraftCacheKey] rather than building the string here.
+  final String? draftCacheKey;
+
   @override
   State<MessageInput> createState() => MessageInputState();
+}
+
+/// Whether [event] is a live press of [key] - i.e. the actual triggering
+/// event for that key, not merely "is this key currently held".
+///
+/// [HardwareKeyboard.isLogicalKeyPressed] answers a global, event-agnostic
+/// question: is this key down RIGHT NOW, regardless of which key's event a
+/// given call of a key handler is even for. `MessageInputState.onKey` used to
+/// ask only that in every branch, so holding Tab while pressing an unrelated
+/// key sent the unrelated key's event down the Tab branch, and every branch
+/// also re-fired on key-up and (for keys that allow it) on OS auto-repeat.
+/// [event] is the question that was never being asked.
+///
+/// [repeat] opts a branch in to firing again on OS auto-repeat - true for
+/// Tab-cycling through autofill results, which should keep advancing while
+/// held, and false everywhere else, where a repeat would resend, re-paste, or
+/// re-navigate on every OS repeat tick of a held key.
+@visibleForTesting
+bool isComposerKeyPress(
+  KeyEvent event,
+  LogicalKeyboardKey key, {
+  bool repeat = false,
+}) {
+  if (event.logicalKey != key) return false;
+  return event is KeyDownEvent || (repeat && event is KeyRepeatEvent);
 }
 
 class MessageInputState extends State<MessageInput> {
@@ -1058,6 +1205,14 @@ class MessageInputState extends State<MessageInput> {
     onTextfieldUpdated(controller.text);
   }
 
+  void _cacheComposerDraft() {
+    final cacheKey = widget.draftCacheKey;
+    if (cacheKey == null) {
+      return;
+    }
+    ComposerDraftCache.save(cacheKey, controller.value);
+  }
+
   void onSetInputText(String newText) {
     setComposerValue(
       TextEditingValue(
@@ -1125,6 +1280,8 @@ class MessageInputState extends State<MessageInput> {
       unawaited(_cancelVoiceRecordingDuringDispose());
     }
     voiceRecordingTicker?.cancel();
+    controller.removeListener(_cacheComposerDraft);
+    controller.removeListener(controllerListener);
     keyboardFocusSubscription?.cancel();
     setInputTextSubscription?.cancel();
     wrapComposerSelectionSubscription?.cancel();
@@ -1155,12 +1312,22 @@ class MessageInputState extends State<MessageInput> {
 
   @override
   void initState() {
+    final cachedDraft = widget.draftCacheKey == null
+        ? null
+        : ComposerDraftCache.read(widget.draftCacheKey!);
     controller = RichTextEditingController(
       client: widget.client,
       room: widget.room,
       text: widget.initialText,
     );
+    // The cached path restores text AND selection through the assignment
+    // below, so seeding the constructor with the same text as well only
+    // invites the two to diverge.
+    if (cachedDraft != null && widget.initialText == null) {
+      controller.value = cachedDraft;
+    }
     controller.addListener(controllerListener);
+    controller.addListener(_cacheComposerDraft);
     keyboardFocusSubscription = widget.focusKeyboard?.listen(
       (_) => onKeyboardFocusRequested(),
     );
@@ -1367,6 +1534,12 @@ class MessageInputState extends State<MessageInput> {
 
     return !RegExp(r'[A-Za-z0-9_]').hasMatch(char);
   }
+
+  /// Overrides the Enter-to-send call in tests, so a repeat's call count at
+  /// the onKey branch can be observed directly rather than through
+  /// sendMessage's own debounce and text-clearing side effects.
+  @visibleForTesting
+  VoidCallback? sendMessageForTesting;
 
   Debouncer sendDebouncer = Debouncer(delay: Duration(milliseconds: 20));
   void sendMessage() {
@@ -1967,8 +2140,10 @@ class MessageInputState extends State<MessageInput> {
     if (BuildConfig.MOBILE || Layout.mobile) return KeyEventResult.ignored;
 
     if (!preferences.disableTextCursorManagement.value) {
-      if (HardwareKeyboard.instance.isLogicalKeyPressed(
+      if (isComposerKeyPress(
+        event,
         LogicalKeyboardKey.backspace,
+        repeat: true,
       )) {
         var selection = controller.selection.baseOffset;
         var selectionEnd = controller.selection.extentOffset;
@@ -1997,16 +2172,13 @@ class MessageInputState extends State<MessageInput> {
       }
     }
 
-    if (HardwareKeyboard.instance.isLogicalKeyPressed(
-      LogicalKeyboardKey.keyV,
-    )) {
-      if (HardwareKeyboard.instance.isControlPressed) {
-        readImageFromClipboard();
-        return KeyEventResult.ignored;
-      }
+    if (isComposerKeyPress(event, LogicalKeyboardKey.keyV) &&
+        HardwareKeyboard.instance.isControlPressed) {
+      (readImageFromClipboardForTesting ?? readImageFromClipboard)();
+      return KeyEventResult.ignored;
     }
 
-    if (HardwareKeyboard.instance.isLogicalKeyPressed(LogicalKeyboardKey.tab)) {
+    if (isComposerKeyPress(event, LogicalKeyboardKey.tab, repeat: true)) {
       if (autoFillResults == null || autoFillResults!.isEmpty) {
         autoFillSelection = null;
         return KeyEventResult.ignored;
@@ -2032,9 +2204,7 @@ class MessageInputState extends State<MessageInput> {
     }
 
     if (widget.disableEnterToSend != true) {
-      if (HardwareKeyboard.instance.isLogicalKeyPressed(
-        LogicalKeyboardKey.enter,
-      )) {
+      if (isComposerKeyPress(event, LogicalKeyboardKey.enter)) {
         if (autoFillSelection != null && autoFillRange != null) {
           applyAutoFill(autoFillResults![autoFillSelection!]);
           return KeyEventResult.handled;
@@ -2044,21 +2214,17 @@ class MessageInputState extends State<MessageInput> {
           return KeyEventResult.ignored;
         }
 
-        sendMessage();
+        (sendMessageForTesting ?? sendMessage)();
         return KeyEventResult.handled;
       }
     }
 
-    if (HardwareKeyboard.instance.isLogicalKeyPressed(
-      LogicalKeyboardKey.escape,
-    )) {
+    if (isComposerKeyPress(event, LogicalKeyboardKey.escape)) {
       doCancelInteraction();
       return KeyEventResult.handled;
     }
 
-    if (HardwareKeyboard.instance.isLogicalKeyPressed(
-          LogicalKeyboardKey.arrowUp,
-        ) &&
+    if (isComposerKeyPress(event, LogicalKeyboardKey.arrowUp) &&
         controller.text.isEmpty) {
       widget.editLastMessage?.call();
     }
@@ -2975,8 +3141,8 @@ class MessageInputState extends State<MessageInput> {
       child: TutorialAnchor(
         id: TutorialAnchorIds.composerEffectsButton,
         padding: const EdgeInsets.all(2),
-        child: Tooltip(
-          message: "Effects",
+        child: tiamat.Tooltip(
+          text: "Effects",
           child: composerActionSlot(
             label: toggled ? "Close message effects" : "Open message effects",
             hint: "Choose a message effect",
@@ -3221,6 +3387,23 @@ class MessageInputState extends State<MessageInput> {
         ?.getRecentTypedEmoticon(widget.room);
 
     var availableEmoji = widget.availibleEmoticons!.toList();
+    var recentStickers = widget.client
+        .getComponent<RecentEmoticonComponent>()
+        ?.getRecentStickerEmoticon(widget.room);
+    var availableStickers = (widget.availibleStickers ?? []).toList();
+
+    if (recentStickers != null && recentStickers.isNotEmpty) {
+      availableStickers.insert(
+        0,
+        DynamicEmoticonPack(
+          identifier: "dynamic_pack_frequently_used_stickers",
+          displayName: "Frequently Used",
+          icon: Icons.schedule,
+          emoticons: recentStickers,
+          usage: EmoticonUsage.sticker,
+        ),
+      );
+    }
 
     if (recent != null && recent.isNotEmpty) {
       availableEmoji.insert(
@@ -3286,7 +3469,7 @@ class MessageInputState extends State<MessageInput> {
                   ).whereType<AutofillSearchResultEmoticon>().toList(),
                   stickers: widget.sendSticker == null
                       ? const []
-                      : (widget.availibleStickers ?? []),
+                      : availableStickers,
                   onEmojiPressed: insertEmoticon,
                   mobileStyle: Layout.mobile,
                   packListAxis: Layout.desktop
@@ -3308,6 +3491,9 @@ class MessageInputState extends State<MessageInput> {
                     }
                     try {
                       sendSticker(emoticon);
+                      if (widget.room != null) {
+                        unawaited(_recordStickerRecent(emoticon));
+                      }
                     } catch (error, stackTrace) {
                       Log.onError(
                         error,
@@ -3352,6 +3538,19 @@ class MessageInputState extends State<MessageInput> {
               ),
             ),
           );
+  }
+
+  Future<void> _recordStickerRecent(Emoticon emoticon) async {
+    final room = widget.room;
+    final recentEmoticons = widget.client
+        .getComponent<RecentEmoticonComponent>();
+    if (room == null || recentEmoticons == null) return;
+
+    try {
+      await recentEmoticons.stickerEmoticon(room, emoticon);
+    } catch (error, stackTrace) {
+      Log.onError(error, stackTrace, content: 'Failed to save sticker recent');
+    }
   }
 
   bool get canOpenRoomEmojiSettings {
@@ -3781,8 +3980,8 @@ class MessageInputState extends State<MessageInput> {
                 button: true,
                 onTap: doCancelInteraction,
                 excludeSemantics: true,
-                child: Tooltip(
-                  message: cancelLabel,
+                child: tiamat.Tooltip(
+                  text: cancelLabel,
                   child: tiamat.IconButton(
                     icon: Icons.cancel_outlined,
                     size: 16,
@@ -4022,6 +4221,11 @@ class MessageInputState extends State<MessageInput> {
   static const MethodChannel _androidClipboardImageChannel = MethodChannel(
     'chat.intergalactic.app/clipboard_image',
   );
+
+  /// Overrides [readImageFromClipboard] in tests, so a Ctrl+V repeat's call
+  /// count can be observed without exercising real clipboard/platform IO.
+  @visibleForTesting
+  Future<void> Function()? readImageFromClipboardForTesting;
 
   Future<void> readImageFromClipboard() async {
     Uint8List? image;

@@ -1,8 +1,12 @@
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:intergalactic/client/bug_report/pending_native_call_crash_guard.dart';
+import 'package:intergalactic/client/bug_report/pending_crash_report_store.dart';
 import 'package:intergalactic/client/components/voip/shared_audio/shared_audio_backend.dart';
 import 'package:intergalactic/client/components/voip/shared_audio/shared_audio_capability.dart';
+import 'package:intergalactic/client/components/voip/shared_audio/shared_audio_coordinator.dart';
 import 'package:intergalactic/client/components/voip/shared_audio/windows_shared_audio_backend.dart';
 import 'package:intergalactic/debug/log.dart';
+import 'package:intergalactic/config/platform_utils.dart';
 import 'package:intergalactic_windows_share/intergalactic_windows_share.dart';
 
 enum ShareTargetType { display, window }
@@ -28,6 +32,14 @@ enum SharedAudioState {
   unavailable,
   failed,
   stopped,
+
+  /// The requested capture cannot run, but alternatives exist and are waiting
+  /// on an explicit choice. Distinct from [unavailable], which means there is
+  /// nothing to offer: collapsing the two is what let the offers go unread.
+  ///
+  /// Nothing starts in this state. The share runs video-only until the user
+  /// picks an option or declines.
+  needsChoice,
 }
 
 enum ShareSessionLifecycle {
@@ -318,6 +330,40 @@ abstract class SharedAudioPublicationSource {
   Future<void> disposePublicationStream();
 }
 
+/// A source that can offer alternatives when the requested capture is refused.
+///
+/// Separate from [SharedAudioSource] for the same reason
+/// [SharedAudioPublicationSource] is: a source with nothing to offer - the
+/// disabled one, and every non-Windows source - should not have to implement
+/// a choice it can never present.
+///
+/// The contract is that nothing here ever starts a capture on the user's
+/// behalf. [pendingFallbackOptions] is non-empty only while a choice is
+/// outstanding, and it is cleared by [applyFallbackOption] or
+/// [declineFallback] - never by a retry this layer decided to make.
+abstract class SharedAudioFallbackSource {
+  /// Alternatives awaiting an explicit choice, best first. Empty when no
+  /// choice is outstanding.
+  List<SharedAudioFallbackOption> get pendingFallbackOptions;
+
+  /// Warning covering the offered alternatives as a group. Empty when there is
+  /// nothing to warn about, or when no choice is outstanding.
+  String get pendingFallbackWarning;
+
+  /// Starts the capture the user picked. Only valid while
+  /// [pendingFallbackOptions] is non-empty; the option must be one of them.
+  ///
+  /// A start that is itself refused can leave a further choice outstanding,
+  /// so callers must re-read [pendingFallbackOptions] after this returns.
+  Future<SharedAudioStatus> applyFallbackOption(
+    SharedAudioFallbackOption option,
+  );
+
+  /// Records that the user declined every alternative. The share continues
+  /// video-only and nothing is offered again for this session.
+  Future<SharedAudioStatus> declineFallback();
+}
+
 class DisabledSharedAudioSource implements SharedAudioSource {
   const DisabledSharedAudioSource({this.reason = 'shared_audio_not_requested'});
 
@@ -359,16 +405,36 @@ class DisabledSharedAudioSource implements SharedAudioSource {
 /// in `shared_audio/`; this maps a request into it and maps the resulting
 /// observation back, verbatim where callers match on exact values.
 class WindowsSharedAudioSource
-    implements SharedAudioSource, SharedAudioPublicationSource {
+    implements
+        SharedAudioSource,
+        SharedAudioPublicationSource,
+        SharedAudioFallbackSource {
   WindowsSharedAudioSource({
     required WindowsShareNativeBinding nativeBinding,
     required this.target,
     required this.requested,
     required this.mode,
     SharedAudioBackend? backend,
-  }) : _backend = backend ?? WindowsSharedAudioBackend(binding: nativeBinding);
+    SharedAudioCoordinator? coordinator,
+  }) : _backend = backend ?? WindowsSharedAudioBackend(binding: nativeBinding) {
+    _coordinator = coordinator ?? SharedAudioCoordinator(backend: _backend);
+  }
 
   final SharedAudioBackend _backend;
+
+  /// Decides whether the requested mode can run and, when it cannot, produces
+  /// the alternatives. It never substitutes a mode on its own, which is the
+  /// property this route depends on: a refused process-loopback capture must
+  /// reach the user as a choice, not as a quietly different capture.
+  late final SharedAudioCoordinator _coordinator;
+
+  /// The choice outstanding right now, or null when there is none.
+  SharedAudioPlan? _pendingPlan;
+
+  /// Set once the user has declined, so a later start cannot re-offer what
+  /// they already turned down.
+  bool _fallbackDeclined = false;
+
   final ShareTarget target;
 
   SharedAudioStatus _status = const SharedAudioStatus(
@@ -415,9 +481,42 @@ class WindowsSharedAudioSource
     }
 
     try {
-      await _backend.start(_request);
-      _status = _statusFrom(_backend.lastStatus);
-      return _status;
+      // Ask before starting. The refusal this exists for is measured, not
+      // predicted: the platform can only be asked by probing, so a mode that
+      // looks supported can still be refused at activation.
+      final plan = await _coordinator.plan(_request);
+
+      if (plan.kind == SharedAudioPlanKind.needsUserChoice) {
+        if (!_fallbackDeclined) {
+          return _awaitChoice(plan);
+        }
+
+        // Re-offering what they already turned down is the silent retry in
+        // slow motion. Falling through to start the planned request would be
+        // worse still: the plan says that mode cannot run, so this would ask
+        // the platform to do the thing it just refused.
+        _pendingPlan = null;
+        _status = SharedAudioStatus(
+          state: SharedAudioState.unavailable,
+          mode: mode,
+          reason: SharedAudioUnavailableReason.userDeclined.logLabel,
+        );
+        return _status;
+      }
+
+      if (plan.kind == SharedAudioPlanKind.unavailable) {
+        _pendingPlan = null;
+        _status = SharedAudioStatus(
+          state: SharedAudioState.unavailable,
+          mode: mode,
+          reason: plan.blockedReason?.logLabel ?? 'shared_audio_unavailable',
+        );
+        return _status;
+      }
+
+      // The plan is ready. Start exactly what was planned - never a
+      // substituted mode.
+      return _startPlanned(plan.request);
     } catch (error, stackTrace) {
       Log.onError(
         error,
@@ -431,6 +530,123 @@ class WindowsSharedAudioSource
       );
       return _status;
     }
+  }
+
+  /// Holds the offers and starts nothing.
+  ///
+  /// The status carries the reason the requested mode was refused, not a
+  /// generic one, because that reason is what the user is being asked to
+  /// decide about.
+  SharedAudioStatus _awaitChoice(SharedAudioPlan plan) {
+    _pendingPlan = plan;
+    _status = SharedAudioStatus(
+      state: SharedAudioState.needsChoice,
+      mode: mode,
+      reason: plan.blockedReason?.logLabel ?? 'shared_audio_needs_choice',
+    );
+    Log.i(
+      'Shared audio needs a choice: refused=${_status.reason} '
+      'options=${plan.options.length}',
+    );
+    return _status;
+  }
+
+  /// Runs a capture that was either planned ready or explicitly chosen.
+  ///
+  /// A start can be refused even after a clean plan, so the outcome's
+  /// follow-up offers are surfaced the same way the initial ones are rather
+  /// than being retried here.
+  Future<SharedAudioStatus> _startPlanned(SharedAudioRequest request) async {
+    final outcome = await _coordinator.start(request);
+
+    if (!outcome.started && !_fallbackDeclined) {
+      final followUp = outcome.followUpPlan;
+      if (followUp != null &&
+          followUp.kind == SharedAudioPlanKind.needsUserChoice) {
+        return _awaitChoice(followUp);
+      }
+    }
+
+    _pendingPlan = null;
+    _status = _statusFrom(_backend.lastStatus);
+    return _status;
+  }
+
+  @override
+  List<SharedAudioFallbackOption> get pendingFallbackOptions =>
+      _pendingPlan?.options ?? const <SharedAudioFallbackOption>[];
+
+  @override
+  String get pendingFallbackWarning => _pendingPlan?.warning ?? '';
+
+  @override
+  Future<SharedAudioStatus> applyFallbackOption(
+    SharedAudioFallbackOption option,
+  ) async {
+    final plan = _pendingPlan;
+    if (plan == null) {
+      // Not an error worth failing the share over, but it must not start
+      // anything: an option applied with no outstanding choice is a caller
+      // bug, and starting it would be the silent substitution this route
+      // exists to prevent.
+      Log.w('Shared-audio fallback chosen with no choice outstanding; ignored');
+      return _status;
+    }
+
+    // A capture is running in the mode the user just replaced, if a follow-up
+    // choice came from a start that had already partially succeeded.
+    try {
+      await _backend.stop();
+    } catch (error, stackTrace) {
+      Log.onError(
+        error,
+        stackTrace,
+        content: 'Failed to stop shared-content audio before applying choice',
+      );
+    }
+
+    _pendingPlan = null;
+
+    try {
+      return await _startPlanned(option.applyTo(plan.request));
+    } catch (error, stackTrace) {
+      Log.onError(
+        error,
+        stackTrace,
+        content: 'Failed to start chosen Windows shared-content audio',
+      );
+      _status = SharedAudioStatus(
+        state: SharedAudioState.failed,
+        mode: mode,
+        reason: 'native_start_failed',
+      );
+      return _status;
+    }
+  }
+
+  @override
+  Future<SharedAudioStatus> declineFallback() async {
+    _pendingPlan = null;
+    _fallbackDeclined = true;
+    try {
+      await _backend.stop();
+    } catch (error, stackTrace) {
+      Log.onError(
+        error,
+        stackTrace,
+        content: 'Failed to stop shared-content audio after declining choice',
+      );
+    }
+    // The platform's refusal is not the reason any more - the user is. Keeping
+    // the original block reason here would record a decision they made as a
+    // failure the machine had.
+    _status = SharedAudioStatus(
+      state: SharedAudioState.unavailable,
+      mode: mode,
+      reason: SharedAudioUnavailableReason.userDeclined.logLabel,
+    );
+    Log.i('Shared audio declined by user: reason=${_status.reason}');
+    return _status;
   }
 
   @override
@@ -589,14 +805,34 @@ class ShareSession {
     required this.videoSource,
     required this.sharedAudioSource,
     this.micSource = const MicSource(),
-  });
+    PendingCrashReportStore crashReportStore = const PendingCrashReportStore(),
+    bool? isWindowsPlatform,
+  }) : _crashReportStore = crashReportStore,
+       _isWindowsPlatform = isWindowsPlatform ?? PlatformUtils.isWindows;
 
   final ShareTarget target;
   final ScreenVideoSource videoSource;
   final SharedAudioSource sharedAudioSource;
   final MicSource micSource;
+  final PendingCrashReportStore _crashReportStore;
+  final bool _isWindowsPlatform;
 
   ShareSessionLifecycle lifecycle = ShareSessionLifecycle.idle;
+  PendingNativeCallCrashGuard? _nativeSharedAudioCrashGuard;
+
+  bool get _usesNativeWindowsSharedAudio =>
+      _isWindowsPlatform &&
+      sharedAudioSource is WindowsSharedAudioSource &&
+      sharedAudioSource.requested;
+
+  Future<PendingNativeCallCrashGuard?> _recordNativeSharedAudioAction() =>
+      PendingNativeCallCrashGuard.recordAction(
+        source:
+            'share-session-native-shared-audio-'
+            '${shortShareSourceIdHash(target.sourceId)}',
+        actionKind: 'Windows display-share audio capture',
+        store: _crashReportStore,
+      );
 
   bool get sharedAudioRequested => sharedAudioSource.requested;
   SharedAudioState get sharedAudioState => sharedAudioSource.state;
@@ -613,11 +849,17 @@ class ShareSession {
 
   Future<SharedAudioStatus> startSharedAudio() async {
     lifecycle = ShareSessionLifecycle.starting;
+    await _nativeSharedAudioCrashGuard?.clear();
+    _nativeSharedAudioCrashGuard = null;
+    final nativeCrashGuard = _usesNativeWindowsSharedAudio
+        ? await _recordNativeSharedAudioAction()
+        : null;
 
     late final SharedAudioStatus status;
     try {
       status = await sharedAudioSource.start();
     } catch (error, stackTrace) {
+      await nativeCrashGuard?.clear();
       Log.onError(
         error,
         stackTrace,
@@ -634,6 +876,11 @@ class ShareSession {
     lifecycle = status.state == SharedAudioState.active
         ? ShareSessionLifecycle.sharing
         : ShareSessionLifecycle.videoOnly;
+    if (status.state == SharedAudioState.active) {
+      _nativeSharedAudioCrashGuard = nativeCrashGuard;
+    } else {
+      await nativeCrashGuard?.clear();
+    }
 
     // Emitted for success as well as failure. A capture that starts cleanly
     // used to log nothing at all, which made a live smoke impossible to
@@ -642,6 +889,18 @@ class ShareSession {
     Log.i('Shared audio start: ${_audioEvidenceLine(status)}');
 
     if (sharedAudioSource.requested &&
+        status.state == SharedAudioState.needsChoice) {
+      // Deliberately not the "unavailable" line below. This share is
+      // video-only for now and can still get audio, and a log saying
+      // otherwise is what would make an unanswered choice look like a
+      // finished failure.
+      Log.w(
+        'Shared-content audio for ${target.title} needs a choice: '
+        '${status.reason}; '
+        '${pendingSharedAudioOptions.length} option(s) offered, '
+        'video-only until one is picked.',
+      );
+    } else if (sharedAudioSource.requested &&
         status.state != SharedAudioState.active) {
       Log.w(
         'Shared-content audio unavailable for ${target.title}: '
@@ -659,6 +918,86 @@ class ShareSession {
       );
     }
 
+    return status;
+  }
+
+  /// Alternatives waiting on an explicit choice, best first.
+  ///
+  /// Non-empty only while [sharedAudioState] is
+  /// [SharedAudioState.needsChoice]. Presenting these is the caller's job;
+  /// nothing starts until one is passed back to
+  /// [chooseSharedAudioFallback].
+  List<SharedAudioFallbackOption> get pendingSharedAudioOptions {
+    final source = sharedAudioSource;
+    if (source is! SharedAudioFallbackSource) {
+      return const <SharedAudioFallbackOption>[];
+    }
+
+    return (source as SharedAudioFallbackSource).pendingFallbackOptions;
+  }
+
+  /// Warning covering the offered alternatives as a group, or empty.
+  String get pendingSharedAudioWarning {
+    final source = sharedAudioSource;
+    if (source is! SharedAudioFallbackSource) {
+      return '';
+    }
+
+    return (source as SharedAudioFallbackSource).pendingFallbackWarning;
+  }
+
+  /// Starts the alternative the user picked.
+  ///
+  /// The picked option can itself be refused, so callers must re-read
+  /// [pendingSharedAudioOptions] afterwards rather than assuming this settled
+  /// the question.
+  Future<SharedAudioStatus> chooseSharedAudioFallback(
+    SharedAudioFallbackOption option,
+  ) async {
+    final source = sharedAudioSource;
+    if (source is! SharedAudioFallbackSource) {
+      return sharedAudioStatus;
+    }
+
+    final fallbackSource = source as SharedAudioFallbackSource;
+    final nativeCrashGuard =
+        _usesNativeWindowsSharedAudio &&
+            fallbackSource.pendingFallbackOptions.isNotEmpty
+        ? await _recordNativeSharedAudioAction()
+        : null;
+    late final SharedAudioStatus status;
+    try {
+      status = await fallbackSource.applyFallbackOption(option);
+    } catch (_) {
+      await nativeCrashGuard?.clear();
+      rethrow;
+    }
+    if (nativeCrashGuard != null) {
+      if (status.state == SharedAudioState.active) {
+        _nativeSharedAudioCrashGuard = nativeCrashGuard;
+      } else {
+        await nativeCrashGuard.clear();
+      }
+    }
+    lifecycle = status.state == SharedAudioState.active
+        ? ShareSessionLifecycle.sharing
+        : ShareSessionLifecycle.videoOnly;
+    Log.i('Shared audio choice applied: ${_audioEvidenceLine(status)}');
+    return status;
+  }
+
+  /// Records that the user wants none of the alternatives. The share stays
+  /// video-only and nothing is offered again for this session.
+  Future<SharedAudioStatus> declineSharedAudioFallback() async {
+    final source = sharedAudioSource;
+    if (source is! SharedAudioFallbackSource) {
+      return sharedAudioStatus;
+    }
+
+    final status = await (source as SharedAudioFallbackSource)
+        .declineFallback();
+    lifecycle = ShareSessionLifecycle.videoOnly;
+    Log.i('Shared audio choice declined: ${_audioEvidenceLine(status)}');
     return status;
   }
 
@@ -699,6 +1038,8 @@ class ShareSession {
         content: 'Shared-content audio dispose failed during share stop',
       );
     } finally {
+      await _nativeSharedAudioCrashGuard?.clear();
+      _nativeSharedAudioCrashGuard = null;
       lifecycle = ShareSessionLifecycle.stopped;
       Log.i('Shared audio stop: ${_audioEvidenceLine(status)}');
     }

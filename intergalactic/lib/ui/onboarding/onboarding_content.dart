@@ -48,7 +48,7 @@ const List<OnboardingStep> initialOnboardingSteps = [
     id: "privacy",
     title: "Privacy and Encryption",
     body:
-        "Inter Galactic is a Matrix client. Messages may be end-to-end encrypted depending on room settings. Losing keys or devices can affect encrypted history recovery. Homeserver and account controls belong to the selected Matrix server.",
+        "Encryption follows room settings. Keep your keys and devices to recover encrypted history.",
     icon: Icons.enhanced_encryption_outlined,
   ),
   OnboardingStep(

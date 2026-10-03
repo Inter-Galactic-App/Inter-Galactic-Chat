@@ -93,9 +93,9 @@ server, public story index, or Matrix account-data fanout service.
   content. If the probe is not confident, Fit falls back to contain so dark or
   ordinary landscape videos are not zoom-cropped.
   **There is no video re-encoder on any platform.** Story video trim was
-  removed on 2026-08-15 together with the bundled `ffmpeg.exe` — see
-  `docs/DECISIONS.md`, *"Story Video Trim Is Removed With The Bundled FFmpeg"*.
-  A source clip is either postable as-is or it is not: over-30-second or
+  removed on 2026-08-15 together with the bundled `ffmpeg.exe`, dropping the
+  licensing and native-build burden of shipping an FFmpeg trim path for a
+  30-second cap. A source clip is either postable as-is or it is not: over-30-second or
   over-size sources are a **validation failure** the person resolves by picking
   a different video, not something the app silently cuts down. That is the
   whole model now, and it is simpler than what it replaced.

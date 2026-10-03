@@ -7,186 +7,229 @@ import 'package:intergalactic/client/matrix/components/url_preview/matrix_url_pr
 import 'package:intergalactic/client/matrix/components/url_preview/url_preview_durable_cache.dart';
 import 'package:intergalactic/client/timeline_events/timeline_event.dart';
 import 'package:intergalactic/client/timeline_events/timeline_event_message.dart';
+import 'package:intergalactic/config/app_globals.dart' as globals;
 import 'package:matrix/matrix.dart' as matrix;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:test/test.dart';
 
 void main() {
-  setUp(() {
+  setUp(() async {
     SharedPreferences.setMockInitialValues({});
+    await globals.preferences.init();
+    // Direct-fetch fallback is opt-in per room encryption state as of
+    // 2026-09-09 - this file's rooms are unencrypted, so only that half needs
+    // granting for its direct-fetch mechanics to remain reachable.
+    await globals.preferences.allowDirectUrlPreviewFallbackInUnencryptedChat
+        .set(true);
   });
 
-  test('direct social preview restores signed thumbnail after room reentry',
-      () async {
-    final prefs = await SharedPreferences.getInstance();
-    final durableCache = UrlPreviewDurableCache(
-      preferences: prefs,
-      prefix: 'url-preview-volatile-reentry-test',
-    );
-    final previewUri =
-        Uri.parse('https://www.tiktok.com/@demo/video/1234567890');
-    final thumbnailUri = Uri.parse(
-      'https://p16-sign-va.tiktokcdn.com/obj/tos-maliva-p-0068/demo.jpeg'
-      '?x-expires=1893456000&x-signature=public-cdn-signature',
-    );
+  test(
+    'direct social preview restores signed thumbnail after room reentry',
+    () async {
+      final prefs = await SharedPreferences.getInstance();
+      final durableCache = UrlPreviewDurableCache(
+        preferences: prefs,
+        prefix: 'url-preview-volatile-reentry-test',
+      );
+      final previewUri = Uri.parse(
+        'https://www.tiktok.com/@demo/video/1234567890',
+      );
+      final thumbnailUri = Uri.parse(
+        'https://p16-sign-va.tiktokcdn.com/obj/tos-maliva-p-0068/demo.jpeg'
+        '?x-expires=1893456000&x-signature=public-cdn-signature',
+      );
 
-    final firstClient = _FakeMatrixClient('client-a');
-    final firstRoom = _FakeRoom(
-      identifier: '!room:example.org',
-      client: firstClient,
-    );
-    final firstEvent = _FakeMessageEvent(
-      eventId: r'$tiktok-first',
-      links: [previewUri],
-    );
-    final firstTimeline = _FakeTimeline(room: firstRoom, events: [firstEvent]);
+      final firstClient = _FakeMatrixClient('client-a');
+      final firstRoom = _FakeRoom(
+        identifier: '!room:example.org',
+        client: firstClient,
+      );
+      final firstEvent = _FakeMessageEvent(
+        eventId: r'$tiktok-first',
+        links: [previewUri],
+      );
+      final firstTimeline = _FakeTimeline(
+        room: firstRoom,
+        events: [firstEvent],
+      );
 
-    var directCalls = 0;
-    var networkCalls = 0;
-    final firstComponent = MatrixUrlPreviewComponent(
-      firstClient,
-      responseFetcher: (_, __) async {
-        networkCalls += 1;
-        return null;
-      },
-      directFetcher: (uri) async {
-        directCalls += 1;
-        return UrlPreviewData(
-          uri,
+      var directCalls = 0;
+      var networkCalls = 0;
+      final firstComponent = MatrixUrlPreviewComponent(
+        firstClient,
+        responseFetcher: (_, __) async {
+          networkCalls += 1;
+          return null;
+        },
+        directFetcher: (uri) async {
+          directCalls += 1;
+          return UrlPreviewData(
+            uri,
+            siteName: 'TikTok',
+            title: 'Fresh TikTok preview',
+            image: NetworkImage(thumbnailUri.toString()),
+            imageUri: thumbnailUri,
+            imageWidth: 1,
+            imageHeight: 1,
+          );
+        },
+        uriNormalizer: (uri) async => uri,
+        matrixClientProvider: (_) => _FakeSdkClient(),
+        durableCache: durableCache,
+      );
+
+      final firstPreview = await firstComponent.getPreview(
+        firstTimeline,
+        firstEvent,
+      );
+
+      expect(firstPreview?.image, isA<NetworkImage>());
+      expect(firstPreview?.imageUri, thumbnailUri);
+      expect(directCalls, 1);
+      expect(networkCalls, 1);
+
+      final secondClient = _FakeMatrixClient('client-b');
+      final secondRoom = _FakeRoom(
+        identifier: '!room:example.org',
+        client: secondClient,
+      );
+      final secondEvent = _FakeMessageEvent(
+        eventId: r'$tiktok-second',
+        links: [previewUri],
+      );
+      final secondTimeline = _FakeTimeline(
+        room: secondRoom,
+        events: [secondEvent],
+      );
+      final secondComponent = MatrixUrlPreviewComponent(
+        secondClient,
+        responseFetcher: (_, __) async {
+          networkCalls += 1;
+          return null;
+        },
+        directFetcher: (_) async {
+          directCalls += 1;
+          return null;
+        },
+        uriNormalizer: (uri) async => uri,
+        matrixClientProvider: (_) => _FakeSdkClient(),
+        durableCache: durableCache,
+      );
+
+      final restoredPreview = await secondComponent.getPreview(
+        secondTimeline,
+        secondEvent,
+      );
+
+      expect(restoredPreview?.title, 'Fresh TikTok preview');
+      expect(restoredPreview?.image, isA<NetworkImage>());
+      expect(restoredPreview?.imageUri, thumbnailUri);
+      expect(directCalls, 1);
+      expect(networkCalls, 1);
+    },
+  );
+
+  test(
+    'transient signed thumbnails expire before durable preview metadata',
+    () async {
+      final prefs = await SharedPreferences.getInstance();
+      var now = DateTime.utc(2026, 6, 15, 12);
+      final durableCache = UrlPreviewDurableCache(
+        preferences: prefs,
+        now: () => now,
+        volatileImageTtl: const Duration(hours: 1),
+        prefix: 'url-preview-volatile-image-expiry-test',
+      );
+      final previewUri = Uri.parse(
+        'https://www.tiktok.com/@demo/video/1234567890',
+      );
+      final thumbnailUri = Uri.parse(
+        'https://p16-sign-va.tiktokcdn.com/obj/tos-maliva-p-0068/demo.jpeg'
+        '?x-expires=1893456000&x-signature=public-cdn-signature',
+      );
+
+      await durableCache.put(
+        previewUri,
+        UrlPreviewData(
+          previewUri,
           siteName: 'TikTok',
-          title: 'Fresh TikTok preview',
+          title: 'Stored TikTok preview',
           image: NetworkImage(thumbnailUri.toString()),
           imageUri: thumbnailUri,
           imageWidth: 1,
           imageHeight: 1,
-        );
-      },
-      uriNormalizer: (uri) async => uri,
-      matrixClientProvider: (_) => _FakeSdkClient(),
-      durableCache: durableCache,
-    );
+        ),
+      );
 
-    final firstPreview =
-        await firstComponent.getPreview(firstTimeline, firstEvent);
+      final freshHit = await durableCache.get(previewUri, _FakeSdkClient());
+      expect(freshHit?.data.title, 'Stored TikTok preview');
+      expect(freshHit?.data.image, isA<NetworkImage>());
+      expect(freshHit?.data.imageUri, thumbnailUri);
+      expect(freshHit?.data.volatileImageOmitted, isTrue);
 
-    expect(firstPreview?.image, isA<NetworkImage>());
-    expect(firstPreview?.imageUri, thumbnailUri);
-    expect(directCalls, 1);
-    expect(networkCalls, 1);
+      now = now.add(const Duration(hours: 2));
 
-    final secondClient = _FakeMatrixClient('client-b');
-    final secondRoom = _FakeRoom(
-      identifier: '!room:example.org',
-      client: secondClient,
-    );
-    final secondEvent = _FakeMessageEvent(
-      eventId: r'$tiktok-second',
-      links: [previewUri],
-    );
-    final secondTimeline =
-        _FakeTimeline(room: secondRoom, events: [secondEvent]);
-    final secondComponent = MatrixUrlPreviewComponent(
-      secondClient,
-      responseFetcher: (_, __) async {
-        networkCalls += 1;
-        return null;
-      },
-      directFetcher: (_) async {
-        directCalls += 1;
-        return null;
-      },
-      uriNormalizer: (uri) async => uri,
-      matrixClientProvider: (_) => _FakeSdkClient(),
-      durableCache: durableCache,
-    );
+      final expiredHit = await durableCache.get(previewUri, _FakeSdkClient());
+      expect(expiredHit?.data.title, 'Stored TikTok preview');
+      expect(expiredHit?.data.image, isNull);
+      expect(expiredHit?.data.imageUri, isNull);
+      expect(expiredHit?.data.volatileImageOmitted, isTrue);
+    },
+  );
 
-    final restoredPreview =
-        await secondComponent.getPreview(secondTimeline, secondEvent);
+  test(
+    'transient signed thumbnails with token queries are not persisted',
+    () async {
+      final prefs = await SharedPreferences.getInstance();
+      final durableCache = UrlPreviewDurableCache(
+        preferences: prefs,
+        prefix: 'url-preview-volatile-secret-image-test',
+      );
+      final previewUri = Uri.parse(
+        'https://www.tiktok.com/@demo/video/1234567890',
+      );
+      final thumbnailUri = Uri.parse(
+        'https://p16-sign-va.tiktokcdn.com/obj/tos-maliva-p-0068/demo.jpeg'
+        '?x-expires=1893456000'
+        '&x-signature=public-cdn-signature'
+        '&access_token=super-secret',
+      );
 
-    expect(restoredPreview?.title, 'Fresh TikTok preview');
-    expect(restoredPreview?.image, isA<NetworkImage>());
-    expect(restoredPreview?.imageUri, thumbnailUri);
-    expect(directCalls, 1);
-    expect(networkCalls, 1);
-  });
+      await durableCache.put(
+        previewUri,
+        UrlPreviewData(
+          previewUri,
+          title: 'Stored TikTok preview',
+          image: NetworkImage(thumbnailUri.toString()),
+          imageUri: thumbnailUri,
+        ),
+      );
 
-  test('transient signed thumbnails expire before durable preview metadata',
-      () async {
+      final hit = await durableCache.get(previewUri, _FakeSdkClient());
+
+      expect(hit?.data.title, 'Stored TikTok preview');
+      expect(hit?.data.image, isNull);
+      expect(hit?.data.imageUri, isNull);
+      expect(hit?.data.volatileImageOmitted, isTrue);
+    },
+  );
+
+  test('site-name-only previews are not persisted across restarts', () async {
     final prefs = await SharedPreferences.getInstance();
-    var now = DateTime.utc(2026, 6, 15, 12);
+    const cachePrefix = 'url-preview-contentless-write-test';
     final durableCache = UrlPreviewDurableCache(
       preferences: prefs,
-      now: () => now,
-      volatileImageTtl: const Duration(hours: 1),
-      prefix: 'url-preview-volatile-image-expiry-test',
+      prefix: cachePrefix,
     );
-    final previewUri =
-        Uri.parse('https://www.tiktok.com/@demo/video/1234567890');
-    final thumbnailUri = Uri.parse(
-      'https://p16-sign-va.tiktokcdn.com/obj/tos-maliva-p-0068/demo.jpeg'
-      '?x-expires=1893456000&x-signature=public-cdn-signature',
-    );
+    final previewUri = Uri.parse('https://www.tiktok.com/@demo/video/123');
 
     await durableCache.put(
       previewUri,
-      UrlPreviewData(
-        previewUri,
-        siteName: 'TikTok',
-        title: 'Stored TikTok preview',
-        image: NetworkImage(thumbnailUri.toString()),
-        imageUri: thumbnailUri,
-        imageWidth: 1,
-        imageHeight: 1,
-      ),
+      UrlPreviewData(previewUri, siteName: 'TikTok'),
     );
 
-    final freshHit = await durableCache.get(previewUri, _FakeSdkClient());
-    expect(freshHit?.data.title, 'Stored TikTok preview');
-    expect(freshHit?.data.image, isA<NetworkImage>());
-    expect(freshHit?.data.imageUri, thumbnailUri);
-    expect(freshHit?.data.volatileImageOmitted, isTrue);
-
-    now = now.add(const Duration(hours: 2));
-
-    final expiredHit = await durableCache.get(previewUri, _FakeSdkClient());
-    expect(expiredHit?.data.title, 'Stored TikTok preview');
-    expect(expiredHit?.data.image, isNull);
-    expect(expiredHit?.data.imageUri, isNull);
-    expect(expiredHit?.data.volatileImageOmitted, isTrue);
-  });
-
-  test('transient signed thumbnails with token queries are not persisted',
-      () async {
-    final prefs = await SharedPreferences.getInstance();
-    final durableCache = UrlPreviewDurableCache(
-      preferences: prefs,
-      prefix: 'url-preview-volatile-secret-image-test',
-    );
-    final previewUri =
-        Uri.parse('https://www.tiktok.com/@demo/video/1234567890');
-    final thumbnailUri = Uri.parse(
-      'https://p16-sign-va.tiktokcdn.com/obj/tos-maliva-p-0068/demo.jpeg'
-      '?x-expires=1893456000'
-      '&x-signature=public-cdn-signature'
-      '&access_token=super-secret',
-    );
-
-    await durableCache.put(
-      previewUri,
-      UrlPreviewData(
-        previewUri,
-        title: 'Stored TikTok preview',
-        image: NetworkImage(thumbnailUri.toString()),
-        imageUri: thumbnailUri,
-      ),
-    );
-
-    final hit = await durableCache.get(previewUri, _FakeSdkClient());
-
-    expect(hit?.data.title, 'Stored TikTok preview');
-    expect(hit?.data.image, isNull);
-    expect(hit?.data.imageUri, isNull);
-    expect(hit?.data.volatileImageOmitted, isTrue);
+    expect(await durableCache.get(previewUri, _FakeSdkClient()), isNull);
+    expect(prefs.getStringList('$cachePrefix.index'), anyOf(isNull, isEmpty));
   });
 }
 
@@ -206,10 +249,7 @@ class _FakeSdkClient implements matrix.Client {
 }
 
 class _FakeRoom implements Room {
-  _FakeRoom({
-    required this.identifier,
-    required this.client,
-  });
+  _FakeRoom({required this.identifier, required this.client});
 
   @override
   final String identifier;
@@ -231,10 +271,7 @@ class _FakeRoom implements Room {
 }
 
 class _FakeTimeline extends Timeline {
-  _FakeTimeline({
-    required Room room,
-    required List<TimelineEvent> events,
-  }) {
+  _FakeTimeline({required Room room, required List<TimelineEvent> events}) {
     this.room = room;
     client = room.client;
     this.events = List<TimelineEvent>.from(events);
@@ -281,10 +318,8 @@ class _FakeTimeline extends Timeline {
 }
 
 class _FakeMessageEvent implements TimelineEventMessage {
-  _FakeMessageEvent({
-    required this.eventId,
-    required List<Uri> links,
-  }) : _links = links;
+  _FakeMessageEvent({required this.eventId, required List<Uri> links})
+    : _links = links;
 
   final List<Uri> _links;
 

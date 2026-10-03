@@ -160,7 +160,34 @@ class VoipRemoteAudioReasons {
   static const mediaAttachStalled = 'remote_media_attach_stalled';
 }
 
+/// What a repair step did, when the step can tell the difference.
+///
+/// WHY THIS EXISTS. `repair` used to record `repaired: true` for any step that
+/// returned without throwing, which conflates "the step RAN" with "the fault is
+/// FIXED". Those came apart in the field: the `rebuildStreamOrSink` step for a
+/// missing audio sink reaches an early return that only notifies listeners,
+/// changes nothing, and cannot fail - so a participant stayed inaudible until a
+/// rejoin while every log line said the repair had been applied. A
+/// self-describing failure that does not self-repair is worse than an
+/// undiagnosed one, because the log looks like the system handling it.
+///
+/// Returning null keeps the old meaning: the step has no opinion and running
+/// without throwing counts as a repair. Only a step that can DETECT it did
+/// nothing should say so.
 typedef VoipRemoteAudioRepairStep = FutureOr<void> Function();
+
+/// Asked, after a step has run without throwing, whether it changed anything.
+///
+/// A REPORTER RATHER THAN A RETURN VALUE, deliberately. Making steps return an
+/// outcome types the distinction at every step site, but it also makes every
+/// void-bodied step - which is nearly all of them, in production and in tests -
+/// an analyzer warning for completing without returning a value, and the CI
+/// gate treats warnings as fatal. So the one step that can detect it did
+/// nothing reports through this, and the other four are untouched.
+///
+/// Only consulted on the success path. A step that threw is a failure, and a
+/// step that never ran was never attempted; neither is this.
+typedef VoipRemoteAudioRepairIneffective = bool Function();
 typedef VoipRemoteAudioRepairIsActive = bool Function();
 typedef VoipRemoteAudioRepairErrorHandler =
     void Function(
@@ -175,6 +202,7 @@ class VoipRemoteAudioRepairResult {
     required this.reason,
     required this.attempted,
     required this.repaired,
+    this.ineffective = false,
     this.inactive = false,
     this.error,
     this.stackTrace,
@@ -184,6 +212,12 @@ class VoipRemoteAudioRepairResult {
   final String reason;
   final bool attempted;
   final bool repaired;
+
+  /// The step ran to completion and reported that it changed nothing. Distinct
+  /// from [failed] (which threw) and from `attempted == false` (which never
+  /// ran), because this is the case that used to be indistinguishable from
+  /// success.
+  final bool ineffective;
   final bool inactive;
   final Object? error;
   final StackTrace? stackTrace;
@@ -203,6 +237,7 @@ class VoipRemoteAudioReconciler {
     VoipRemoteAudioRepairStep? removeStream,
     VoipRemoteAudioRepairIsActive? isActive,
     VoipRemoteAudioRepairErrorHandler? onError,
+    VoipRemoteAudioRepairIneffective? stepWasIneffective,
   }) async {
     final step = _stepForAction(
       reconciliation.action,
@@ -243,11 +278,15 @@ class VoipRemoteAudioReconciler {
           inactive: true,
         );
       }
+      // No reporter means the old answer: a step that ran without throwing
+      // counts as a repair. Only a step that can DETECT it did nothing says so.
+      final ineffective = stepWasIneffective?.call() ?? false;
       return VoipRemoteAudioRepairResult(
         action: reconciliation.action,
         reason: reconciliation.reason,
         attempted: true,
-        repaired: true,
+        repaired: !ineffective,
+        ineffective: ineffective,
       );
     } catch (error, stackTrace) {
       if (!_isActive(isActive)) {
@@ -347,6 +386,16 @@ class VoipRemoteMediaAttachMonitor {
     );
 
     if (!wanted || sinkAttached) {
+      // WHICH of the two restarted the window is the question a capture cannot
+      // answer without being told. The 2026-09-07 field case arrived under a
+      // publication that never changed - no republish, no new SID - so
+      // `!wanted` and `sinkAttached` are different stories about it: the first
+      // means the app stopped wanting the media (a mute, or its own
+      // receive-priority policy dropping an off-screen tile), the second means
+      // the sink was attaching and detaching under a publication that looked
+      // stable. Recording the reason is the difference between one capture
+      // deciding it and another round of inference.
+      entry.lastRestartReason = wanted ? 'sink_attached' : 'not_wanted';
       // Restart the attach window, but KEEP the entry. Removing it discarded
       // `repairCount` and `lastRepairAt` too, so a publication that alternates
       // between wanted and unwanted - exactly the hidden screen-share tile,
@@ -371,6 +420,34 @@ class VoipRemoteMediaAttachMonitor {
     return true;
   }
 
+  /// The three gate values behind [recordObservation]'s answer, for logging.
+  ///
+  /// WHY THIS IS A DIAGNOSTIC AND NOT A GETTER PER FIELD. When an escalation to
+  /// `resubscribe` does not happen, exactly one of three gates held it back -
+  /// still inside [attachWindow], [maxRepairs] spent, or inside
+  /// [repairCooldown] - and a capture that reports only the chosen action
+  /// cannot say which. That happened on the owner's 2026-09-07 capture and left
+  /// three live hypotheses where the log could have left none. Emitting all
+  /// three together is what makes one capture decisive.
+  ///
+  /// Returns null when [sid] has never been observed.
+  String? describeGateState(String sid, DateTime now) {
+    final entry = _entries[sid];
+    if (entry == null) {
+      return null;
+    }
+    final lastRepairAt = entry.lastRepairAt;
+    final sinceRepair = lastRepairAt == null
+        ? 'never'
+        : '${now.difference(lastRepairAt).inSeconds}s';
+    return 'wanted_for=${now.difference(entry.firstWantedAt).inSeconds}s '
+        'attach_window=${attachWindow.inSeconds}s '
+        'window_restart=${entry.lastRestartReason ?? 'none'} '
+        'repairs=${entry.repairCount}/$maxRepairs '
+        'since_repair=$sinceRepair '
+        'cooldown=${repairCooldown.inSeconds}s';
+  }
+
   /// Marks that a repair ran for [sid] and restarts its observation window.
   void recordRepair(String sid, DateTime now) {
     final entry = _entries[sid];
@@ -380,6 +457,7 @@ class VoipRemoteMediaAttachMonitor {
     entry.repairCount += 1;
     entry.lastRepairAt = now;
     entry.firstWantedAt = now;
+    entry.lastRestartReason = 'repair';
   }
 
   /// Drops tracking for publications that no longer exist.
@@ -396,6 +474,10 @@ class _VoipRemoteMediaAttachEntry {
   DateTime firstWantedAt;
   int repairCount = 0;
   DateTime? lastRepairAt;
+
+  /// Why [firstWantedAt] was last moved forward: `not_wanted`, `sink_attached`
+  /// or `repair`. Null until something has restarted it.
+  String? lastRestartReason;
 }
 
 /// Tracks whether a subscribed remote audio publication has ever delivered

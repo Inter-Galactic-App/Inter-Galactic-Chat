@@ -2,10 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:http/http.dart' as http;
 import 'package:intergalactic/client/matrix/matrix_client.dart';
 import 'package:intergalactic/client/matrix/matrix_room.dart';
 import 'package:intergalactic/debug/log.dart';
+import 'package:intergalactic/utils/database/database_release_trigger.dart';
 import 'package:matrix/encryption.dart' as matrix_crypto;
 import 'package:matrix/matrix.dart' as matrix;
 
@@ -54,9 +56,7 @@ bool matrixHistoryDeviceEligibleForKeyShare(matrix.DeviceKeys device) {
   return device.deviceId != null && !device.blocked && device.encryptToDevice;
 }
 
-bool matrixHistoryBundleDeclaredFileSizesAreSafe(
-  Map<String, dynamic> file,
-) {
+bool matrixHistoryBundleDeclaredFileSizesAreSafe(Map<String, dynamic> file) {
   final plaintextSize = _nonNegativeIntValue(file['size']);
   final encryptedSize = _nonNegativeIntValue(file['encrypted_size']);
   return plaintextSize != null &&
@@ -144,10 +144,29 @@ String _matrixHistoryAutoKeyShareRequestKey({
   ].join('\u0000');
 }
 
+/// What a key-request response did.
+///
+/// A `bool` could not carry the difference between "we declined this" and "we
+/// could not act yet", and the interactive break-glass path is the caller that
+/// needs it: the user has already approved an ineligible device by the time
+/// the response is attempted, so a deferral that reads as a refusal spends a
+/// consent and shows nothing.
+enum MatrixKeyRequestOutcome {
+  /// The forwarded key was dispatched.
+  fulfilled,
+
+  /// Declined on policy, or the session is not available here. Retrying with
+  /// the same inputs would decline again.
+  refused,
+
+  /// Not attempted, because the encryption store was released and did not
+  /// come back. The same request can succeed later, so callers must not treat
+  /// it as an answer.
+  deferred,
+}
+
 class MatrixHistoryShareReport {
-  MatrixHistoryShareReport({
-    required this.targetUserIds,
-  });
+  MatrixHistoryShareReport({required this.targetUserIds});
 
   final List<String> targetUserIds;
   final List<String> usersWithEligibleDevices = <String>[];
@@ -168,6 +187,12 @@ class MatrixHistoryShareReport {
   int bundleImportedSessionCount = 0;
   int ineligibleRequestsIgnored = 0;
   int blockedRequestsIgnored = 0;
+
+  /// Requests that could not be answered because the encryption store was
+  /// released. Counted separately from the ignored ones: those are decisions,
+  /// this is a deferral, and a reader who cannot tell them apart will conclude
+  /// the device was refused.
+  int deferredRequests = 0;
 
   bool get hasFailures => failures.isNotEmpty;
 
@@ -202,6 +227,7 @@ class MatrixHistoryShareReport {
       "Bundles sent:                $bundleCount",
       "Ineligible requests ignored: $ineligibleRequestsIgnored",
       "Blocked requests ignored:    $blockedRequestsIgnored",
+      "Deferred (storage resuming): $deferredRequests",
     ];
 
     if (failures.isNotEmpty) {
@@ -210,17 +236,30 @@ class MatrixHistoryShareReport {
       lines.addAll(failures.map((failure) => "- $failure"));
     }
 
+    if (deferredRequests > 0) {
+      lines.add("");
+      lines.add(
+        "NOTE: $deferredRequests request(s) arrived while encryption storage "
+        "was resuming and were not answered. Nothing was refused - ask the "
+        "target to request the keys again.",
+      );
+    }
+
     if (usersWithoutEligibleDevices.isNotEmpty) {
       lines.add("");
-      lines.add("NOTE: Users with no devices eligible under your key-sharing "
-          "policy will not receive automatic history.");
+      lines.add(
+        "NOTE: Users with no devices eligible under your key-sharing "
+        "policy will not receive automatic history.",
+      );
     }
 
     if (sharedDeviceDeliveries > 0 && sharedSessionCount > 0) {
       lines.add("");
-      lines.add("Keys were dispatched to eligible devices. If the target "
-          "still cannot decrypt, ask them to open an undecryptable message "
-          "and re-request encryption keys, then run /sharehistory again.");
+      lines.add(
+        "Keys were dispatched to eligible devices. If the target "
+        "still cannot decrypt, ask them to open an undecryptable message "
+        "and re-request encryption keys, then run /sharehistory again.",
+      );
     }
 
     return lines.join('\n');
@@ -260,12 +299,13 @@ MatrixHistoryShareTargetResolution matrixHistoryResolveShareTargets({
 }) {
   const usage = 'Usage: /sharehistory @user:server [@user2:server ...]';
   final joined = joinedUserIds.toSet();
-  final explicit = explicitTargetUserIds
-      .where((userId) => userId.trim().isNotEmpty)
-      .map((userId) => userId.trim())
-      .toSet()
-      .toList()
-    ..sort();
+  final explicit =
+      explicitTargetUserIds
+          .where((userId) => userId.trim().isNotEmpty)
+          .map((userId) => userId.trim())
+          .toSet()
+          .toList()
+        ..sort();
 
   if (explicit.isEmpty) {
     final candidates = joined.where((userId) => userId != selfUserId).toList()
@@ -286,27 +326,32 @@ MatrixHistoryShareTargetResolution matrixHistoryResolveShareTargets({
 
     return MatrixHistoryShareTargetResolution(
       targetUserIds: const <String>[],
-      issue: '$usage\n\nI found ${candidates.length} other joined members. '
+      issue:
+          '$usage\n\nI found ${candidates.length} other joined members. '
           'Add the full Matrix user ID for each member you want to help.',
     );
   }
 
-  final invalidTargets =
-      explicit.where((userId) => !userId.isValidMatrixId).toList();
+  final invalidTargets = explicit
+      .where((userId) => !userId.isValidMatrixId)
+      .toList();
   if (invalidTargets.isNotEmpty) {
     return MatrixHistoryShareTargetResolution(
       targetUserIds: const <String>[],
-      issue: 'These targets are not full Matrix user IDs: '
+      issue:
+          'These targets are not full Matrix user IDs: '
           '${invalidTargets.join(', ')}\n\n$usage',
     );
   }
 
-  final missingUsers =
-      explicit.where((userId) => !joined.contains(userId)).toList();
+  final missingUsers = explicit
+      .where((userId) => !joined.contains(userId))
+      .toList();
   if (missingUsers.isNotEmpty) {
     return MatrixHistoryShareTargetResolution(
       targetUserIds: const <String>[],
-      issue: 'These users are not currently joined to the room: '
+      issue:
+          'These users are not currently joined to the room: '
           '${missingUsers.join(', ')}\n\nIf they just joined, wait for the '
           'member list to sync and try again.',
     );
@@ -316,9 +361,7 @@ MatrixHistoryShareTargetResolution matrixHistoryResolveShareTargets({
 }
 
 class MatrixHistoryBundleImportReport {
-  MatrixHistoryBundleImportReport({
-    required this.roomId,
-  });
+  MatrixHistoryBundleImportReport({required this.roomId});
 
   final String roomId;
   int pendingBundleCount = 0;
@@ -381,8 +424,9 @@ extension MatrixHistorySharing on MatrixClient {
     for (final userId in targetUserIds) {
       final devices = _knownTargetDevicesForUser(matrixClient, userId);
       final verified = devices.where((device) => device.verified).toList();
-      final unverified =
-          devices.where((device) => !device.verified).toList(growable: false);
+      final unverified = devices
+          .where((device) => !device.verified)
+          .toList(growable: false);
       final eligible = devices
           .where(matrixHistoryDeviceEligibleForKeyShare)
           .toList(growable: false);
@@ -499,7 +543,7 @@ extension MatrixHistorySharing on MatrixClient {
     return report;
   }
 
-  Future<bool> respondToRoomKeyRequest(
+  Future<MatrixKeyRequestOutcome> respondToRoomKeyRequest(
     MatrixRoom room,
     matrix_crypto.RoomKeyRequest request,
     MatrixHistoryShareReport report, {
@@ -507,19 +551,19 @@ extension MatrixHistorySharing on MatrixClient {
   }) async {
     final encryption = matrixClient.encryption;
     if (encryption == null || !matrixClient.encryptionEnabled) {
-      return false;
+      return MatrixKeyRequestOutcome.refused;
     }
 
     if (request.request.canceled) {
-      return false;
+      return MatrixKeyRequestOutcome.refused;
     }
 
     if (!report.targetUserIds.contains(request.sender)) {
-      return false;
+      return MatrixKeyRequestOutcome.refused;
     }
 
     if (request.room.id != room.identifier) {
-      return false;
+      return MatrixKeyRequestOutcome.refused;
     }
 
     final device = request.requestingDevice;
@@ -531,7 +575,7 @@ extension MatrixHistorySharing on MatrixClient {
         "user=${_matrixHistoryLogHash(device.userId)} "
         "device=${_matrixHistoryLogHash(device.deviceId)}",
       );
-      return false;
+      return MatrixKeyRequestOutcome.refused;
     }
 
     final eligibleDevice = matrixHistoryDeviceEligibleForKeyShare(device);
@@ -543,10 +587,40 @@ extension MatrixHistorySharing on MatrixClient {
         "user=${_matrixHistoryLogHash(device.userId)} "
         "device=${_matrixHistoryLogHash(device.deviceId)}",
       );
-      return false;
+      return MatrixKeyRequestOutcome.refused;
     }
 
     final sessionId = request.request.sessionId;
+
+    // Same gate the presence reads use, for the same reason. An inbound key
+    // request served just after a database release reaches
+    // loadInboundGroupSession on a released connection, which throws by
+    // design - 76 times in each of two phone logs on builds with no wake
+    // code, so this predates the release trigger and is only made more
+    // frequent by it. Deferring here rather than throwing lets the caller
+    // report it and the requester retry.
+    //
+    // TIMING, because the name suggests otherwise: `waitForDatabase` does not
+    // answer false the moment a database is released. It WAITS, and answers
+    // false only when a resume fails under it - and a failed resume re-arms
+    // the gate, so a caller that starts after the failure waits for the
+    // following resume. A request arriving mid-suspension therefore blocks
+    // here until the store comes back, which is what we want on this path:
+    // the answer is worth more late than never, and the caller is already
+    // async.
+    if (!await DatabaseReleaseTrigger.waitForDatabase('key_request.respond')) {
+      Log.w(
+        "respondToRoomKeyRequest: deferred, database unavailable "
+        "room=${_matrixHistoryLogHash(room.identifier)} "
+        "session=${_matrixHistoryLogHash(sessionId)}",
+      );
+      report.deferredRequests += 1;
+      // DEFERRED, not refused. Nothing was decided about this device: the
+      // store was released and did not come back in time, and the same
+      // request can be answered later.
+      return MatrixKeyRequestOutcome.deferred;
+    }
+
     final session = await encryption.keyManager.loadInboundGroupSession(
       room.identifier,
       sessionId,
@@ -557,7 +631,7 @@ extension MatrixHistorySharing on MatrixClient {
         "respondToRoomKeyRequest: session=${_matrixHistoryLogHash(sessionId)} "
         "not available locally",
       );
-      return false;
+      return MatrixKeyRequestOutcome.refused;
     }
 
     final payload = _buildForwardedRoomKeyPayload(encryption, session!);
@@ -580,15 +654,16 @@ extension MatrixHistorySharing on MatrixClient {
         "eligible=$eligibleDevice "
         "verified=${device.verified}",
       );
-      return true;
+      return MatrixKeyRequestOutcome.fulfilled;
     } catch (error, stack) {
-      final msg = "Failed to fulfil key request "
+      final msg =
+          "Failed to fulfil key request "
           "session=${_matrixHistoryLogHash(sessionId)} "
           "user=${_matrixHistoryLogHash(device.userId)} "
           "error=${_matrixHistoryLogError(error)}";
       report.failures.add(msg);
       Log.onError(error, stack, content: "respondToRoomKeyRequest: $msg");
-      return false;
+      return MatrixKeyRequestOutcome.refused;
     }
   }
 
@@ -604,8 +679,9 @@ extension MatrixHistorySharing on MatrixClient {
           !requestedTargets.containsAll(previewTargets)) {
         throw ArgumentError('preview targets must match targetUserIds');
       }
-      if (preview.eligibleDevices
-          .any((device) => !requestedTargets.contains(device.userId))) {
+      if (preview.eligibleDevices.any(
+        (device) => !requestedTargets.contains(device.userId),
+      )) {
         throw ArgumentError('preview devices must match targetUserIds');
       }
     } else {
@@ -639,6 +715,23 @@ extension MatrixHistorySharing on MatrixClient {
 
   Future<void> stopSharedHistoryBundleListener() async {
     await _historySharingRuntimes[this]?.stop();
+  }
+
+  /// Test-only entry to the auto-share handler for one key request.
+  ///
+  /// The database gate lives inside `_handleRoomKeyRequest`, on a private
+  /// runtime reached only through an [Expando] and driven only by the SDK's
+  /// `onRoomKeyRequest` stream. A test that pushed an event through that
+  /// stream would be asserting the SDK's controller and the listener wiring;
+  /// this enters the unit that contains the gate, which is the thing that
+  /// must not be removed. The handler is also `unawaited` in production, so
+  /// this returning a future is what lets a test observe it mid-flight.
+  @visibleForTesting
+  Future<void> debugHandleRoomKeyRequestForTesting(
+    matrix_crypto.RoomKeyRequest request,
+  ) {
+    _historySharingRuntimes[this] ??= _MatrixHistorySharingRuntime(this);
+    return _historySharingRuntimes[this]!._handleRoomKeyRequest(request);
   }
 
   Future<MatrixHistoryBundleImportReport> acceptPendingSharedHistoryForRoom(
@@ -688,7 +781,8 @@ extension MatrixHistorySharing on MatrixClient {
       report.sharedDeviceDeliveries += devices.length;
       report.markSessionShared(sessionId);
     } catch (error, stack) {
-      final msg = "Failed sending session=${_matrixHistoryLogHash(sessionId)} "
+      final msg =
+          "Failed sending session=${_matrixHistoryLogHash(sessionId)} "
           "error=${_matrixHistoryLogError(error)}";
       report.failures.add(msg);
       Log.onError(error, stack, content: "shareHistoryKeys: $msg");
@@ -722,8 +816,9 @@ extension MatrixHistorySharing on MatrixClient {
       if (session?.inboundGroupSession == null) {
         report.skippedSessionIds.add(sessionId);
         report.withheldSessionIds.add(sessionId);
-        withheld
-            .add(_withheldRecord(room.identifier, sessionId, 'm.unavailable'));
+        withheld.add(
+          _withheldRecord(room.identifier, sessionId, 'm.unavailable'),
+        );
         continue;
       }
 
@@ -779,8 +874,9 @@ extension MatrixHistorySharing on MatrixClient {
       ),
     );
 
-    payload['forwarding_curve25519_key_chain'] =
-        List<String>.from(session.forwardingCurve25519KeyChain);
+    payload['forwarding_curve25519_key_chain'] = List<String>.from(
+      session.forwardingCurve25519KeyChain,
+    );
 
     if ((session.senderKey as String).isNotEmpty) {
       payload['sender_key'] = session.senderKey;
@@ -842,6 +938,26 @@ class _MatrixHistorySharingRuntime {
     final visibilityAllowsSharing = matrixHistoryVisibilityAllowsInviteSharing(
       room.matrixRoom.historyVisibility,
     );
+    // `_requesterIsJoined` reads the participant list, which reaches
+    // `client.database.getUsers` in the SDK - the same released-store hazard
+    // `respondToRoomKeyRequest` gates against, met earlier in the same
+    // request. It is also OUTSIDE the try below, so a throw here does not
+    // become the `autoHistoryShare: failed` line: it escapes the unawaited
+    // listener into the zone and the request disappears with no record at
+    // all. Gate first, so one released store produces one outcome for the
+    // whole request rather than a different one per read.
+    if (!await DatabaseReleaseTrigger.waitForDatabase(
+      'key_request.participants',
+    )) {
+      Log.w(
+        "autoHistoryShare: deferred, database unavailable "
+        "room=${_matrixHistoryLogHash(room.identifier)} "
+        "target=${_matrixHistoryLogHash(requesterUserId)} "
+        "session=${_matrixHistoryLogHash(request.request.sessionId)}",
+      );
+      return;
+    }
+
     final requesterIsJoined = await _requesterIsJoined(
       room.matrixRoom,
       requesterUserId,
@@ -887,14 +1003,15 @@ class _MatrixHistorySharingRuntime {
       targetUserIds: <String>[requesterUserId],
     );
     try {
-      final sent = await client.respondToRoomKeyRequest(
+      final outcome = await client.respondToRoomKeyRequest(
         room,
         request,
         report,
         allowIneligibleDevice: false,
       );
+      final sent = outcome == MatrixKeyRequestOutcome.fulfilled;
       Log.i(
-        "autoHistoryShare: ${sent ? 'fulfilled' : 'not_fulfilled'} "
+        "autoHistoryShare: ${outcome.name} "
         "room=${_matrixHistoryLogHash(room.identifier)} "
         "target=${_matrixHistoryLogHash(requesterUserId)} "
         "device=${_matrixHistoryLogHash(requestingDevice.deviceId)} "
@@ -909,7 +1026,8 @@ class _MatrixHistorySharingRuntime {
       Log.onError(
         error,
         stack,
-        content: "autoHistoryShare: failed "
+        content:
+            "autoHistoryShare: failed "
             "room=${_matrixHistoryLogHash(room.identifier)} "
             "target=${_matrixHistoryLogHash(requesterUserId)} "
             "device=${_matrixHistoryLogHash(requestingDevice.deviceId)} "
@@ -1013,8 +1131,9 @@ class _MatrixHistorySharingRuntime {
       _pendingBundles.remove(bundle);
     }
     report.rejectedBundleCount += mismatched.length;
-    report.pendingBundleCount =
-        _pendingBundles.where((bundle) => bundle.roomId == roomId).length;
+    report.pendingBundleCount = _pendingBundles
+        .where((bundle) => bundle.roomId == roomId)
+        .length;
 
     if (matching.isEmpty) {
       Log.i(
@@ -1043,15 +1162,17 @@ class _MatrixHistorySharingRuntime {
         Log.onError(
           error,
           stack,
-          content: "historyBundle: failed import "
+          content:
+              "historyBundle: failed import "
               "room=${_matrixHistoryLogHash(roomId)} "
               "sender=${_matrixHistoryLogHash(bundle.senderUserId)} "
               "error=${_matrixHistoryLogError(error)}",
         );
       }
     }
-    report.pendingBundleCount =
-        _pendingBundles.where((bundle) => bundle.roomId == roomId).length;
+    report.pendingBundleCount = _pendingBundles
+        .where((bundle) => bundle.roomId == roomId)
+        .length;
 
     Log.i(
       "historyBundle: import result "
@@ -1127,9 +1248,7 @@ class _MatrixHistorySharingRuntime {
       final sessionKey = _stringValue(payload['session_key']);
       final claimedEd25519 =
           _stringValue(payload['sender_claimed_ed25519_key']) ??
-              _stringValue(
-                _mapValue(payload['sender_claimed_keys'])?['ed25519'],
-              );
+          _stringValue(_mapValue(payload['sender_claimed_keys'])?['ed25519']);
 
       if (sessionId == null ||
           senderKey == null ||
@@ -1208,12 +1327,14 @@ class _MatrixHistorySharingRuntime {
     }
 
     final decrypted = await client.matrixClient.nativeImplementations
-        .decryptFile(matrix.EncryptedFile(
-      data: encryptedBytes,
-      k: k,
-      iv: iv,
-      sha256: sha256,
-    ));
+        .decryptFile(
+          matrix.EncryptedFile(
+            data: encryptedBytes,
+            k: k,
+            iv: iv,
+            sha256: sha256,
+          ),
+        );
 
     if (decrypted == null || decrypted.length > _maxEncryptedBundleBytes) {
       throw StateError("Encrypted bundle file could not be decrypted.");
@@ -1228,8 +1349,9 @@ class _MatrixHistorySharingRuntime {
     Uri mxcUri, {
     required int maxBytes,
   }) async {
-    final downloadUri = await matrix.MxcUriExtension(mxcUri)
-        .getDownloadUri(client.matrixClient);
+    final downloadUri = await matrix.MxcUriExtension(
+      mxcUri,
+    ).getDownloadUri(client.matrixClient);
     final request = http.Request('GET', downloadUri);
     final accessToken = client.matrixClient.accessToken;
     if (accessToken != null) {
@@ -1255,8 +1377,9 @@ class _MatrixHistorySharingRuntime {
     final bytes = BytesBuilder(copy: false);
     var received = 0;
     try {
-      await for (final chunk
-          in response.stream.timeout(_encryptedBundleDownloadTimeout)) {
+      await for (final chunk in response.stream.timeout(
+        _encryptedBundleDownloadTimeout,
+      )) {
         received += chunk.length;
         if (received > maxBytes) {
           throw StateError("Encrypted bundle file is too large.");
@@ -1363,9 +1486,7 @@ Map<String, dynamic> _bundleToDeviceContent({
         'key_ops': <String>['encrypt', 'decrypt'],
         'kty': 'oct',
       },
-      'hashes': <String, dynamic>{
-        'sha256': encrypted.sha256,
-      },
+      'hashes': <String, dynamic>{'sha256': encrypted.sha256},
     },
   };
 }

@@ -159,6 +159,42 @@ void main() {
       },
     );
 
+    test(
+      'reapplies newer background state after a timed-out platform reply completes late',
+      () async {
+        final platform = _ControlledMobileCallBackgroundPlatform();
+        final controller = MobileCallBackgroundController(
+          platform: platform,
+          platformCallTimeout: const Duration(milliseconds: 1),
+        );
+        final session = _FakeVoipSession(
+          client: _FakeClient(identifier: 'client-a'),
+          sessionId: 'session-a',
+          state: VoipState.connected,
+        );
+
+        final activeSync = controller.syncSessions([session]);
+        await _waitForMobileCallBackgroundRequests(platform, 1);
+
+        session.state = VoipState.ended;
+        final inactiveSync = controller.syncSessions([session]);
+        await activeSync;
+        await _waitForMobileCallBackgroundRequests(platform, 2);
+
+        platform.completeRequest(1);
+        await inactiveSync;
+        expect(platform.requests.map((request) => request.active), [
+          true,
+          false,
+        ]);
+
+        platform.completeRequest(0);
+        await _waitForMobileCallBackgroundRequests(platform, 3);
+        expect(platform.requests.last.active, isFalse);
+        platform.completeRequest(2);
+      },
+    );
+
     test('recovers when push-to-talk mute operations fail', () async {
       SharedPreferences.setMockInitialValues({
         'voip_push_to_talk_enabled': false,
@@ -1026,6 +1062,48 @@ class _FakeMobileCallBackgroundPlatform
       ),
     );
   }
+}
+
+class _ControlledMobileCallBackgroundPlatform
+    extends _FakeMobileCallBackgroundPlatform {
+  final List<Completer<void>> _pendingRequests = [];
+
+  @override
+  Future<void> setCallBackgroundActive({
+    required bool active,
+    String? roomName,
+    required bool usesMicrophone,
+    required bool usesCamera,
+  }) {
+    requests.add(
+      _MobileCallBackgroundRequest(
+        active: active,
+        roomName: roomName,
+        usesMicrophone: usesMicrophone,
+        usesCamera: usesCamera,
+      ),
+    );
+    final completer = Completer<void>();
+    _pendingRequests.add(completer);
+    return completer.future;
+  }
+
+  void completeRequest(int index) => _pendingRequests[index].complete();
+}
+
+Future<void> _waitForMobileCallBackgroundRequests(
+  _FakeMobileCallBackgroundPlatform platform,
+  int count,
+) async {
+  for (var attempt = 0; attempt < 50; attempt++) {
+    if (platform.requests.length >= count) {
+      return;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 1));
+  }
+  fail(
+    'Expected $count mobile call background requests, found ${platform.requests.length}.',
+  );
 }
 
 class _TrackedCancelStream<T> extends Stream<T> {

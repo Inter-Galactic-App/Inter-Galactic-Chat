@@ -1,7 +1,6 @@
 # Settings Information Architecture
 
 Date: 2026-05-10
-Agent: DESIGN
 Source map: `docs/architecture/features/settings-ui-map.md`
 
 This document records phase 1 of the Settings UI overhaul. It is an
@@ -57,7 +56,7 @@ Security remains user-facing, but it should receive high-risk treatment in
 later phases because encryption, session verification, key backup, and recovery
 can affect access to encrypted history.
 
-Implementation update, 2026-06-11: App Settings now has one shared settings
+App Settings now has one shared settings
 account selector in the settings chrome instead of separate account dropdowns
 inside each account-aware tab. The selector initializes from the focused
 account stored in `filter_client_id`, falling back to the first signed-in
@@ -67,7 +66,7 @@ tools, and developer account diagnostics all read that shared selected account.
 Changing the selector chooses which account the open settings surface edits; it
 does not change the main-shell focused account.
 
-Implementation update, 2026-07-28: Account-specific collections in App
+Account-specific collections in App
 Settings, including Soundboard space discovery and Notifications room/space
 overrides, follow the shared settings account selector and must not aggregate
 indistinguishable entries from other signed-in accounts. Contextual Room and
@@ -75,7 +74,7 @@ Space Settings are instead pinned to the client that owns the room or space
 object. Their account header shows that acting account and is not selectable,
 even when the main-shell focused account or App Settings selector differs.
 
-Implementation update, 2026-06-11: Account Security combines password
+Account Security combines password
 management and account recovery codes in one Account security section, using
 direct settings rows instead of nested background cards. Encryption health keeps
 its detailed desktop status chips but uses compact mobile labels to avoid
@@ -85,7 +84,7 @@ decryption retry actions now live behind one **Encrypted message tools** chooser
 with copy that distinguishes missing-key delivery repair from retrying
 decryption with keys already present on the session.
 
-Implementation update, 2026-05-12: Account management and profile editing are
+Account management and profile editing are
 now combined as **Account & Profile**, account deletion lives in Security, and
 the old Privacy tab's read receipts, typing indicators, and DM lock controls
 are presented through App General. Emoticons moved from Account settings into
@@ -94,7 +93,7 @@ and room/space packs sit with other app-wide communication preferences. The
 underlying emoticon data still belongs to the selected Matrix account or joined
 rooms/spaces.
 
-Implementation update, 2026-05-12: Shortcuts now includes local custom
+Shortcuts now includes local custom
 navigation entries for user-entered room/space IDs, aliases, or Matrix links.
 The shortcut definition is a local app preference with optional account scope,
 while the actual keybind stays in the existing system-wide hotkey storage.
@@ -102,13 +101,13 @@ App-level Soundboard discovery remains read/preview oriented, but each visible
 space card can now open that space's contextual Soundboard settings tab for
 management.
 
-Implementation update, 2026-05-29: Shortcuts also owns the local composer
+Shortcuts also owns the local composer
 bracket typing toggle and the desktop shortcut for wrapping the current
 composer selection in brackets. Bracket auto-close is off by default and stays
 local to the message composer; the desktop shortcut has no default keybind and
 only acts on the focused composer selection.
 
-Implementation update, 2026-06-10: Custom room shortcuts now let users pick
+Custom room shortcuts now let users pick
 from the currently joined rooms in the shortcut dialog. The dropdown uses the
 room's user-facing display name as the primary label and includes account plus
 room ID details to distinguish duplicate names. The stored shortcut target
@@ -128,7 +127,7 @@ These settings are support, policy, tutorial, and app identity surfaces:
 Logs stay developer-only and now belong under the Developer area rather than
 everyday Help/About surfaces.
 
-Implementation update, 2026-05-17: App Settings > Help now includes **FAQ**.
+App Settings > Help now includes **FAQ**.
 The FAQ is sectioned into General, Security, and Features; each question is a
 card that opens a popup answer. The FAQ tab exports row-level settings search
 entries for each question so users can search by question, answer summary, and
@@ -152,13 +151,13 @@ collapsible expert panels. Everyday settings should stay outside this area
 unless they are diagnostic, low-level, or risky enough to need explicit
 separation.
 
-Implementation update, 2026-05-12: the old **Advanced** tab label changed to
+The old **Advanced** tab label changed to
 **Developer** while preserving "advanced" search compatibility. Account
 Developer JSON and Notification push transport/registered pusher diagnostics
 now live as Developer panels instead of separate Account or Notifications
 surfaces.
 
-Implementation update, 2026-05-12: Logs and Developer Utils also moved into
+Logs and Developer Utils also moved into
 collapsible App Settings > Developer panels. Developer Utils is the final
 Developer panel and is grouped into described utility dropdowns.
 
@@ -173,8 +172,8 @@ They can share implementation widgets where that is the cleanest technical
 path, but the user-facing IA should treat room and space settings as distinct
 contexts.
 
-Implementation update, 2026-05-13: contextual Room and Space Settings now use
-the proposed context IA. Notifications owns notification mode, read receipts,
+Contextual Room and Space Settings use
+the context IA below. Notifications owns notification mode, read receipts,
 typing indicators, and desktop sound overrides. Room Security owns encryption,
 room visibility, and room history visibility. Admin Settings owns identity,
 addresses, and room events. Appearance is now room-local message
@@ -182,12 +181,12 @@ background/bubble styling, while Space Settings keeps soundboard management as
 its own contextual tab. General remains a searchable legacy alias rather than a
 visible contextual tab.
 
-Implementation update, 2026-05-28: Room Settings exposes Security as a visible
+Room Settings exposes Security as a visible
 tab so admins can change the current Room History value directly. The
 Permissions tab still controls who is allowed to change
 `m.room.history_visibility`.
 
-Implementation update, 2026-06-11: Space Settings now includes **Categories**
+Space Settings now includes **Categories**
 for shared Inter Galactic room grouping inside a space. Category definitions
 are stored in a custom Matrix state event on the space room, but they do not
 write or reorder Matrix space children. Creation and management controls are

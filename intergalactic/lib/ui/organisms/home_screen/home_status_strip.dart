@@ -183,7 +183,7 @@ class _HomeStatusStripState extends State<HomeStatusStrip> {
   late List<HomeStatusEntry> _entries;
   late List<StreamSubscription> _subscriptions;
 
-  String get labelStatuses => Intl.message(
+  String get labelHomeStatusStrip => Intl.message(
     'Status',
     name: 'labelHomeStatusStrip',
     desc: 'Header for the Home screen horizontal status strip',
@@ -436,7 +436,7 @@ class _HomeStatusStripState extends State<HomeStatusStrip> {
       padding: const EdgeInsets.fromLTRB(0, 0, 0, 12),
       child: tiamat.Panel(
         mode: tiamat.TileType.surfaceContainerLow,
-        header: labelStatuses,
+        header: labelHomeStatusStrip,
         padding: isMobile ? 10 : 8,
         child: SizedBox(
           height: height,
@@ -677,8 +677,10 @@ class _HomeStatusBubble extends StatelessWidget {
       //     already announces `semanticLabel`, and the tooltip message is the
       //     same string, so a reader would say it twice. Same shape as SpaceIcon
       //     and AccessibleInteractiveRegion on the rails.
-      child: Tooltip(
-        message: semanticLabel,
+      child: tiamat.Tooltip(
+        text: semanticLabel,
+        preferredDirection: AxisDirection.down,
+        excludeFromSemantics: true,
         child: SizedBox(
           width: width,
           child: Material(
@@ -835,30 +837,68 @@ class _HomeStatusBubble extends StatelessWidget {
     );
   }
 
-  String _presenceLabel(UserPresenceStatus? status) {
-    return switch (status) {
-      UserPresenceStatus.online => Intl.message(
-        'online',
-        name: 'homeStatusPresenceOnline',
-        desc: 'Accessibility label for an online Home status contact',
-      ),
-      UserPresenceStatus.unavailable => Intl.message(
-        'away',
-        name: 'homeStatusPresenceAway',
-        desc: 'Accessibility label for an away Home status contact',
-      ),
-      UserPresenceStatus.offline => Intl.message(
-        'offline',
-        name: 'homeStatusPresenceOffline',
-        desc: 'Accessibility label for an offline Home status contact',
-      ),
-      UserPresenceStatus.unknown || null => Intl.message(
-        'presence unknown',
-        name: 'homeStatusPresenceUnknown',
-        desc: 'Accessibility label for a Home status contact with no presence',
-      ),
-    };
-  }
+  // EVERY MESSAGE BELOW DECLARES ITS OWN MEMBER, and the `_presenceLabel`,
+  // `_storyLabel`, `_semanticLabel` and `_activitySemanticLabel` members that
+  // choose between them hold no `Intl.message` at all. That split is load
+  // bearing: `intl_translation` keys a message off its declaring member, so it
+  // takes at most one message per member and refuses any message declared
+  // inside a member that takes parameters. Folding one of these back into its
+  // selector un-extracts it silently - no error, no analyzer complaint and no
+  // failing test. The `args:` escape hatch does not apply to the parameterless
+  // ones: none of them uses the selector's parameter, so listing it would be a
+  // lie. The four sentence members below do take parameters, and they must be
+  // POSITIONAL - `intl_translation` rejects named parameters on a message
+  // function outright.
+
+  String get homeStatusPresenceOnline => Intl.message(
+    'online',
+    name: 'homeStatusPresenceOnline',
+    desc: 'Accessibility label for an online Home status contact',
+  );
+
+  String get homeStatusPresenceAway => Intl.message(
+    'away',
+    name: 'homeStatusPresenceAway',
+    desc: 'Accessibility label for an away Home status contact',
+  );
+
+  String get homeStatusPresenceOffline => Intl.message(
+    'offline',
+    name: 'homeStatusPresenceOffline',
+    desc: 'Accessibility label for an offline Home status contact',
+  );
+
+  String get homeStatusPresenceUnknown => Intl.message(
+    'presence unknown',
+    name: 'homeStatusPresenceUnknown',
+    desc: 'Accessibility label for a Home status contact with no presence',
+  );
+
+  String _presenceLabel(UserPresenceStatus? status) => switch (status) {
+    UserPresenceStatus.online => homeStatusPresenceOnline,
+    UserPresenceStatus.unavailable => homeStatusPresenceAway,
+    UserPresenceStatus.offline => homeStatusPresenceOffline,
+    UserPresenceStatus.unknown || null => homeStatusPresenceUnknown,
+  };
+
+  String get homeStatusUploadingStoryLabel => Intl.message(
+    ', uploading story',
+    name: 'homeStatusUploadingStoryLabel',
+    desc:
+        'Accessibility suffix for the current user while a story is uploading',
+  );
+
+  String get homeStatusNewStoryLabel => Intl.message(
+    ', new story',
+    name: 'homeStatusNewStoryLabel',
+    desc: 'Accessibility suffix for a Home status contact with unseen stories',
+  );
+
+  String get homeStatusViewedStoryLabel => Intl.message(
+    ', viewed story',
+    name: 'homeStatusViewedStoryLabel',
+    desc: 'Accessibility suffix for a Home status contact with seen stories',
+  );
 
   String _storyLabel(
     bool hasStories,
@@ -866,30 +906,90 @@ class _HomeStatusBubble extends StatelessWidget {
     bool hasPendingStoryUpload,
   ) {
     if (hasPendingStoryUpload) {
-      return Intl.message(
-        ', uploading story',
-        name: 'homeStatusUploadingStoryLabel',
-        desc:
-            'Accessibility suffix for the current user while a story is uploading',
-      );
+      return homeStatusUploadingStoryLabel;
     }
     if (!hasStories) {
       return '';
     }
     if (hasUnseenStories) {
-      return Intl.message(
-        ', new story',
-        name: 'homeStatusNewStoryLabel',
-        desc:
-            'Accessibility suffix for a Home status contact with unseen stories',
-      );
+      return homeStatusNewStoryLabel;
     }
-    return Intl.message(
-      ', viewed story',
-      name: 'homeStatusViewedStoryLabel',
-      desc: 'Accessibility suffix for a Home status contact with seen stories',
-    );
+    return homeStatusViewedStoryLabel;
   }
+
+  String homeStatusSemanticLabel(
+    String displayName,
+    String presenceLabel,
+    String storyLabel,
+  ) => Intl.message(
+    '$displayName, $presenceLabel$storyLabel',
+    name: 'homeStatusSemanticLabel',
+    args: [displayName, presenceLabel, storyLabel],
+    desc: 'Accessibility label for a Home status contact',
+    examples: const {
+      'displayName': 'Ada',
+      'presenceLabel': 'online',
+      'storyLabel': ', new story',
+    },
+  );
+
+  String homeStatusSemanticLabelWithActivity(
+    String displayName,
+    String presenceLabel,
+    String storyLabel,
+    String activityLabel,
+  ) => Intl.message(
+    '$displayName, $presenceLabel$storyLabel, $activityLabel',
+    name: 'homeStatusSemanticLabelWithActivity',
+    args: [displayName, presenceLabel, storyLabel, activityLabel],
+    desc:
+        'Accessibility label for a Home status contact with an activity badge',
+    examples: const {
+      'displayName': 'Ada',
+      'presenceLabel': 'online',
+      'storyLabel': ', new story',
+      'activityLabel': 'playing a game',
+    },
+  );
+
+  String homeStatusSemanticLabelWithStatus(
+    String displayName,
+    String presenceLabel,
+    String storyLabel,
+    String status,
+  ) => Intl.message(
+    '$displayName, $presenceLabel$storyLabel, status: $status',
+    name: 'homeStatusSemanticLabelWithStatus',
+    args: [displayName, presenceLabel, storyLabel, status],
+    desc: 'Accessibility label for a Home status contact with a short status',
+    examples: const {
+      'displayName': 'Ada',
+      'presenceLabel': 'online',
+      'storyLabel': ', new story',
+      'status': 'Back in 5',
+    },
+  );
+
+  String homeStatusSemanticLabelWithActivityAndStatus(
+    String displayName,
+    String presenceLabel,
+    String storyLabel,
+    String activityLabel,
+    String status,
+  ) => Intl.message(
+    '$displayName, $presenceLabel$storyLabel, $activityLabel, status: $status',
+    name: 'homeStatusSemanticLabelWithActivityAndStatus',
+    args: [displayName, presenceLabel, storyLabel, activityLabel, status],
+    desc:
+        'Accessibility label for a Home status contact with an activity badge and a short status',
+    examples: const {
+      'displayName': 'Ada',
+      'presenceLabel': 'online',
+      'storyLabel': ', new story',
+      'activityLabel': 'playing a game',
+      'status': 'Back in 5',
+    },
+  );
 
   String _semanticLabel({
     required String displayName,
@@ -901,53 +1001,50 @@ class _HomeStatusBubble extends StatelessWidget {
     final activityLabel = _activitySemanticLabel(activityKind);
     if (status == null || status.isEmpty) {
       if (activityLabel != null) {
-        return Intl.message(
-          '$displayName, $presenceLabel$storyLabel, $activityLabel',
-          name: 'homeStatusSemanticLabelWithActivity',
-          args: [displayName, presenceLabel, storyLabel, activityLabel],
-          desc:
-              'Accessibility label for a Home status contact with an activity badge',
+        return homeStatusSemanticLabelWithActivity(
+          displayName,
+          presenceLabel,
+          storyLabel,
+          activityLabel,
         );
       }
-      return Intl.message(
-        '$displayName, $presenceLabel$storyLabel',
-        name: 'homeStatusSemanticLabel',
-        args: [displayName, presenceLabel, storyLabel],
-        desc: 'Accessibility label for a Home status contact',
-      );
+      return homeStatusSemanticLabel(displayName, presenceLabel, storyLabel);
     }
     if (activityLabel != null) {
-      return Intl.message(
-        '$displayName, $presenceLabel$storyLabel, $activityLabel, status: $status',
-        name: 'homeStatusSemanticLabelWithActivityAndStatus',
-        args: [displayName, presenceLabel, storyLabel, activityLabel, status],
-        desc:
-            'Accessibility label for a Home status contact with an activity badge and a short status',
+      return homeStatusSemanticLabelWithActivityAndStatus(
+        displayName,
+        presenceLabel,
+        storyLabel,
+        activityLabel,
+        status,
       );
     }
-    return Intl.message(
-      '$displayName, $presenceLabel$storyLabel, status: $status',
-      name: 'homeStatusSemanticLabelWithStatus',
-      args: [displayName, presenceLabel, storyLabel, status],
-      desc: 'Accessibility label for a Home status contact with a short status',
+    return homeStatusSemanticLabelWithStatus(
+      displayName,
+      presenceLabel,
+      storyLabel,
+      status,
     );
   }
 
-  String? _activitySemanticLabel(HomeActivityStatusKind? kind) {
-    return switch (kind) {
-      HomeActivityStatusKind.game => Intl.message(
-        'playing a game',
-        name: 'homeStatusActivityGameLabel',
-        desc: 'Accessibility label for a Home status game activity badge',
-      ),
-      HomeActivityStatusKind.music => Intl.message(
-        'listening to music',
-        name: 'homeStatusActivityMusicLabel',
-        desc: 'Accessibility label for a Home status music activity badge',
-      ),
-      null => null,
-    };
-  }
+  String get homeStatusActivityGameLabel => Intl.message(
+    'playing a game',
+    name: 'homeStatusActivityGameLabel',
+    desc: 'Accessibility label for a Home status game activity badge',
+  );
+
+  String get homeStatusActivityMusicLabel => Intl.message(
+    'listening to music',
+    name: 'homeStatusActivityMusicLabel',
+    desc: 'Accessibility label for a Home status music activity badge',
+  );
+
+  String? _activitySemanticLabel(HomeActivityStatusKind? kind) =>
+      switch (kind) {
+        HomeActivityStatusKind.game => homeStatusActivityGameLabel,
+        HomeActivityStatusKind.music => homeStatusActivityMusicLabel,
+        null => null,
+      };
 }
 
 class _HomeActivityBadge extends StatelessWidget {

@@ -8,6 +8,49 @@ import 'package:intergalactic/ui/molecules/composer_bracket_formatter.dart';
 import 'package:intergalactic/ui/molecules/message_input.dart';
 
 void main() {
+  setUp(ComposerDraftCache.clearForTesting);
+
+  test(
+    'composer drafts are scoped to their room and retain cursor position',
+    () {
+      const initial = TextEditingValue(
+        text: 'finish this in the other room',
+        selection: TextSelection.collapsed(offset: 6),
+      );
+      ComposerDraftCache.save('account-a:room-a:room', initial);
+
+      final restored = ComposerDraftCache.read('account-a:room-a:room');
+
+      expect(restored, initial);
+      expect(ComposerDraftCache.read('account-a:room-b:room'), isNull);
+    },
+  );
+
+  test('composer drafts expire and empty drafts clear their room cache', () {
+    final createdAt = DateTime(2026, 9, 1);
+    ComposerDraftCache.save(
+      'account-a:room-a:room',
+      const TextEditingValue(text: 'short-lived draft'),
+      now: createdAt,
+    );
+
+    expect(
+      ComposerDraftCache.read(
+        'account-a:room-a:room',
+        now: createdAt.add(ComposerDraftCache.retention),
+      ),
+      isNull,
+    );
+
+    ComposerDraftCache.save(
+      'account-a:room-a:room',
+      const TextEditingValue(text: 'send me'),
+    );
+    ComposerDraftCache.save('account-a:room-a:room', TextEditingValue.empty);
+
+    expect(ComposerDraftCache.read('account-a:room-a:room'), isNull);
+  });
+
   test(
     'inserting an app emoji without selection appends without leading space',
     () {
@@ -62,16 +105,20 @@ void main() {
     );
   });
 
-  test('hidden and loud effects transform draft text directly', () {
+  test('hidden, loud, and whisper effects transform draft text directly', () {
     final hidden = composerMessageEffects.firstWhere(
       (effect) => effect.label == 'Hidden',
     );
     final loud = composerMessageEffects.firstWhere(
       (effect) => effect.label == 'Loud',
     );
+    final whisper = composerMessageEffects.firstWhere(
+      (effect) => effect.label == 'Whisper',
+    );
 
     expect(composerEffectSendText(hidden, 'secret'), '||secret||');
     expect(composerEffectSendText(loud, 'important'), '### important');
+    expect(composerEffectSendText(whisper, 'quietly'), '###### quietly');
   });
 
   test(
@@ -83,14 +130,20 @@ void main() {
       final rainbow = composerMessageEffects.firstWhere(
         (effect) => effect.label == 'Rainbow',
       );
+      final whisper = composerMessageEffects.firstWhere(
+        (effect) => effect.label == 'Whisper',
+      );
 
       final hiddenDraft = composerEffectDraftValue(hidden)!;
       final rainbowDraft = composerEffectDraftValue(rainbow)!;
+      final whisperDraft = composerEffectDraftValue(whisper)!;
 
       expect(hiddenDraft.text, '||||');
       expect(hiddenDraft.selection.baseOffset, 2);
       expect(rainbowDraft.text, '/rainbow ');
       expect(rainbowDraft.selection.baseOffset, rainbowDraft.text.length);
+      expect(whisperDraft.text, '###### ');
+      expect(whisperDraft.selection.baseOffset, whisperDraft.text.length);
     },
   );
 

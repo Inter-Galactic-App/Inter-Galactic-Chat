@@ -53,23 +53,28 @@ class KeyboardHookShortcutsSettingsPage extends StatefulWidget {
 
 class _KeyboardHookShortcutsSettingsPageState
     extends State<KeyboardHookShortcutsSettingsPage> {
-  String get promptShortcutsPressAKeyCombination {
-    if (_canRecordMouseShortcuts()) {
-      return Intl.message(
-        "Press a key or mouse button",
-        name: "promptShortcutsPressAKeyOrMouseButtonCombination",
-        desc:
-            "Prompt the user to input a key or mouse button combination, which is recorded and used to activate a shortcut",
-      );
-    }
+  // These two used to be one getter that returned whichever the platform
+  // wanted. `intl_translation` keys a message off its declaring member, so the
+  // mouse-button one's name could never match and it was silently dropped from
+  // the ARB - no error, and the string simply could not reach a translator.
+  // Each message now declares its own member, and the platform choice is made
+  // at the single call site. Unlike the pair in attachment_processor.dart there
+  // is no selector getter here, because the name a selector would want is
+  // already taken by a real message key with an English entry behind it.
 
-    return Intl.message(
-      "Press a key combination",
-      name: "promptShortcutsPressAKeyCombination",
-      desc:
-          "Prompt the user to input a key combination, which is recorded and used to activate a shortcut",
-    );
-  }
+  String get promptShortcutsPressAKeyCombination => Intl.message(
+    "Press a key combination",
+    name: "promptShortcutsPressAKeyCombination",
+    desc:
+        "Prompt the user to input a key combination, which is recorded and used to activate a shortcut",
+  );
+
+  String get promptShortcutsPressAKeyOrMouseButtonCombination => Intl.message(
+    "Press a key or mouse button",
+    name: "promptShortcutsPressAKeyOrMouseButtonCombination",
+    desc:
+        "Prompt the user to input a key or mouse button combination, which is recorded and used to activate a shortcut",
+  );
 
   String get promptShortcutsClearKeyboardShortcut => Intl.message(
     "Clear Shortcut",
@@ -394,7 +399,11 @@ class _KeyboardHookShortcutsSettingsPageState
           spacing: 8,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            tiamat.Text.largeTitle(promptShortcutsPressAKeyCombination),
+            tiamat.Text.largeTitle(
+              _canRecordMouseShortcuts()
+                  ? promptShortcutsPressAKeyOrMouseButtonCombination
+                  : promptShortcutsPressAKeyCombination,
+            ),
             SizedBox(
               height: 50,
               child: Center(

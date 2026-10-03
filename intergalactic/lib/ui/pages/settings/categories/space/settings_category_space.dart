@@ -8,6 +8,7 @@ import 'package:intergalactic/ui/pages/settings/categories/room/permissions/matr
 import 'package:intergalactic/ui/pages/settings/categories/space/space_admin_settings_page.dart';
 import 'package:intergalactic/ui/pages/settings/categories/space/space_categories_settings_page.dart';
 import 'package:intergalactic/ui/pages/settings/categories/space/space_developer_settings_view.dart';
+import 'package:intergalactic/ui/pages/settings/categories/space/space_general_settings_page.dart';
 import 'package:intergalactic/ui/pages/settings/categories/space/space_emoji_pack_settings.dart';
 import 'package:intergalactic/ui/pages/settings/categories/space/space_matrix_room_builder.dart';
 import 'package:intergalactic/ui/pages/settings/categories/space/space_notifications_settings_page.dart';
@@ -19,8 +20,8 @@ import 'package:intl/intl.dart';
 
 class SettingsCategorySpace implements SettingsCategory {
   SettingsCategorySpace(this.space);
-  static const String tabIdNotifications = 'space.general';
-  static const String tabIdGeneral = tabIdNotifications;
+  static const String tabIdGeneral = 'space.general';
+  static const String tabIdNotifications = 'space.notifications';
   static const String tabIdEmoticons = 'space.emoticons';
   static const String tabIdAdmin = 'space.admin';
   static const String tabIdSoundboard = 'space.soundboard';
@@ -110,6 +111,51 @@ class SettingsCategorySpace implements SettingsCategory {
         .getComponent<SpaceEmoticonComponent>();
     final soundboard = space.getComponent<SoundboardComponent>();
     return List.from([
+      SettingsTab(
+        id: tabIdGeneral,
+        label: labelSpaceSettingsGeneral,
+        icon: Icons.info_outline,
+        searchKeywords: const [
+          'general',
+          'icon',
+          'avatar',
+          'banner',
+          'name',
+          'topic',
+          'description',
+          'space addresses',
+          'addresses',
+          'aliases',
+          'address',
+        ],
+        searchEntries: const [
+          SettingsSearchEntry(
+            title: 'Icon, name, and topic',
+            section: 'Space Profile',
+            keywords: [
+              'avatar',
+              'name',
+              'topic',
+              'description',
+              'appearance',
+              'general',
+            ],
+          ),
+          SettingsSearchEntry(
+            title: 'Space banner',
+            section: 'Banner',
+            keywords: ['banner', 'appearance'],
+          ),
+          SettingsSearchEntry(
+            title: 'Room Addresses',
+            section: 'Addresses',
+            keywords: ['aliases', 'address', 'general', 'space addresses'],
+          ),
+        ],
+        pageBuilder: (context) {
+          return SpaceGeneralSettingsPage(space: space);
+        },
+      ),
       SettingsTab(
         id: tabIdNotifications,
         label: labelSpaceSettingsNotifications,
@@ -239,38 +285,15 @@ class SettingsCategorySpace implements SettingsCategory {
         label: labelSpaceSettingsAdmin,
         icon: Icons.admin_panel_settings_outlined,
         searchKeywords: const [
-          'general',
-          'appearance',
           'security',
-          'icon',
-          'avatar',
-          'banner',
-          'name',
-          'topic',
-          'room addresses',
-          'space addresses',
-          'aliases',
           'visibility',
           'discover',
           'server discovery',
           'space directory',
+          'image-pack access',
+          'repair links',
         ],
         searchEntries: const [
-          SettingsSearchEntry(
-            title: 'Icon, name, and topic',
-            section: 'Space Profile',
-            keywords: ['avatar', 'name', 'topic', 'appearance', 'general'],
-          ),
-          SettingsSearchEntry(
-            title: 'Space banner',
-            section: 'Banner',
-            keywords: ['banner', 'appearance'],
-          ),
-          SettingsSearchEntry(
-            title: 'Room Addresses',
-            section: 'Addresses',
-            keywords: ['aliases', 'address', 'general', 'space addresses'],
-          ),
           SettingsSearchEntry(
             title: 'Space Visibility',
             section: 'Access',
@@ -293,6 +316,11 @@ class SettingsCategorySpace implements SettingsCategory {
               'publish space',
               'unpublish space',
             ],
+          ),
+          SettingsSearchEntry(
+            title: 'Repair access for existing rooms',
+            section: 'Space image-pack access',
+            keywords: ['image packs', 'canonical space', 'repair links'],
           ),
         ],
         pageBuilder: (context) {

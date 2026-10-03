@@ -18,64 +18,64 @@ class FavoritesAppearanceSettingsPage extends StatefulWidget {
 
 class _FavoritesAppearanceSettingsPageState
     extends State<FavoritesAppearanceSettingsPage> {
-  String get labelFavoritesAppearance => Intl.message(
-        'Favorites Appearance',
-        name: 'labelFavoritesAppearanceSettings',
-        desc: 'Section title for Favorites appearance settings',
-      );
+  String get labelFavoritesAppearanceSettings => Intl.message(
+    'Favorites Appearance',
+    name: 'labelFavoritesAppearanceSettings',
+    desc: 'Section title for Favorites appearance settings',
+  );
 
   String get labelFavoritesIcon => Intl.message(
-        'Favorites icon',
-        name: 'labelFavoritesIcon',
-        desc: 'Label for the Favorites icon appearance setting',
-      );
+    'Favorites icon',
+    name: 'labelFavoritesIcon',
+    desc: 'Label for the Favorites icon appearance setting',
+  );
 
   String get labelFavoritesIconDescription => Intl.message(
-        'Shown on the Favorites rail button and virtual-space avatar on this device.',
-        name: 'labelFavoritesIconDescription',
-        desc: 'Description for the Favorites icon appearance setting',
-      );
+    'Shown on the Favorites rail button and virtual-space avatar on this device.',
+    name: 'labelFavoritesIconDescription',
+    desc: 'Description for the Favorites icon appearance setting',
+  );
 
   String get labelFavoritesBanner => Intl.message(
-        'Favorites banner',
-        name: 'labelFavoritesBanner',
-        desc: 'Label for the Favorites banner appearance setting',
-      );
+    'Favorites banner',
+    name: 'labelFavoritesBanner',
+    desc: 'Label for the Favorites banner appearance setting',
+  );
 
   String get labelFavoritesBannerDescription => Intl.message(
-        'Shown across the Favorites virtual-space header on this device.',
-        name: 'labelFavoritesBannerDescription',
-        desc: 'Description for the Favorites banner appearance setting',
-      );
+    'Shown across the Favorites virtual-space header on this device.',
+    name: 'labelFavoritesBannerDescription',
+    desc: 'Description for the Favorites banner appearance setting',
+  );
 
   String get labelChooseFavoritesIcon => Intl.message(
-        'Choose icon',
-        name: 'labelChooseFavoritesIcon',
-        desc: 'Empty-state prompt for choosing a Favorites icon',
-      );
+    'Choose icon',
+    name: 'labelChooseFavoritesIcon',
+    desc: 'Empty-state prompt for choosing a Favorites icon',
+  );
 
   String get labelChooseFavoritesBanner => Intl.message(
-        'Choose banner',
-        name: 'labelChooseFavoritesBanner',
-        desc: 'Empty-state prompt for choosing a Favorites banner',
-      );
+    'Choose banner',
+    name: 'labelChooseFavoritesBanner',
+    desc: 'Empty-state prompt for choosing a Favorites banner',
+  );
 
   String get labelChangeFavoritesIcon => Intl.message(
-        'Change Favorites icon',
-        name: 'labelChangeFavoritesIcon',
-        desc: 'Dialog title for changing the Favorites icon',
-      );
+    'Change Favorites icon',
+    name: 'labelChangeFavoritesIcon',
+    desc: 'Dialog title for changing the Favorites icon',
+  );
 
   String get labelChangeFavoritesBanner => Intl.message(
-        'Change Favorites banner',
-        name: 'labelChangeFavoritesBanner',
-        desc: 'Dialog title for changing the Favorites banner',
-      );
+    'Change Favorites banner',
+    name: 'labelChangeFavoritesBanner',
+    desc: 'Dialog title for changing the Favorites banner',
+  );
 
   @override
   Widget build(BuildContext context) {
     return SettingsSection(
-      title: labelFavoritesAppearance,
+      title: labelFavoritesAppearanceSettings,
       children: [
         SettingsControlRow(
           title: labelFavoritesIcon,
@@ -211,10 +211,7 @@ class _FavoritesImagePreview extends StatelessWidget {
               color: theme.colorScheme.surfaceContainerLow,
               image: image == null
                   ? null
-                  : DecorationImage(
-                      image: image!,
-                      fit: BoxFit.cover,
-                    ),
+                  : DecorationImage(image: image!, fit: BoxFit.cover),
               border: Border.all(
                 color: theme.colorScheme.outline.withValues(alpha: 0.72),
               ),

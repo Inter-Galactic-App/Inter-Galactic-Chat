@@ -1,7 +1,6 @@
 # Bug Report Payload Schema
 
 Status: implemented
-Owner: DEBUG / Help & diagnostics
 Last updated: 2026-07-23
 
 The upload is a single redacted JSON body (`schema_version: 1`). This document

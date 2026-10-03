@@ -11,10 +11,7 @@ import 'package:matrix/matrix.dart' as matrix;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class UrlPreviewDurableCacheHit {
-  const UrlPreviewDurableCacheHit({
-    required this.data,
-    required this.isStale,
-  });
+  const UrlPreviewDurableCacheHit({required this.data, required this.isStale});
 
   final UrlPreviewData data;
   final bool isStale;
@@ -30,10 +27,13 @@ class UrlPreviewDurableCache {
     this.maxStaleAge = const Duration(days: 14),
     this.maxEntries = 500,
     this.prefix = 'url_preview_cache',
-  })  : _preferences = preferences,
-        _now = now ?? DateTime.now;
+  }) : _preferences = preferences,
+       _now = now ?? DateTime.now;
 
-  static const int _version = 1;
+  // Version 2 stops preserving a site-name-only fallback across restarts. The
+  // service can now resolve supported providers with actual preview content,
+  // but version 1 records bypass that request forever until their normal TTL.
+  static const int _version = 2;
   static const Set<String> _sensitiveQueryNames = {
     'access_token',
     'refresh_token',
@@ -110,22 +110,25 @@ class UrlPreviewDurableCache {
         return null;
       }
 
-      final data = _dataFromJson(
-        decoded,
-        matrixClient,
-        cachedAtMs: cachedAtMs,
-      );
+      final data = _dataFromJson(decoded, matrixClient, cachedAtMs: cachedAtMs);
       if (data == null) {
+        await _removeKey(prefs, key);
+        return null;
+      }
+
+      // A version 1 entry could contain only the inferred site name after a
+      // provider's generic response was sanitized. That is not enough content
+      // for a preview, but returning it here prevents a newly capable service
+      // from being queried. Treat it as a targeted schema migration rather
+      // than asking people to clear application storage.
+      if (_shouldDiscardContentlessEntry(decoded, data)) {
         await _removeKey(prefs, key);
         return null;
       }
 
       await _touchKey(prefs, key);
 
-      return UrlPreviewDurableCacheHit(
-        data: data,
-        isStale: age > validTtl,
-      );
+      return UrlPreviewDurableCacheHit(data: data, isStale: age > validTtl);
     } catch (error) {
       Log.d(
         'Optional durable URL preview cache read failed: ${error.runtimeType}',
@@ -145,12 +148,18 @@ class UrlPreviewDurableCache {
       final prefs = await _prefs();
       final hash = _hashUri(normalizedUri);
       final key = _entryKey(hash);
+      if (_shouldAvoidPersistingContentlessData(data)) {
+        await _removeKey(prefs, key);
+        return;
+      }
       final nowMs = _now().millisecondsSinceEpoch;
-      final encoded = jsonEncode(_dataToJson(
-        normalizedUri: normalizedUri,
-        data: data,
-        cachedAtMs: nowMs,
-      ));
+      final encoded = jsonEncode(
+        _dataToJson(
+          normalizedUri: normalizedUri,
+          data: data,
+          cachedAtMs: nowMs,
+        ),
+      );
 
       await prefs.setString(key, encoded);
       await _touchKey(prefs, key);
@@ -216,12 +225,15 @@ class UrlPreviewDurableCache {
       };
     }
 
-    final safeDataUri =
-        _isSafeToPersistUri(data.uri) ? data.uri : normalizedUri;
+    final safeDataUri = _isSafeToPersistUri(data.uri)
+        ? data.uri
+        : normalizedUri;
     final imageJson = _imageToJson(data);
-    final volatileImageJson =
-        imageJson == null ? _volatileImageToJson(data) : null;
-    final volatileImageOmitted = data.volatileImageOmitted ||
+    final volatileImageJson = imageJson == null
+        ? _volatileImageToJson(data)
+        : null;
+    final volatileImageOmitted =
+        data.volatileImageOmitted ||
         volatileImageJson != null ||
         _hasOmittedVolatileImage(data, imageJson);
 
@@ -260,7 +272,8 @@ class UrlPreviewDurableCache {
       return null;
     }
 
-    final imageUri = _imageUriFromJson(decoded['image']) ??
+    final imageUri =
+        _imageUriFromJson(decoded['image']) ??
         _volatileImageUriFromJson(
           decoded['volatile_image'],
           cachedAtMs: cachedAtMs,
@@ -301,6 +314,34 @@ class UrlPreviewDurableCache {
     }
 
     return false;
+  }
+
+  bool _shouldDiscardContentlessEntry(
+    Map<String, dynamic> decoded,
+    UrlPreviewData data,
+  ) {
+    final version = _intValue(decoded['version']) ?? 1;
+    if (!_shouldAvoidPersistingContentlessData(data)) {
+      return false;
+    }
+
+    // Version 1 is the migration target. A current record can reach this
+    // shape later only when its short-lived volatile image expires; it must
+    // also miss so a fresh provider result gets a chance to replace it.
+    return version < _version || data.volatileImageOmitted;
+  }
+
+  bool _shouldAvoidPersistingContentlessData(UrlPreviewData data) {
+    if (data == UrlPreviewComponent.invalidPreviewData) {
+      return false;
+    }
+
+    return data.image == null &&
+        data.imageUri == null &&
+        normalizeUrlPreviewText(data.title) == null &&
+        normalizeUrlPreviewText(data.description) == null &&
+        normalizeUrlPreviewText(data.postingAccount) == null &&
+        normalizeUrlPreviewText(data.stats) == null;
   }
 
   Map<String, String>? _imageToJson(UrlPreviewData data) {
@@ -363,17 +404,11 @@ class UrlPreviewDurableCache {
     }
 
     if (uri.scheme == 'http' || uri.scheme == 'https') {
-      return {
-        'type': 'network',
-        'url': uri.toString(),
-      };
+      return {'type': 'network', 'url': uri.toString()};
     }
 
     if (uri.scheme == 'mxc') {
-      return {
-        'type': 'mxc',
-        'uri': uri.toString(),
-      };
+      return {'type': 'mxc', 'uri': uri.toString()};
     }
 
     return null;
@@ -389,10 +424,7 @@ class UrlPreviewDurableCache {
     }
 
     if (uri.scheme == 'http' || uri.scheme == 'https') {
-      return {
-        'type': 'network',
-        'url': uri.toString(),
-      };
+      return {'type': 'network', 'url': uri.toString()};
     }
 
     return null;
@@ -427,10 +459,7 @@ class UrlPreviewDurableCache {
     return null;
   }
 
-  Uri? _volatileImageUriFromJson(
-    Object? value, {
-    required int cachedAtMs,
-  }) {
+  Uri? _volatileImageUriFromJson(Object? value, {required int cachedAtMs}) {
     if (volatileImageTtl.inMicroseconds <= 0) {
       return null;
     }
@@ -493,13 +522,10 @@ class UrlPreviewDurableCache {
   Future<void> _removeKey(SharedPreferences prefs, String key) async {
     await prefs.remove(key);
     final existing = prefs.getStringList(_indexKey) ?? const <String>[];
-    await prefs.setStringList(
-      _indexKey,
-      [
-        for (final item in existing)
-          if (item != key) item
-      ],
-    );
+    await prefs.setStringList(_indexKey, [
+      for (final item in existing)
+        if (item != key) item,
+    ]);
   }
 
   Future<void> _prune(SharedPreferences prefs) async {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:intergalactic/client/attachment.dart';
@@ -148,6 +149,7 @@ class PhotoStackAttachmentView extends StatelessWidget {
   const PhotoStackAttachmentView({
     required this.items,
     required this.timeline,
+    this.scopeEventId,
     this.previewMedia = true,
     this.isThreadTimeline = false,
     this.setEditingEvent,
@@ -158,6 +160,10 @@ class PhotoStackAttachmentView extends StatelessWidget {
 
   final List<PhotoStackAttachmentItem> items;
   final Timeline timeline;
+
+  /// The event whose reactions belong to the stack as a whole rather than to
+  /// one photo. See [photoStackAllScopeLabel].
+  final String? scopeEventId;
   final bool previewMedia;
   final bool isThreadTimeline;
   final Function(TimelineEvent event)? setEditingEvent;
@@ -252,6 +258,7 @@ class PhotoStackAttachmentView extends StatelessWidget {
                             context,
                             items: items,
                             timeline: timeline,
+                            scopeEventId: scopeEventId,
                             isThreadTimeline: isThreadTimeline,
                             setEditingEvent: setEditingEvent,
                             setReplyingEvent: setReplyingEvent,
@@ -282,7 +289,7 @@ class PhotoStackAttachmentView extends StatelessWidget {
                               4 * scale,
                             ),
                             child: Text(
-                              _photoStackCountLabel(count),
+                              photoStackCountLabel(count),
                               style: Theme.of(context).textTheme.labelSmall
                                   ?.copyWith(
                                     color: scheme.onSurfaceVariant,
@@ -295,7 +302,11 @@ class PhotoStackAttachmentView extends StatelessWidget {
                     ],
                   ),
                 ),
-                _PhotoStackReactionIndicators(items: items, timeline: timeline),
+                _PhotoStackReactionIndicators(
+                  items: items,
+                  timeline: timeline,
+                  scopeEventId: scopeEventId,
+                ),
               ],
             ),
           ),
@@ -418,80 +429,291 @@ class _PhotoStackLayer extends StatelessWidget {
   }
 }
 
+/// Label for the chip carrying reactions that belong to the whole stack.
+///
+/// A stack shows N photos but offers N+1 reaction scopes, and a Matrix reaction
+/// can only target a real event - so the whole-stack scope is stored on the
+/// stack's anchor event, which is also its last photo. That made the same
+/// reactions render twice: once as the message's own reaction row and again as
+/// the numbered chip for the last photo, which read as "these people reacted to
+/// photo 2". Labelling the anchor "All" and dropping it from the numbered chips
+/// leaves exactly one chip per scope.
+const String photoStackAllScopeLabel = 'All';
+
+/// One reaction chip: which photo (or the whole stack) it speaks for.
+class PhotoStackReactionChipSpec {
+  const PhotoStackReactionChipSpec({required this.label, required this.item});
+
+  /// `null` when the chip stands alone and the photo is already identified by
+  /// its surroundings, as in the focused lightbox.
+  final String? label;
+  final PhotoStackAttachmentItem item;
+}
+
+/// Builds the chip row: the stack scope first as "All", then the photos that
+/// carry their own reactions, numbered by their position in the stack.
+///
+/// Numbering deliberately uses the position in [items] rather than the position
+/// among the chips, so photo 3's chip still says 3 when photos 1 and 2 have no
+/// reactions.
+List<PhotoStackReactionChipSpec> photoStackReactionChipOrder({
+  required List<PhotoStackAttachmentItem> items,
+  required Timeline timeline,
+  required String? scopeEventId,
+}) {
+  PhotoStackAttachmentItem? scopeItem;
+  final numbered = <PhotoStackReactionChipSpec>[];
+
+  for (var position = 0; position < items.length; position++) {
+    final item = items[position];
+    if (scopeEventId != null && item.event.eventId == scopeEventId) {
+      scopeItem = item;
+      continue;
+    }
+
+    numbered.add(
+      PhotoStackReactionChipSpec(label: '${position + 1}', item: item),
+    );
+  }
+
+  return [
+        if (scopeItem != null)
+          PhotoStackReactionChipSpec(
+            label: photoStackAllScopeLabel,
+            item: scopeItem,
+          ),
+        ...numbered,
+      ]
+      .where((spec) => photoStackItemHasReactions(spec.item.event, timeline))
+      .toList(growable: false);
+}
+
+bool photoStackItemHasReactions(TimelineEvent event, Timeline timeline) {
+  return switch (event) {
+    TimelineEventFeatureReactions reactionEvent => reactionEvent.hasReactions(
+      timeline,
+    ),
+    _ => false,
+  };
+}
+
 class _PhotoStackReactionIndicators extends StatelessWidget {
   const _PhotoStackReactionIndicators({
     required this.items,
     required this.timeline,
+    required this.scopeEventId,
   });
 
   final List<PhotoStackAttachmentItem> items;
   final Timeline timeline;
+  final String? scopeEventId;
 
   @override
   Widget build(BuildContext context) {
-    final reactedItems = items
-        .where((item) => _hasReactions(item.event, timeline))
-        .toList(growable: false);
-    if (reactedItems.isEmpty) {
+    final specs = photoStackReactionChipOrder(
+      items: items,
+      timeline: timeline,
+      scopeEventId: scopeEventId,
+    );
+    if (specs.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(0, 2, 0, 0),
       child: Wrap(
         spacing: 6,
         runSpacing: 4,
         children: [
-          for (final item in reactedItems)
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: scheme.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(
-                  color: scheme.outlineVariant.withValues(alpha: 0.55),
-                ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(6, 3, 6, 3),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      '${items.indexOf(item) + 1}',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    TimelineEventViewReactions(
-                      key: ValueKey(
-                        'photo-stack-reactions-${item.event.eventId}-${item.index}',
-                      ),
-                      index: item.index,
-                      timeline: timeline,
-                    ),
-                  ],
-                ),
-              ),
+          for (final spec in specs)
+            PhotoStackReactionChip(
+              label: spec.label,
+              item: spec.item,
+              index: spec.item.index,
+              timeline: timeline,
             ),
         ],
       ),
     );
   }
+}
 
-  bool _hasReactions(TimelineEvent event, Timeline timeline) {
-    return switch (event) {
-      TimelineEventFeatureReactions reactionEvent => reactionEvent.hasReactions(
-        timeline,
+/// A scope label beside the reaction chips for one event.
+class PhotoStackReactionChip extends StatelessWidget {
+  const PhotoStackReactionChip({
+    required this.label,
+    required this.item,
+    required this.index,
+    required this.timeline,
+    this.updateRevision = 0,
+    this.onDark = false,
+    super.key,
+  });
+
+  final String? label;
+  final PhotoStackAttachmentItem item;
+
+  /// Current timeline index of [item]'s event - not [PhotoStackAttachmentItem.index],
+  /// which is only fresh while the resolving entry is rebuilding.
+  final int index;
+  final Timeline timeline;
+  final int updateRevision;
+
+  /// Set on the lightbox, which paints over a near-black barrier where the
+  /// surface tokens have no contrast to work with.
+  final bool onDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: onDark
+            ? Colors.black.withValues(alpha: 0.52)
+            : scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(999),
+        border: onDark
+            ? null
+            : Border.all(color: scheme.outlineVariant.withValues(alpha: 0.55)),
       ),
-      _ => false,
-    };
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(6, 3, 6, 3),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (label != null) ...[
+              Text(
+                label!,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: onDark ? Colors.white : scheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(width: 4),
+            ],
+            TimelineEventViewReactions(
+              key: ValueKey('photo-stack-reactions-${item.event.eventId}'),
+              index: index,
+              timeline: timeline,
+              updateRevision: updateRevision,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
-String _photoStackCountLabel(int count) {
+/// Reactions for the photo currently in focus in the lightbox.
+///
+/// Two things the in-timeline row gets for free and this does not. The lightbox
+/// is a route above the timeline, so nothing rebuilds it when a reaction lands;
+/// it subscribes to the timeline itself. And it resolves the event's index on
+/// every build, because timeline indices shift as history loads and the index
+/// captured when the stack was resolved can be stale while the lightbox is open.
+class PhotoStackFocusedReactions extends StatefulWidget {
+  const PhotoStackFocusedReactions({
+    required this.item,
+    required this.timeline,
+    this.scopeEventId,
+    super.key,
+  });
+
+  final PhotoStackAttachmentItem item;
+  final Timeline timeline;
+  final String? scopeEventId;
+
+  @override
+  State<PhotoStackFocusedReactions> createState() =>
+      _PhotoStackFocusedReactionsState();
+}
+
+class _PhotoStackFocusedReactionsState
+    extends State<PhotoStackFocusedReactions> {
+  final List<StreamSubscription<int>> _subscriptions = [];
+  int _revision = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _subscribe();
+  }
+
+  @override
+  void didUpdateWidget(covariant PhotoStackFocusedReactions oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.timeline != oldWidget.timeline) {
+      _unsubscribe();
+      _subscribe();
+    }
+  }
+
+  @override
+  void dispose() {
+    _unsubscribe();
+    super.dispose();
+  }
+
+  void _subscribe() {
+    for (final stream in [
+      widget.timeline.onChange.stream,
+      widget.timeline.onEventAdded.stream,
+      widget.timeline.onRemove.stream,
+    ]) {
+      _subscriptions.add(stream.listen((_) => _bump()));
+    }
+  }
+
+  void _unsubscribe() {
+    for (final subscription in _subscriptions) {
+      subscription.cancel();
+    }
+    _subscriptions.clear();
+  }
+
+  void _bump() {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _revision++;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final timeline = widget.timeline;
+    final eventId = widget.item.event.eventId;
+    final index = timeline.events.indexWhere(
+      (event) => event.eventId == eventId,
+    );
+    if (index < 0) {
+      return const SizedBox.shrink();
+    }
+
+    if (!photoStackItemHasReactions(timeline.events[index], timeline)) {
+      return const SizedBox.shrink();
+    }
+
+    final isScope =
+        widget.scopeEventId != null && eventId == widget.scopeEventId;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 0, 0, 8),
+      child: PhotoStackReactionChip(
+        label: isScope ? photoStackAllScopeLabel : null,
+        item: widget.item,
+        index: index,
+        timeline: timeline,
+        updateRevision: _revision,
+        onDark: true,
+      ),
+    );
+  }
+}
+
+String photoStackCountLabel(int count) {
   return Intl.plural(
     count,
     one: '1 photo',
@@ -505,6 +727,7 @@ class PhotoStackLightbox extends StatefulWidget {
   const PhotoStackLightbox({
     required this.items,
     required this.timeline,
+    this.scopeEventId,
     this.initialIndex = 0,
     this.isThreadTimeline = false,
     this.setEditingEvent,
@@ -515,6 +738,10 @@ class PhotoStackLightbox extends StatefulWidget {
 
   final List<PhotoStackAttachmentItem> items;
   final Timeline timeline;
+
+  /// See [PhotoStackAttachmentView.scopeEventId]. Null for the photo album,
+  /// which has no anchor event standing in for the stack.
+  final String? scopeEventId;
   final int initialIndex;
   final bool isThreadTimeline;
   final Function(TimelineEvent event)? setEditingEvent;
@@ -525,6 +752,7 @@ class PhotoStackLightbox extends StatefulWidget {
     BuildContext context, {
     required List<PhotoStackAttachmentItem> items,
     required Timeline timeline,
+    String? scopeEventId,
     int initialIndex = 0,
     bool isThreadTimeline = false,
     Function(TimelineEvent event)? setEditingEvent,
@@ -540,6 +768,7 @@ class PhotoStackLightbox extends StatefulWidget {
         return PhotoStackLightbox(
           items: items,
           timeline: timeline,
+          scopeEventId: scopeEventId,
           initialIndex: initialIndex,
           isThreadTimeline: isThreadTimeline,
           setEditingEvent: setEditingEvent,
@@ -704,21 +933,37 @@ class _PhotoStackLightboxState extends State<PhotoStackLightbox> {
               alignment: Alignment.bottomCenter,
               child: Padding(
                 padding: EdgeInsets.all(BuildConfig.MOBILE ? 92 : 18),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.52),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
-                    child: Text(
-                      count == 0 ? '0 / 0' : '${_index + 1} / $count',
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (count > 0)
+                      PhotoStackFocusedReactions(
+                        key: ValueKey(
+                          'photo-stack-focused-reactions-'
+                          '${widget.items[_index].event.eventId}',
+                        ),
+                        item: widget.items[_index],
+                        timeline: widget.timeline,
+                        scopeEventId: widget.scopeEventId,
+                      ),
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.52),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
+                        child: Text(
+                          count == 0 ? '0 / 0' : '${_index + 1} / $count',
+                          style: Theme.of(context).textTheme.labelMedium
+                              ?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
               ),
             ),
@@ -1073,8 +1318,8 @@ class _FocusedMediaActionButton extends StatelessWidget {
         ? scheme.primaryContainer.withValues(alpha: 0.9)
         : scheme.surface.withValues(alpha: 0.34);
     final disabledColor = scheme.onSurfaceVariant.withValues(alpha: 0.45);
-    return Tooltip(
-      message: tooltip,
+    return tiamat.Tooltip(
+      text: tooltip,
       excludeFromSemantics: true,
       child: SizedBox(
         width: 48,
@@ -1107,8 +1352,8 @@ class _FocusedMediaReactionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
+    return tiamat.Tooltip(
+      text: tooltip,
       excludeFromSemantics: true,
       child: SizedBox(
         width: 44,

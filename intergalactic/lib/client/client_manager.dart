@@ -1,3 +1,5 @@
+import 'package:intergalactic/client/components/push_notification/ios/notification_policy_snapshot.dart';
+import 'package:intergalactic/client/components/push_notification/ios/nse_backup_version.dart';
 import 'dart:async';
 
 import 'package:intergalactic/client/alert.dart';
@@ -5,11 +7,14 @@ import 'package:intergalactic/client/call_manager.dart';
 import 'package:intergalactic/client/client.dart';
 import 'package:intergalactic/client/components/direct_messages/direct_message_aggregator.dart';
 import 'package:intergalactic/client/components/direct_messages/direct_message_component.dart';
+import 'package:intergalactic/client/favorite_rooms.dart';
+import 'package:intergalactic/client/favorite_room_categories.dart';
 import 'package:intergalactic/client/matrix/matrix_client.dart';
 import 'package:intergalactic/client/matrix/web/web_restore_snapshot.dart';
 import 'package:intergalactic/client/stale_info.dart';
 
 import 'package:intergalactic/debug/log.dart';
+import 'package:intergalactic/ui/molecules/message_input.dart';
 import 'package:intergalactic/utils/notifying_list.dart';
 
 class ClientManager {
@@ -144,7 +149,51 @@ class ClientManager {
       }
 
       _clientSubscriptions[client] = [
-        client.onSync.listen((_) => _synced()),
+        client.onSync.listen((_) {
+          _synced();
+          // Keep the original favourites migration alongside category
+          // migration. Categories derive their assignments from m.tag, but
+          // the room store still owns moving legacy device-local favourites
+          // into that Matrix tag for accounts that have not migrated yet.
+          final favoriteMigration = favoriteRoomStore.migrateClient(client);
+          unawaited(
+            favoriteRoomCategoryStore.onClientSync(client).catchError((
+              Object error,
+              StackTrace trace,
+            ) {
+              Log.onError(
+                error,
+                trace,
+                content: 'Failed to sync favorite categories',
+              );
+            }),
+          );
+          // Categories derive their assignments from m.tag. Wait for the
+          // legacy migration to complete before taking that snapshot, or a
+          // first-sync race can permanently seed empty categories.
+          unawaited(
+            favoriteMigration
+                .then((result) async {
+                  if (result.outcome == FavoriteMigrationOutcome.failed ||
+                      result.outcome == FavoriteMigrationOutcome.notReady) {
+                    return;
+                  }
+                  await favoriteRoomCategoryStore.migrateClient(
+                    client,
+                    favoriteRoomIds: client.rooms
+                        .where(favoriteRoomStore.isFavorite)
+                        .map((room) => room.favoriteStorageId),
+                  );
+                })
+                .catchError((Object error, StackTrace trace) {
+                  Log.onError(
+                    error,
+                    trace,
+                    content: 'Failed to migrate favorites',
+                  );
+                }),
+          );
+        }),
         client.onSelfUpdated.listen((_) => _clientUpdated(client)),
         client.onRoomAdded.listen((index) => _onClientAddedRoom(client, index)),
         client.onRoomRemoved.listen(
@@ -157,6 +206,7 @@ class ClientManager {
       ];
 
       onClientAdded.add(_clients.length - 1);
+      _synchronizeNseBackupVersions();
       if (client.self != null) {
         _clientUpdated(client);
       }
@@ -260,6 +310,11 @@ class ClientManager {
       close: closeDuringDetach,
       emitRemoved: true,
     );
+    // The iOS notification policy snapshot is deleted with the last account
+    // and rewritten otherwise (S&C C3, "deleted on logout"). No-op elsewhere.
+    await NotificationPolicySnapshot.onAccountsChanged(
+      clientCount: _clients.length,
+    );
   }
 
   void removeClient(Client client) {
@@ -292,6 +347,27 @@ class ClientManager {
 
   void _synced() {
     onSync.add(null);
+    _synchronizeNseBackupVersions();
+  }
+
+  /// E3: the host is the only component allowed to obtain the current backup
+  /// version. The extension receives the protected handoff later; it never
+  /// discovers a version endpoint itself.
+  void _synchronizeNseBackupVersions() {
+    unawaited(
+      NseBackupVersion.synchronize(
+        _clientsList.whereType<MatrixClient>().map((client) async {
+          final sdk = client.getMatrixClient();
+          final keyManager = sdk.encryption?.keyManager;
+          if (keyManager == null || !keyManager.enabled) return null;
+          final info = await keyManager.getRoomKeysBackupInfo();
+          return NseBackupVersionEntry(
+            clientId: client.identifier,
+            version: info.version,
+          );
+        }),
+      ),
+    );
   }
 
   void _clientUpdated(Client client) {
@@ -324,6 +400,14 @@ class ClientManager {
 
     _removeClientRoomsAndSpaces(client);
     _detachClientFromCollections(client);
+    _synchronizeNseBackupVersions();
+
+    // Plaintext taken out of that account's encrypted rooms, cached process-
+    // wide for seven days of process lifetime. Cleared here because this is
+    // the one funnel every removal reaches - logout, local disposal, and the
+    // replace-an-existing-client path - and it is synchronous, so the close
+    // below failing cannot skip it.
+    ComposerDraftCache.clearForClient(client.identifier);
 
     if (close) {
       try {

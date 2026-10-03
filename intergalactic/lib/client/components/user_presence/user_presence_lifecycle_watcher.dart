@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:intergalactic/client/components/user_presence/user_presence_component.dart';
 import 'package:intergalactic/debug/log.dart';
 import 'package:intergalactic/main.dart';
+import 'package:intergalactic/utils/database/database_release_trigger.dart';
 import 'package:flutter/widgets.dart';
 
 class UserPresenceLifecycleWatcher {
@@ -37,6 +38,25 @@ class UserPresenceLifecycleWatcher {
             unawaited(setState(UserPresenceStatus.unavailable));
           });
         },
+        // `paused` is where the B5 trigger releases the account database, so
+        // from here until `resumed` there is nothing to write presence into.
+        // The overdue inactivity timer used to fire either while the app was
+        // backgrounded-and-running (iOS had not frozen it yet) or in the
+        // first milliseconds of the wake, before the lifecycle event that
+        // re-establishes the database - one rejected presence write every
+        // cycle, measured on device. Not writing `unavailable` at all costs
+        // nothing: sync stops on `paused`, and the server marks the session
+        // away on its own. `onResume` already writes `online`, and setState
+        // waits for the trigger's re-establish before touching the database.
+        //
+        // `paused` only: desktop never enters it, and its minimise-to-`hidden`
+        // path must keep the inactivity timer so a minimised desktop still
+        // goes `unavailable`.
+        onPause: () {
+          inactivityTimer?.cancel();
+          inactivityTimer = null;
+          _cancelRetry();
+        },
       );
     }
 
@@ -44,7 +64,6 @@ class UserPresenceLifecycleWatcher {
   }
 
   Future<void> setState(UserPresenceStatus state) async {
-    final now = DateTime.now();
     final priorPendingState = _pendingRetryState;
     _desiredState = state;
     final generation = ++_stateGeneration;
@@ -52,6 +71,38 @@ class UserPresenceLifecycleWatcher {
       _cancelRetry();
     }
 
+    // The database may be released (B5). This listener's onResume runs
+    // BEFORE the release trigger's observer on the same lifecycle event, and
+    // the wrapper cannot know a re-establish is coming until the trigger has
+    // scheduled it - so asking the wrapper is a race that the write loses.
+    // The trigger arms this gate at release time; it is already complete
+    // when nothing was released.
+    // A failed re-establish completes the gate with an error: the write is
+    // dropped loudly here, and the trigger retries on the next resume.
+    final releaseTrigger = DatabaseReleaseTrigger.instance;
+    if (releaseTrigger != null) {
+      try {
+        await releaseTrigger.whenEstablished;
+      } catch (error) {
+        // Object, not StateError. The trigger completes this gate only with a
+        // StateError today, so nothing else can arrive here yet - but every
+        // caller reaches setState through unawaited(), so a future error type
+        // would leave as an unhandled asynchronous error instead of a dropped
+        // update. The type is logged so a new one is visible when it appears.
+        Log.w(
+          'Dropping presence lifecycle update: ${error.runtimeType}: $error',
+          category: LogCategory.matrix,
+          source: 'presence-lifecycle',
+        );
+        return;
+      }
+      if (generation != _stateGeneration) {
+        return;
+      }
+    }
+
+    // Taken after the wait so the 10 s dedup window measures from the write.
+    final now = DateTime.now();
     if (lastUpdatedStatus != null) {
       if (now.difference(lastUpdatedStatus!).inSeconds < 10) {
         return;
@@ -63,7 +114,8 @@ class UserPresenceLifecycleWatcher {
       for (var client in clientManager!.clients) {
         final component = client.getComponent<UserPresenceComponent>();
         if (component != null) {
-          succeeded = await _setComponentStatus(component, state, generation) &&
+          succeeded =
+              await _setComponentStatus(component, state, generation) &&
               succeeded;
         }
       }

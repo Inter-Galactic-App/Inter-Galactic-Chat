@@ -7,9 +7,11 @@ import 'package:intergalactic/client/components/push_notification/modifiers/noti
 import 'package:intergalactic/client/components/push_notification/modifiers/hide_content.dart';
 import 'package:intergalactic/client/components/push_notification/modifiers/room_notification_snooze.dart';
 import 'package:intergalactic/client/components/push_notification/modifiers/suppress_active_room.dart';
+import 'package:intergalactic/client/components/push_notification/modifiers/suppress_extension_delivered.dart';
 import 'package:intergalactic/client/components/push_notification/modifiers/suppress_other_device_active.dart';
 import 'package:intergalactic/client/components/push_notification/notification_companion_controller.dart';
 import 'package:intergalactic/client/components/push_notification/notification_content.dart';
+import 'package:intergalactic/client/components/push_notification/ios/ios_notifier.dart';
 import 'package:intergalactic/client/components/push_notification/notifier.dart';
 import 'package:intergalactic/client/components/push_notification/platform_notifier_factory.dart';
 import 'package:intergalactic/client/components/push_notification/web/web_push_notifier.dart';
@@ -71,6 +73,13 @@ class NotificationManager {
     addModifier(NotificationModifierSuppressActiveRoom());
     if (BuildConfig.ANDROID) {
       addModifier(NotificationModifierSuppressOtherActiveDevice());
+    }
+    if (PlatformUtils.isIOS) {
+      addModifier(
+        NotificationModifierSuppressExtensionDelivered(
+          deliveredEventIds: IosNotifier.deliveredRemoteEventIds,
+        ),
+      );
     }
 
     // After the suppression modifiers, so a photo that would not have been
@@ -219,6 +228,8 @@ class NotificationManager {
       if (forceShow) {
         if (modifier is NotificationModifierSuppressActiveRoom) continue;
         if (modifier is NotificationModifierSuppressOtherActiveDevice) continue;
+        if (modifier is NotificationModifierSuppressExtensionDelivered)
+          continue;
       }
 
       content = await modifier.process(content!);

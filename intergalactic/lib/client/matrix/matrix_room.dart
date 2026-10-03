@@ -2,10 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui';
+import 'package:collection/collection.dart';
 import 'package:intergalactic/client/alert.dart';
 import 'package:intergalactic/client/components/message_effects/automatic_message_effects.dart';
 import 'package:intergalactic/client/components/message_effects/message_effect_formatting.dart';
 import 'package:intergalactic/client/components/message_effects/message_effect_types.dart';
+import 'package:intergalactic/client/matrix/components/message_forwarding/matrix_forwarded_message.dart';
 import 'package:intergalactic/client/components/component.dart';
 import 'package:intergalactic/client/components/component_registry.dart';
 import 'package:intergalactic/client/components/direct_messages/direct_message_component.dart';
@@ -27,6 +29,7 @@ import 'package:intergalactic/client/matrix/components/read_receipts/matrix_read
 import 'package:intergalactic/client/matrix/components/user_presence/matrix_user_presence.dart';
 import 'package:intergalactic/client/matrix/matrix_attachment.dart';
 import 'package:intergalactic/client/matrix/matrix_bad_encrypted_recovery.dart';
+import 'package:intergalactic/client/components/push_notification/notification_mode_policy.dart';
 import 'package:intergalactic/client/matrix/matrix_client.dart';
 import 'package:intergalactic/client/matrix/matrix_member.dart';
 import 'package:intergalactic/client/matrix/matrix_mxc_image_provider.dart';
@@ -34,6 +37,7 @@ import 'package:intergalactic/client/matrix/matrix_peer.dart';
 import 'package:intergalactic/client/matrix/matrix_role.dart';
 import 'package:intergalactic/client/matrix/matrix_room_display_name_state.dart';
 import 'package:intergalactic/client/matrix/matrix_room_permissions.dart';
+import 'package:intergalactic/client/matrix/push_rule_state_cache.dart';
 import 'package:intergalactic/client/matrix/matrix_timeline.dart';
 import 'package:intergalactic/client/matrix/timeline_events/matrix_timeline_event_add_reaction.dart';
 import 'package:intergalactic/client/matrix/timeline_events/matrix_timeline_event.dart';
@@ -252,8 +256,24 @@ void _applyAutomaticMessageEffect(
   }
 }
 
+/// Returns users that should be shown in the room's elevated-member list.
+///
+/// Room versions 12 and newer make creators implicit maximum-power users, so
+/// they are not required (and may be rejected) in `m.room.power_levels.users`.
+Set<String> matrixImportantMemberIds({
+  required Map<Object?, Object?>? explicitUsers,
+  required Iterable<String> immutableCreatorIds,
+}) {
+  return {...?explicitUsers?.keys.whereType<String>(), ...immutableCreatorIds};
+}
+
+bool matrixRoomHasReplacementId(String? replacementRoomId) {
+  return replacementRoomId != null && replacementRoomId.trim().isNotEmpty;
+}
+
 class MatrixRoom extends Room
     implements
+        PushRuleCacheHolder,
         InboxRoomSource,
         InboxSnapshotProvider,
         RoomJoinRequestActions,
@@ -316,10 +336,14 @@ class MatrixRoom extends Room
   bool get isE2EE => _matrixRoom.encrypted;
 
   @override
-  int get highlightedNotificationCount => _matrixRoom.highlightCount;
+  int get highlightedNotificationCount =>
+      _projectUnreadCount(_matrixRoom.highlightCount, highlighted: true);
 
   @override
-  int get notificationCount {
+  int get notificationCount =>
+      _projectUnreadCount(_notificationCountWithoutProjection);
+
+  int get _notificationCountWithoutProjection {
     final rawCount = _matrixRoom.notificationCount;
     if (rawCount <= 0) {
       return rawCount;
@@ -340,6 +364,145 @@ class MatrixRoom extends Room
             ) ??
         0;
     return (rawCount - suppressed).clamp(0, rawCount).toInt();
+  }
+
+  int _projectUnreadCount(int rawCount, {bool highlighted = false}) {
+    final projection = _readMarkerProjection;
+    if (projection == null) return rawCount;
+    if (!projection.orderKnown) return rawCount;
+    final baseline = highlighted
+        ? projection.highlightBaseline
+        : projection.notificationBaseline;
+    var newer = projection.newerNotifications.values
+        .where((notification) => !highlighted || notification.highlighted)
+        .length;
+    // A cached newer message may already be in the SDK baseline even if its
+    // notification callback was not delivered to this room wrapper. Preserve
+    // at least one unread indication until the confirming sync in that case.
+    if (rawCount > 0 &&
+        newer == 0 &&
+        (highlighted
+            ? projection.hasNewerDirectMention
+            : projection.hasNewerInboundMessage)) {
+      newer = 1;
+    }
+    // The SDK count still includes notifications before the accepted marker.
+    // Its increase captures a concurrent arrival even before onNotification
+    // fires; the bounded event ledger covers a frozen Inbox target that was
+    // already stale before this request began.
+    if (rawCount > baseline) {
+      return rawCount - baseline > newer ? rawCount - baseline : newer;
+    }
+    if (rawCount < baseline &&
+        (newer > 0 ||
+            projection.newerEventIds.isNotEmpty ||
+            (_matrixRoom.lastEvent?.eventId != null &&
+                _matrixRoom.lastEvent?.eventId !=
+                    projection.lastEventIdAtConfirmation))) {
+      return rawCount > newer ? rawCount : newer;
+    }
+    return newer;
+  }
+
+  _ReadMarkerProjection? _readMarkerProjection;
+  // Kept only for this room's lifetime; event IDs are never persisted.
+  final Map<String, _RecentNotification> _recentNotifications = {};
+  int _notificationSequence = 0;
+
+  Future<void> _confirmReadMarker(
+    String targetEventId,
+    int notificationBaseline,
+    int highlightBaseline,
+    int requestStartSequence,
+    String previousMarkerEventId,
+  ) async {
+    final ordered = await _orderedEventsAround(targetEventId);
+    final newerNotifications = <String, _RecentNotification>{};
+    if (ordered != null) {
+      for (final eventId in ordered.newer) {
+        final notification = _recentNotifications[eventId];
+        if (notification != null) newerNotifications[eventId] = notification;
+      }
+      for (final entry in _recentNotifications.entries) {
+        if (entry.value.sequence > requestStartSequence &&
+            entry.key != targetEventId &&
+            !ordered.atOrBefore.contains(entry.key)) {
+          newerNotifications[entry.key] = entry.value;
+        }
+      }
+    }
+    _readMarkerProjection = _ReadMarkerProjection(
+      targetEventId,
+      previousMarkerEventId,
+      notificationBaseline,
+      highlightBaseline,
+      ordered != null,
+      ordered?.newer ?? <String>{},
+      ordered?.atOrBefore ?? <String>{},
+      ordered?.hasNewerInboundMessage ?? false,
+      ordered?.hasNewerDirectMention ?? false,
+      newerNotifications,
+      _matrixRoom.lastEvent?.eventId,
+    );
+    if (ordered != null) {
+      _hasRoomWideMentionNotification = newerNotifications.values.any(
+        (event) => event.roomMention,
+      );
+    }
+    _onUpdate.add(null);
+  }
+
+  Future<
+    ({
+      Set<String> newer,
+      Set<String> atOrBefore,
+      bool hasNewerInboundMessage,
+      bool hasNewerDirectMention,
+    })?
+  >
+  _orderedEventsAround(String targetEventId) async {
+    try {
+      final events = await _matrixRoom.client.database.getEventList(
+        _matrixRoom,
+        limit: _inboxCachedEventScanLimit,
+      );
+      final newer = <String>{};
+      final atOrBefore = <String>{};
+      var hasNewerInboundMessage = false;
+      var hasNewerDirectMention = false;
+      var foundTarget = false;
+      final selfId = _matrixRoom.client.userID ?? _client.self?.identifier;
+      for (final event in events) {
+        if (!event.status.isSynced) continue;
+        if (foundTarget || event.eventId == targetEventId) {
+          foundTarget = true;
+          atOrBefore.add(event.eventId);
+        } else {
+          newer.add(event.eventId);
+          if (event.senderId != selfId &&
+              (event.type == matrix.EventTypes.Message ||
+                  event.type == matrix.EventTypes.Sticker)) {
+            hasNewerInboundMessage = true;
+            if (event.mentions.room ||
+                (selfId != null && event.mentions.userIds.contains(selfId))) {
+              hasNewerDirectMention = true;
+            }
+          }
+        }
+      }
+      if (foundTarget) {
+        return (
+          newer: newer,
+          atOrBefore: atOrBefore,
+          hasNewerInboundMessage: hasNewerInboundMessage,
+          hasNewerDirectMention: hasNewerDirectMention,
+        );
+      }
+    } catch (_) {
+      // The marker succeeded, but without ordering evidence we must preserve
+      // SDK counts rather than risk hiding an unread event.
+    }
+    return null;
   }
 
   bool _hasRoomWideMentionNotification = false;
@@ -400,14 +563,12 @@ class MatrixRoom extends Room
   }
 
   // cache the result of push rule because this was becoming an expensive operation for ui stuff
-  matrix.PushRuleState? _pushRule;
+  late final PushRuleStateCache _pushRuleCache = PushRuleStateCache(
+    _readPushRuleState,
+  );
   @override
   PushRule get pushRule {
-    if (_pushRule == null) {
-      _pushRule = _readPushRuleState();
-    }
-
-    switch (_pushRule!) {
+    switch (_pushRuleCache.value) {
       case matrix.PushRuleState.notify:
         return PushRule.notify;
       case matrix.PushRuleState.mentionsOnly:
@@ -426,8 +587,24 @@ class MatrixRoom extends Room
     };
 
     await _setPushRuleState(newRule);
-    _pushRule = newRule;
+    _pushRuleCache.assign(newRule);
     _onUpdate.add(null);
+  }
+
+  /// Drops the cached push-rule state so the next read reflects synced rules.
+  ///
+  /// The cache was previously invalidated only by a local [setPushRule] on this
+  /// instance, so a rule set on another device - or on a different wrapper for
+  /// the same room - left this one reporting the state it first read. That is
+  /// BUG-319. Returns whether the state actually changed, so a sync carrying
+  /// `m.push_rules` does not rebuild every room for nothing.
+  @override
+  bool invalidatePushRuleCache() {
+    if (!_pushRuleCache.invalidate()) {
+      return false;
+    }
+    _onUpdate.add(null);
+    return true;
   }
 
   @override
@@ -498,7 +675,7 @@ class MatrixRoom extends Room
   }
 
   Future<void> _setPushRuleState(matrix.PushRuleState newState) async {
-    final currentState = _pushRule ?? _readPushRuleState();
+    final currentState = _pushRuleCache.value;
     if (newState == currentState) {
       return;
     }
@@ -916,6 +1093,29 @@ class MatrixRoom extends Room
   }
 
   void onNotification(matrix.Event matrixEvent) {
+    final selfId = _matrixRoom.client.userID ?? _client.self?.identifier;
+    final notification = _RecentNotification(
+      ++_notificationSequence,
+      matrixEvent.mentions.room ||
+          (selfId != null && matrixEvent.mentions.userIds.contains(selfId)),
+      matrixEvent.mentions.room,
+    );
+    _recentNotifications[matrixEvent.eventId] = notification;
+    if (_recentNotifications.length > 128) {
+      _recentNotifications.remove(_recentNotifications.keys.first);
+    }
+    final projection = _readMarkerProjection;
+    if (projection != null &&
+        projection.orderKnown &&
+        matrixEvent.eventId != projection.targetEventId &&
+        !projection.atOrBeforeEventIds.contains(matrixEvent.eventId)) {
+      projection.newerNotifications[matrixEvent.eventId] = notification;
+      if (projection.newerNotifications.length > 128) {
+        projection.orderKnown = false;
+        projection.newerNotifications.clear();
+      }
+      _onUpdate.add(null);
+    }
     var event = convertEvent(matrixEvent);
 
     updateRoomWideMentionNotification(event);
@@ -1004,6 +1204,28 @@ class MatrixRoom extends Room
     }
   }
 
+  /// The mode that actually governs this room's account.
+  ///
+  /// NOT `preferences.notificationMode.value`. That preference is device-wide,
+  /// so reading it raw made muting one account silence every other signed-in
+  /// account, and made a migrated account obey a local value the server had
+  /// already overridden. For a migrated account the SERVER master rule decides,
+  /// which is both per-account and the same on every device.
+  NotificationMode get _effectiveNotificationMode {
+    final matrixClient = client as MatrixClient;
+    final isMigrated = preferences.isGlobalMutePushRuleMigrated(
+      matrixClient.identifier,
+    );
+    return resolveNotificationMode(
+      isMigrated: isMigrated,
+      serverMuted:
+          isMigrated &&
+          matrixClient.getMatrixClient().allPushNotificationsMuted,
+      enableNotifications: preferences.enableNotifications.value,
+      localModeValue: preferences.notificationMode.value,
+    );
+  }
+
   bool shouldNotifyMembershipKnock(MatrixTimelineEventMembership event) {
     if (!BuildConfig.DESKTOP) {
       return false;
@@ -1028,8 +1250,9 @@ class MatrixRoom extends Room
       return false;
     }
 
-    final notificationMode = preferences.notificationMode.value;
-    if (notificationMode == 'mute' || notificationMode == 'mentions') {
+    final notificationMode = _effectiveNotificationMode;
+    if (notificationMode == NotificationMode.mute ||
+        notificationMode == NotificationMode.mentions) {
       return false;
     }
 
@@ -1145,8 +1368,8 @@ class MatrixRoom extends Room
       return false;
     }
 
-    final notificationMode = preferences.notificationMode.value;
-    if (notificationMode == 'mute') {
+    final notificationMode = _effectiveNotificationMode;
+    if (notificationMode == NotificationMode.mute) {
       return false;
     }
 
@@ -1161,7 +1384,7 @@ class MatrixRoom extends Room
       return false;
     }
 
-    if (notificationMode == 'mentions') {
+    if (notificationMode == NotificationMode.mentions) {
       return match.highlight;
     }
 
@@ -1462,6 +1685,59 @@ class MatrixRoom extends Room
     return null;
   }
 
+  /// Sends a forward with already-normalized content. Unlike [sendMessage],
+  /// this never derives Matrix mentions from text: attribution is visual-only
+  /// and must not notify the original author.
+  ///
+  /// Each call targets one destination and must use that destination's stable
+  /// transaction ID. Attachments are processed afresh here before the SDK
+  /// encrypts and uploads them for this room.
+  Future<String?> sendForwardedMessage({
+    required MatrixForwardedMessage message,
+    required String transactionId,
+  }) async {
+    if (!permissions.canSendMessage) {
+      throw StateError('Cannot send a message to this room.');
+    }
+
+    if (!message.hasAttachments) {
+      return _matrixRoom.sendEvent(
+        Map<String, dynamic>.from(message.textContent),
+        txid: transactionId,
+      );
+    }
+
+    String? firstEventId;
+    for (var index = 0; index < message.attachments.length; index++) {
+      final pending = message.attachments[index].toPendingAttachment();
+      final processed = await processAttachment(pending);
+      if (processed == null) {
+        throw StateError('Unable to process a forwarded attachment.');
+      }
+      // Matrix transaction IDs identify one event. Keep the stable destination
+      // attempt ID for a single attachment and derive deterministic siblings
+      // if a later source type exposes more than one attachment.
+      final attachmentTxid = index == 0
+          ? transactionId
+          : '$transactionId-forward-$index';
+      final eventId = await _matrixRoom.sendFileEvent(
+        processed.file,
+        txid: attachmentTxid,
+        thumbnail: processed.thumbnailFile,
+        extraContent: {
+          ...message.attachmentExtraContent,
+          if (processed.spoiler) 'chat.intergalactic.spoiler': true,
+          if (processed.spoiler) 'fi.mau.spoiler': true,
+        },
+      );
+      firstEventId ??= eventId;
+      if (eventId == null) {
+        return null;
+      }
+    }
+    return firstEventId;
+  }
+
   TimelineEvent convertEvent(matrix.Event event, {matrix.Timeline? timeline}) {
     var c = client as MatrixClient;
     try {
@@ -1669,6 +1945,21 @@ class MatrixRoom extends Room
   }
 
   @override
+  Future<RoomTimelineLease> getTimelineForEventContext(
+    String contextEventId,
+  ) async {
+    final matrixClient = client as MatrixClient;
+    final contextTimeline = MatrixTimeline(matrixClient, this, matrixRoom);
+    return RoomTimelineLease.initializeOwned(
+      contextTimeline,
+      () => matrixClient.runWithSessionRepairOnUnknownToken(
+        'loading event-context timeline for room=${_matrixRoomLogHash(matrixRoom.id)}',
+        () => contextTimeline.initTimeline(contextEventId: contextEventId),
+      ),
+    );
+  }
+
+  @override
   Future<ImageProvider?> getShortcutImage() async {
     if (avatar != null) return avatar;
 
@@ -1758,7 +2049,11 @@ class MatrixRoom extends Room
       limit: _inboxCachedEventScanLimit,
     );
     final activeTimeline = timeline;
-    final fullyReadEventId = _matrixRoom.fullyRead;
+    // The SDK's m.fully_read cache can lag a successful marker request. Use
+    // the same accepted target as the optimistic count projection so older
+    // messages cannot re-enter the Inbox mention filter during that gap.
+    final fullyReadEventId =
+        _readMarkerProjection?.targetEventId ?? _matrixRoom.fullyRead;
     final selfId = _matrixRoom.client.userID;
 
     InboxEventSnapshot? newestUnread;
@@ -1889,16 +2184,23 @@ class MatrixRoom extends Room
       );
     }
 
+    final notificationBaseline = _notificationCountWithoutProjection;
+    final highlightBaseline = _matrixRoom.highlightCount;
+    final requestStartSequence = _notificationSequence;
+    final previousMarkerEventId = _matrixRoom.fullyRead;
     final public = _readMarkerIsPublic();
     await _matrixRoom.setReadMarker(
       snapshot.readTargetEventId,
       mRead: snapshot.readTargetEventId,
       public: public,
     );
-    if (_hasRoomWideMentionNotification) {
-      _hasRoomWideMentionNotification = false;
-      _onUpdate.add(null);
-    }
+    await _confirmReadMarker(
+      snapshot.readTargetEventId,
+      notificationBaseline,
+      highlightBaseline,
+      requestStartSequence,
+      previousMarkerEventId,
+    );
   }
 
   @override
@@ -1998,20 +2300,23 @@ class MatrixRoom extends Room
   @override
   List<(Member, Role)> importantMembers() {
     var state = _matrixRoom.states["m.room.power_levels"]?[""];
-    if (state == null) return [];
-
-    var roles = (state.content["users"] as Map<String, dynamic>?);
-    if (roles == null) return [];
-
-    var ids = roles.keys;
+    final rawRoles = state?.content["users"];
+    final roles = rawRoles is Map ? Map<Object?, Object?>.from(rawRoles) : null;
+    final ids = matrixImportantMemberIds(
+      explicitUsers: roles,
+      immutableCreatorIds: _immutableCreatorIds,
+    );
+    if (ids.isEmpty) return [];
 
     var result = ids
-        .map((e) => (getMemberOrFallback(e), MatrixRole(roles[e])))
+        .map((e) => (getMemberOrFallback(e), getMemberRole(e)))
         .toList();
 
-    result.removeWhere((element) => element.$2.rank == 0);
+    result.removeWhere((element) => (element.$2 as MatrixRole).rank == 0);
 
-    result.sort((a, b) => b.$2.rank.compareTo(a.$2.rank));
+    result.sort(
+      (a, b) => (b.$2 as MatrixRole).rank.compareTo((a.$2 as MatrixRole).rank),
+    );
 
     return result;
   }
@@ -2255,6 +2560,42 @@ class MatrixRoom extends Room
 
     if (update == null) return;
 
+    final projection = _readMarkerProjection;
+    if (projection != null) {
+      final reportedMarker = update.accountData
+          ?.lastWhereOrNull((event) => event.type == 'm.fully_read')
+          ?.content['event_id'];
+      final markerChangedElsewhere =
+          reportedMarker is String &&
+          reportedMarker != projection.targetEventId &&
+          reportedMarker != projection.previousMarkerEventId;
+      final markerConfirmed =
+          reportedMarker == projection.targetEventId ||
+          _matrixRoom.fullyRead == projection.targetEventId;
+      final unread = update.unreadNotifications;
+      final syncedNotifications = unread?.notificationCount;
+      final syncedHighlights = unread?.highlightCount;
+      final countReduced =
+          unread != null &&
+          ((syncedNotifications != null &&
+                  syncedNotifications < projection.notificationBaseline) ||
+              (syncedHighlights != null &&
+                  syncedHighlights < projection.highlightBaseline));
+      final countConverged =
+          unread != null &&
+          _notificationCountWithoutProjection <=
+              _projectUnreadCount(_notificationCountWithoutProjection) &&
+          _matrixRoom.highlightCount <=
+              _projectUnreadCount(
+                _matrixRoom.highlightCount,
+                highlighted: true,
+              );
+      if (markerChangedElsewhere ||
+          (markerConfirmed && (countReduced || countConverged))) {
+        _readMarkerProjection = null;
+      }
+    }
+
     if (_matrixRoom.notificationCount == 0 && _hasRoomWideMentionNotification) {
       _hasRoomWideMentionNotification = false;
     }
@@ -2490,13 +2831,27 @@ class MatrixRoom extends Room
     // the chat subscribed to a timeline nobody updates.
     final tl = await matrixRoom.getTimeline();
     try {
-      await tl.setReadMarker(public: _readMarkerIsPublic());
+      final target = tl.events.firstWhereOrNull(
+        (event) => event.status.isSynced,
+      );
+      if (target == null) return;
+      final notificationBaseline = _notificationCountWithoutProjection;
+      final highlightBaseline = _matrixRoom.highlightCount;
+      final requestStartSequence = _notificationSequence;
+      final previousMarkerEventId = _matrixRoom.fullyRead;
+      await tl.setReadMarker(
+        eventId: target.eventId,
+        public: _readMarkerIsPublic(),
+      );
+      await _confirmReadMarker(
+        target.eventId,
+        notificationBaseline,
+        highlightBaseline,
+        requestStartSequence,
+        previousMarkerEventId,
+      );
     } finally {
       tl.cancelSubscriptions();
-    }
-    if (_hasRoomWideMentionNotification) {
-      _hasRoomWideMentionNotification = false;
-      _onUpdate.add(null);
     }
   }
 
@@ -2603,4 +2958,40 @@ class MatrixRoom extends Room
             .toList() ??
         [];
   }
+}
+
+class _ReadMarkerProjection {
+  _ReadMarkerProjection(
+    this.targetEventId,
+    this.previousMarkerEventId,
+    this.notificationBaseline,
+    this.highlightBaseline,
+    this.orderKnown,
+    this.newerEventIds,
+    this.atOrBeforeEventIds,
+    this.hasNewerInboundMessage,
+    this.hasNewerDirectMention,
+    this.newerNotifications,
+    this.lastEventIdAtConfirmation,
+  );
+
+  final String targetEventId;
+  final String previousMarkerEventId;
+  final int notificationBaseline;
+  final int highlightBaseline;
+  bool orderKnown;
+  final Set<String> newerEventIds;
+  final Set<String> atOrBeforeEventIds;
+  final bool hasNewerInboundMessage;
+  final bool hasNewerDirectMention;
+  final Map<String, _RecentNotification> newerNotifications;
+  final String? lastEventIdAtConfirmation;
+}
+
+class _RecentNotification {
+  const _RecentNotification(this.sequence, this.highlighted, this.roomMention);
+
+  final int sequence;
+  final bool highlighted;
+  final bool roomMention;
 }

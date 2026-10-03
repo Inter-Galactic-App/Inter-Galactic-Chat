@@ -1,21 +1,23 @@
 import 'package:intergalactic/config/layout_config.dart';
 import 'package:intergalactic/ui/accessibility/accessibility_scope.dart';
 import 'package:intergalactic/ui/atoms/tiny_pill.dart';
+import 'package:intergalactic/ui/navigation/adaptive_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:tiamat/tiamat.dart' as tiamat;
 
 class MatrixSessionView extends StatelessWidget {
-  const MatrixSessionView(
-      {this.displayName,
-      required this.deviceId,
-      this.lastSeenIp,
-      this.lastSeenTimestamp,
-      super.key,
-      this.verified = false,
-      this.isThisDevice = false,
-      this.beginVerification,
-      this.removeSession});
+  const MatrixSessionView({
+    this.displayName,
+    required this.deviceId,
+    this.lastSeenIp,
+    this.lastSeenTimestamp,
+    super.key,
+    this.verified = false,
+    this.isThisDevice = false,
+    this.beginVerification,
+    this.removeSession,
+  });
 
   final String? displayName;
   final String deviceId;
@@ -26,9 +28,11 @@ class MatrixSessionView extends StatelessWidget {
   final Function? beginVerification;
   final Function? removeSession;
 
-  String get promptMatrixVerifySession => Intl.message("Verify",
-      desc: "Text on the button to verify a session",
-      name: "promptMatrixVerifySession");
+  String get promptMatrixVerifySession => Intl.message(
+    "Verify",
+    desc: "Text on the button to verify a session",
+    name: "promptMatrixVerifySession",
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -36,8 +40,9 @@ class MatrixSessionView extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(5)),
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(5),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(8.0),
         child: Column(
@@ -72,15 +77,14 @@ class MatrixSessionView extends StatelessWidget {
                         ),
                         if (lastSeenTimestamp != null)
                           tiamat.Text.tiny(
-                              "Last Seen: ${DateFormat(DateFormat.YEAR_MONTH_WEEKDAY_DAY).format(DateTime.fromMillisecondsSinceEpoch(lastSeenTimestamp!))}"),
+                            "Last Seen: ${DateFormat(DateFormat.YEAR_MONTH_WEEKDAY_DAY).format(DateTime.fromMillisecondsSinceEpoch(lastSeenTimestamp!))}",
+                          ),
                         if (lastSeenIp != null)
                           const Padding(
                             padding: EdgeInsets.fromLTRB(10, 0, 10, 0),
                             child: SizedBox(
                               width: 10,
-                              child: tiamat.Seperator(
-                                padding: 0,
-                              ),
+                              child: tiamat.Seperator(padding: 0),
                             ),
                           ),
                         if (lastSeenIp != null) tiamat.Text.tiny(lastSeenIp!),
@@ -88,17 +92,17 @@ class MatrixSessionView extends StatelessWidget {
                     ),
                   ],
                 ),
-                if (Layout.desktop) verifyButton()
+                if (Layout.desktop) verifyButton(context),
               ],
             ),
-            if (Layout.mobile) Align(child: verifyButton()),
+            if (Layout.mobile) Align(child: verifyButton(context)),
           ],
         ),
       ),
     );
   }
 
-  Row verifyButton() {
+  Row verifyButton(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
@@ -113,18 +117,41 @@ class MatrixSessionView extends StatelessWidget {
             child: tiamat.IconButton(
               icon: Icons.delete,
               size: 24,
-              onPressed: () => removeSession?.call(),
+              semanticLabel: 'Remove session',
+              tooltip: 'Remove session',
+              onPressed: () {
+                _confirmRemoveSession(context);
+              },
             ),
-          )
+          ),
       ],
     );
+  }
+
+  Future<void> _confirmRemoveSession(BuildContext context) async {
+    final confirmed = await AdaptiveDialog.confirmation(
+      context,
+      title: 'Remove session?',
+      prompt:
+          'This signs the device out of your account and stops new access. '
+          'Messages already stored on that device may remain available.',
+      confirmationText: 'Remove session',
+      dangerous: true,
+    );
+
+    if (confirmed == true) {
+      removeSession?.call();
+    }
   }
 
   IconData getIcon() {
     if (displayName == null) return Icons.device_unknown;
 
-    if (["ios", "android", "mobile"]
-        .any((element) => displayName!.toLowerCase().contains(element))) {
+    if ([
+      "ios",
+      "android",
+      "mobile",
+    ].any((element) => displayName!.toLowerCase().contains(element))) {
       return Icons.smartphone;
     }
 

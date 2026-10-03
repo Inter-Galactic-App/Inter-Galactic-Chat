@@ -91,6 +91,7 @@ class CallManager {
   Player? player;
   Player? muteSoundPlayer;
   Player? unmuteSoundPlayer;
+  Player? streamCuePlayer;
   @visibleForTesting
   bool disableSoundEffectsForTesting = false;
   @visibleForTesting
@@ -252,6 +253,18 @@ class CallManager {
     player = getSoundPlayer();
     player?.open(Media("asset:///assets/sound/joined_call.ogg"));
     player?.setPlaylistMode(PlaylistMode.none);
+  }
+
+  void playStreamStartSound() => _playStreamCue('stream_start.ogg');
+
+  void playStreamEndSound() => _playStreamCue('stream_end.ogg');
+
+  void _playStreamCue(String asset) {
+    if (disableSoundEffectsForTesting || _disposed) return;
+    streamCuePlayer ??= Player(configuration: PlayerConfiguration());
+    streamCuePlayer!.setVolume(preferences.notificationsVolume.value);
+    streamCuePlayer!.open(Media('asset:///assets/sound/$asset'));
+    streamCuePlayer!.setPlaylistMode(PlaylistMode.none);
   }
 
   void mute() {
@@ -1213,10 +1226,16 @@ class CallManager {
     unawaited(_onSessionStarted.close());
     unawaited(_onDeafenChanged.close());
 
-    final players = [player, muteSoundPlayer, unmuteSoundPlayer];
+    final players = [
+      player,
+      muteSoundPlayer,
+      unmuteSoundPlayer,
+      streamCuePlayer,
+    ];
     player = null;
     muteSoundPlayer = null;
     unmuteSoundPlayer = null;
+    streamCuePlayer = null;
 
     for (final soundPlayer in players) {
       try {

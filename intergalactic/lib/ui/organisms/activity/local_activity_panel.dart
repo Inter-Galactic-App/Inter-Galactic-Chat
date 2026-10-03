@@ -11,6 +11,7 @@ import 'package:intergalactic/main.dart';
 import 'package:intergalactic/ui/mobile/mobile_surface.dart';
 import 'package:intergalactic/ui/mobile/mobile_visuals.dart';
 import 'package:intergalactic/ui/onboarding/tutorial_anchor.dart';
+import 'package:tiamat/tiamat.dart' as tiamat;
 
 class LocalActivityPanel extends StatefulWidget {
   const LocalActivityPanel({
@@ -205,8 +206,8 @@ class CompactActivityCard extends StatelessWidget {
                       .toList(),
                 ),
               if (onHideActivity != null)
-                Tooltip(
-                  message: 'Hide activity',
+                tiamat.Tooltip(
+                  text: 'Hide activity',
                   child: IconButton(
                     icon: const Icon(Icons.close),
                     iconSize: 14,
@@ -459,8 +460,8 @@ class _ActivityControlButton extends StatelessWidget {
       final scheme = Theme.of(context).colorScheme;
       return Padding(
         padding: const EdgeInsets.only(left: 3),
-        child: Tooltip(
-          message: control.tooltip ?? control.label,
+        child: tiamat.Tooltip(
+          text: control.tooltip ?? control.label,
           child: DecoratedBox(
             decoration: BoxDecoration(
               shape: BoxShape.circle,
@@ -483,8 +484,8 @@ class _ActivityControlButton extends StatelessWidget {
       );
     }
 
-    return Tooltip(
-      message: control.tooltip ?? control.label,
+    return tiamat.Tooltip(
+      text: control.tooltip ?? control.label,
       child: IconButton(
         icon: Icon(_iconForControl(control)),
         iconSize: 15,

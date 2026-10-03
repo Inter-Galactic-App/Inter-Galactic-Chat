@@ -81,6 +81,34 @@ class GeneralSettingsPageState extends State<GeneralSettingsPage> {
     name: "labelUrlPreviewInEncryptedChatDescription",
   );
 
+  String get labelDirectPreviewFallbackE2EETitle => Intl.message(
+    "Direct preview fallback in encrypted chats",
+    desc:
+        "Label for the toggle allowing a direct third-party fetch as a fallback for URL previews in encrypted chats",
+    name: "labelDirectPreviewFallbackE2EETitle",
+  );
+
+  String get labelDirectPreviewFallbackE2EEDescription => Intl.message(
+    "Off by default. The app first tries a configured preview service if available, then may try your homeserver. If the preview remains incomplete, this option may fetch from TikTok, Instagram, or Reddit. A card with enough text but no image may still fetch a provider site icon. The service, homeserver, and link site may each receive the URL; the provider or image host may see your device's IP address when fetching a thumbnail or icon.",
+    desc:
+        "Description explaining that encrypted-chat direct fallback may fetch metadata, a thumbnail, or a site icon, disclosing the URL or device IP to additional recipients",
+    name: "labelDirectPreviewFallbackE2EEDescription",
+  );
+
+  String get labelDirectPreviewFallbackUnencryptedTitle => Intl.message(
+    "Direct preview fallback in unencrypted chats",
+    desc:
+        "Label for the toggle allowing a direct third-party fetch as a fallback for URL previews in unencrypted chats",
+    name: "labelDirectPreviewFallbackUnencryptedTitle",
+  );
+
+  String get labelDirectPreviewFallbackUnencryptedDescription => Intl.message(
+    "Off by default. The app first tries a configured preview service if available, then may try your homeserver. If the preview remains incomplete, this option may fetch from TikTok, Instagram, or Reddit. A card with enough text but no image may still fetch a provider site icon. Your homeserver already sees unencrypted links; the service and link site may also receive the URL. The provider or image host may see your device's IP address when fetching a thumbnail or icon.",
+    desc:
+        "Description explaining that unencrypted-chat direct fallback may fetch metadata, a thumbnail, or a site icon, disclosing the URL or device IP to additional recipients",
+    name: "labelDirectPreviewFallbackUnencryptedDescription",
+  );
+
   String get labelMediaPreviewsTitle => Intl.message(
     "Media previews",
     desc: "Label for the media preview picker",
@@ -349,6 +377,17 @@ class GeneralSettingsPageState extends State<GeneralSettingsPage> {
               description: labelUrlPreviewInEncryptedChatDescription,
               onChanged: (value) =>
                   preferences.applyUrlPreviewE2EEConsentChoice(allow: value),
+            ),
+            BooleanPreferenceToggle(
+              preference: preferences.allowDirectUrlPreviewFallbackInE2EEChat,
+              title: labelDirectPreviewFallbackE2EETitle,
+              description: labelDirectPreviewFallbackE2EEDescription,
+            ),
+            BooleanPreferenceToggle(
+              preference:
+                  preferences.allowDirectUrlPreviewFallbackInUnencryptedChat,
+              title: labelDirectPreviewFallbackUnencryptedTitle,
+              description: labelDirectPreviewFallbackUnencryptedDescription,
             ),
             _buildMediaPreviewModePicker(),
             BooleanPreferenceToggle(

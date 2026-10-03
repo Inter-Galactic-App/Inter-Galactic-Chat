@@ -1,7 +1,6 @@
 # Stream Bottleneck Classification
 
 Status: Active architecture contract
-Owner: EXPERIMENTAL
 Last updated: 2026-06-21
 
 Every stream-test bottleneck label must be evidence-based. If the required

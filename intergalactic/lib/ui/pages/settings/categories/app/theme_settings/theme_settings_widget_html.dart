@@ -499,15 +499,15 @@ class _ThemeListWidgetState extends State<ThemeListWidget> {
                 onTap: createCustomTheme,
               ),
             ),
-            Tooltip(
-              message: 'Import is not available in the web build',
+            tiamat.Tooltip(
+              text: 'Import is not available in the web build',
               child: const tiamat.CircleButton(
                 icon: Icons.upload_file,
                 onPressed: null,
               ),
             ),
-            Tooltip(
-              message: activeCustomTheme == null
+            tiamat.Tooltip(
+              text: activeCustomTheme == null
                   ? 'Select a custom theme to export'
                   : 'Export Theme Archive',
               child: tiamat.CircleButton(
@@ -752,21 +752,21 @@ class _ThemeEntryRow extends StatelessWidget {
         ),
         const SizedBox(width: 12),
         if (entry.isCustom) ...[
-          Tooltip(
-            message: CommonStrings.promptEdit,
+          tiamat.Tooltip(
+            text: CommonStrings.promptEdit,
             child: tiamat.CircleButton(icon: Icons.edit, onPressed: onEdit),
           ),
           const SizedBox(width: 4),
-          Tooltip(
-            message: 'Export Theme Archive',
+          tiamat.Tooltip(
+            text: 'Export Theme Archive',
             child: tiamat.CircleButton(
               icon: Icons.download,
               onPressed: onExport,
             ),
           ),
           const SizedBox(width: 4),
-          Tooltip(
-            message: CommonStrings.promptDelete,
+          tiamat.Tooltip(
+            text: CommonStrings.promptDelete,
             child: tiamat.CircleButton(icon: Icons.delete, onPressed: onDelete),
           ),
           const SizedBox(width: 12),
@@ -797,8 +797,8 @@ class _ThemeSwatchButton extends StatelessWidget {
     final fallback = Theme.of(context).colorScheme.primary;
     final swatches = colors.isEmpty ? [fallback] : colors;
 
-    return Tooltip(
-      message: 'Select theme',
+    return tiamat.Tooltip(
+      text: 'Select theme',
       child: Material(
         color: Colors.transparent,
         child: InkWell(

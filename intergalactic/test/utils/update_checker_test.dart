@@ -234,5 +234,130 @@ void main() {
         expect(args, isNot(contains("-Command")));
       }
     });
+
+    test('never opens the manual download through a shell', () {
+      final launch = UpdateChecker.debugWindowsManualDownloadLaunch(
+        Uri.parse('https://app.ourgalaxy.space/downloads/app.exe'),
+      )!;
+
+      // runInShell would make Windows run this as `cmd.exe /c ...`, which
+      // interprets shell metacharacters in the installer URL.
+      expect(launch.runInShell, isFalse);
+      expect(launch.executable, 'rundll32.exe');
+      expect(launch.arguments.first, 'url.dll,FileProtocolHandler');
+    });
+
+    test('passes a metacharacter installer url as one literal argument', () {
+      // `&` survives Uri normalisation (unlike `|`, `<` or `^`, which are
+      // percent-encoded), and the URL has no whitespace, so Dart would not
+      // quote it for cmd.exe: under runInShell it would start a second
+      // command.
+      const hostile = r'https://app.ourgalaxy.space/downloads/app.exe&calc.exe';
+      final url = Uri.parse(hostile);
+      expect(url.toString(), hostile, reason: 'Uri must not neutralise `&`');
+
+      final launch = UpdateChecker.debugWindowsManualDownloadLaunch(url)!;
+
+      // The assertion this test was missing. Everything below proves the `&`
+      // is not SPLIT into a second argument; none of it proves the argument
+      // is not handed to a shell in the first place. A URL-specific branch -
+      // "this one looks odd, run it through cmd so the quoting is handled" -
+      // would satisfy every other expectation here and reopen exactly the
+      // injection #342 closed, because `&calc.exe` only becomes a second
+      // command once cmd.exe parses it.
+      expect(
+        launch.runInShell,
+        isFalse,
+        reason:
+            'the safe-URL test pins runInShell; without the same pin here the '
+            'hostile input is the one input allowed to reach a shell',
+      );
+      expect(launch.arguments.length, 2);
+      expect(launch.arguments.last, hostile);
+      expect(launch.executable, isNot(contains('cmd')));
+      expect(launch.executable, isNot(contains(hostile)));
+    });
+
+    test('refuses to launch an installer url that is not https', () {
+      // The manual-download button is reachable when the updater already
+      // rejected the URLs as untrusted, so the installer URL here is remote
+      // input. `url.dll,FileProtocolHandler` resolves whatever scheme it is
+      // handed - a `file:` UNC path or any registered third-party protocol
+      // handler - so anything that is not an https web address must produce
+      // no launch configuration at all, and therefore no button.
+      const rejected = [
+        r'file://attacker.example/share/payload.exe',
+        r'\\attacker.example\share\payload.exe',
+        'ms-settings:',
+        'javascript:alert(1)',
+        'http://app.ourgalaxy.space/downloads/app.exe',
+        'https:///downloads/app.exe',
+      ];
+
+      for (final url in rejected) {
+        expect(
+          UpdateChecker.debugWindowsManualDownloadLaunch(Uri.parse(url)),
+          isNull,
+          reason: '$url must never reach FileProtocolHandler',
+        );
+      }
+
+      // Guards the assertions above against a launch helper that returns null
+      // for everything: the legitimate case must still be launchable.
+      expect(
+        UpdateChecker.debugWindowsManualDownloadLaunch(
+          Uri.parse('https://app.ourgalaxy.space/downloads/app.exe'),
+        ),
+        isNotNull,
+      );
+    });
+
+    // The two gates are independent and neither subsumes the other, so each
+    // one is asserted with the OTHER passing - otherwise a test would go on
+    // passing after its own gate was deleted, which is exactly how the
+    // untrusted-destination hole survived the first fix.
+    test('an untrusted manifest gets no manual download even over https', () {
+      expect(
+        UpdateChecker.manualDownloadLaunch(
+          installerUrl: Uri.parse('https://evil.example/InterGalactic.exe'),
+          hasTrustedDestinations: false,
+        ),
+        isNull,
+        reason:
+            'the updater refused to download from this address moments '
+            'earlier; offering one click to open it undoes that refusal',
+      );
+    });
+
+    test('a trusted manifest still cannot smuggle a non-https scheme', () {
+      for (final url in const [
+        r'file://attacker.example/share/InterGalactic.exe',
+        'ms-settings:',
+        'http://app.ourgalaxy.space/downloads/app.exe',
+      ]) {
+        expect(
+          UpdateChecker.manualDownloadLaunch(
+            installerUrl: Uri.parse(url),
+            hasTrustedDestinations: true,
+          ),
+          isNull,
+          reason: '$url passed the manifest gate but must fail the scheme one',
+        );
+      }
+    });
+
+    test('both gates passing still yields a launch', () {
+      // Vacuity guard. Without it, a `manualDownloadLaunch` hard-wired to
+      // return null passes both tests above.
+      expect(
+        UpdateChecker.manualDownloadLaunch(
+          installerUrl: Uri.parse(
+            'https://app.ourgalaxy.space/downloads/app.exe',
+          ),
+          hasTrustedDestinations: true,
+        ),
+        isNotNull,
+      );
+    });
   });
 }

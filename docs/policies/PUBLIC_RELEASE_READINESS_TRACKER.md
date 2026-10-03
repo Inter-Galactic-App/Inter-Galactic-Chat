@@ -1,33 +1,30 @@
 # Public Release Readiness Tracker
 
-Last updated: 2026-06-16
+Status: retained `0.7.4+985` readiness snapshot; not a current-release gate.
+Evidence last updated: 2026-06-16. Scope reviewed: 2026-09-28.
 
-Purpose: this is the simple checklist to maintain as public-release work lands.
-It summarizes the workspace audit report, the policy docs in this folder, and
-the latest implementation work. Keep the detailed evidence in the linked docs;
-keep this file short enough to scan before each release pass.
+Purpose: preserve the release-era checklist and its linked evidence. Use the
+release-specific record for a later build; these historical checkboxes do not
+approve it.
 
 This is an engineering/release tracker, not legal advice.
 
-## How To Maintain This File
+## How To Read And Correct This Snapshot
 
-- Check a box only after the code, docs, and manual evidence are done.
-- If a code change lands but still needs device/App Store verification, leave
-  the blocker unchecked and add a short note.
-- Add the commit, PR, screenshot, upload result, or human review note in the
-  evidence line when available.
-- Confirm public contacts and TODO URLs before any public submission.
+- Read each checked item against its recorded `0.7.4+985` or explicitly named
+  historical artifact, not a later release.
+- Correct historical facts with a dated, source-backed note; do not check a
+  box because a newer build or website page passed a similar gate.
+- Use the current release record and [`SOURCE_OFFER.md`](SOURCE_OFFER.md) for
+  later release identity and source routes.
 
-## Current Snapshot
+## Retained 0.7.4+985 Snapshot
 
-> **Scope note added 2026-08-17.** The snapshot below is the readiness record
-> for the **`0.7.4+985` cycle**, and its evidence lines are accurate for that
-> cycle. It is **not** the current public release. The newest public release is
-> **`0.8.0+993`**; its source, notice and correspondence evidence lives in
-> [`SOURCE_OFFER.md`](SOURCE_OFFER.md), which is authoritative on release
-> identity whenever the two disagree. Read a "current" in this file as "current
-> for 0.7.4+985", and do not take a readiness decision for a later build from
-> it.
+> **Scope note added 2026-08-17, clarified 2026-09-28.** The snapshot below
+> records the `0.7.4+985` cycle only. Read a "current" in its evidence lines as
+> "current for 0.7.4+985"; none of its checkboxes attests a later build. The
+> release identity and source route for currently distributed material belong
+> in [`SOURCE_OFFER.md`](SOURCE_OFFER.md), not this historical snapshot.
 
 - [x] REVIEW release-closeout pass completed for the then-current `0.7.4+985`
   rollout boundary.

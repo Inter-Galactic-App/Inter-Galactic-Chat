@@ -1,55 +1,60 @@
 # Public Changelog
 
-This app-repo copy mirrors the current public-safe release note entry for the
-source archive and public repository. The release workflow publishes the same
-public changelog section to the website update metadata when a release is
-prepared.
-
-Current public changelog target:
-
-- `https://app.ourgalaxy.space/updates/changelog/v0.8.1.md`
-
-Previous published changelog:
-
-- `https://app.ourgalaxy.space/updates/changelog/v0.8.0.md`
-
-Internal engineering history belongs in `CHANGE_LOG.md`.
-
----
-
-# Inter Galactic v0.8.1 Beta
-
-Build date: 2026-08-03
-Build identity: v0.8.1+1000 development cycle.
-Status: In-progress beta notes for the public repository and future release
-pipeline.
+# Inter Galactic v0.8.2
 
 ## Highlights
 
-### Top Changes
+### Top 5 Changes
 
-- Fixed noise suppression staying switched off on Android after an app update.
-  Updating no longer leaves the voice-cleanup model stale, and installs that had
-  already got into that state recover on the next launch.
-- Android release packaging now completes its license-notice step reliably, so a
-  successfully built Android update is no longer reported as a failed build.
-- The third-party license notices published alongside each release now have
-  automated checks that keep local build-machine file paths out of the published
-  files, while preserving the package and license references those notices exist
-  to record.
-- A new default-on **Remove photo metadata before sending** setting removes
-  embedded details such as location metadata from compatible still photos. You
-  can turn it off in Settings > General > Media to send the original photo
-  unchanged; the setting applies consistently across message composers, and
-  re-encoded images keep accurate file type labels. If a photo cannot be
-  prepared safely, the original photo is sent unchanged. On the web build, a
-  photo the browser hands over only as a file reference cannot be read or
-  rewritten, so it is sent unchanged with its metadata intact - use a desktop
-  or mobile build if you are relying on this.
+1. **Forward messages to other rooms.** Send text, images, and links to as many
+   as ten rooms at once with a searchable room picker. Any original-author
+   label is supplied by the person forwarding and is not verified against the
+   source message.
+2. **See and hear when a stream is active.** Streams now play a cue when sharing
+   starts or stops, and stream headers show who is watching.
+3. **Calls work more smoothly across devices.** Double-tap your local camera
+   tile on mobile to switch cameras, join Windows calls with Push to Talk ready,
+   and recover from connection changes with fewer stale tiles and gentler
+   screen-share quality changes.
+4. **Keep your spaces in sync.** Favorite rooms and Space ordering follow your
+   account across devices; favorite categories remain local to each device.
+5. **Choose notification and preview privacy.** Set notification behavior per
+   account across your devices, and separately control direct link-preview
+   requests for encrypted and unencrypted conversations.
 
-### Known Issues
+### More Improvements
 
-- The v0.8.0 known issues below still apply to this cycle.
+- Whisper is now available as a composer message effect.
+- Forwarded replies no longer include the quoted author's Matrix ID.
+- Inbox conversations open into their messages on mobile. Replies, threads,
+  previews, reactions, polls, unread state, and search results stay more current
+  as conversations change.
+- Call-room chat can reach older messages more reliably, and typing indicators
+  clear when a stop update is missed.
+- iOS notifications can show decrypted message previews and images. Android
+  image previews are clearer, and room alerts clear more reliably when read or
+  snoozed.
+- Room and Space settings make profile details easier for members to find, and
+  reply highlights preserve custom chat backgrounds.
+- Frequently Used sticker recents stay available on the device where you use
+  them. Desktop composer shortcuts also respond more consistently.
+- Encrypted-history requests explain when storage recovery is needed and can be
+  retried.
+- Background handling is more reliable on iOS and Android.
+- The Windows updater checks download links before offering to open them.
+- Windows Enhanced noise suppression includes an optional setting to reduce
+  rapid changes in loud-speech protection. It is off by default.
+- The in-app FAQ has been expanded with guidance on stories, soundboard,
+  notifications, activity privacy, noise suppression, message effects, themes,
+  and accessibility.
+- Tooltips avoid unnecessary repeated screen-reader announcements where
+  supported.
+
+---
+
+## Previously Published
+
+Previous public release: Inter Galactic `v0.8.1+1004`.
 
 ---
 

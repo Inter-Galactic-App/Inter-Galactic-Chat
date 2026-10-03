@@ -1,7 +1,6 @@
 # Calls, Streaming, And Audio Historical Archive
 
 Status: historical index
-Owner: DOCUMENTATION for structure
 Last reviewed: 2026-06-25
 
 Use this folder for dated milestone, gap, and planning docs that still help

@@ -9,6 +9,7 @@ import 'package:intergalactic/client/components/profile/profile_component.dart';
 import 'package:intergalactic/client/matrix/components/profile/matrix_profile_component.dart';
 import 'package:intergalactic/client/matrix/matrix_client.dart';
 import 'package:intergalactic/client/matrix/matrix_room.dart';
+import 'package:intergalactic/client/matrix/matrix_room_migration.dart';
 import 'package:intergalactic/client/matrix/matrix_space.dart';
 import 'package:intergalactic/client/matrix/timeline_events/matrix_timeline_event.dart';
 import 'package:intergalactic/client/room.dart';
@@ -19,6 +20,7 @@ import 'package:intergalactic/debug/log.dart';
 import 'package:intergalactic/main.dart';
 import 'package:intergalactic/ui/navigation/adaptive_dialog.dart';
 import 'package:intergalactic/ui/organisms/chat/chat.dart';
+import 'package:intergalactic/utils/event_bus.dart';
 import 'package:flutter/material.dart'
     show SelectableText, SizedBox, TextButton, Theme;
 import 'package:flutter/widgets.dart';
@@ -32,7 +34,11 @@ class MatrixCommandComponent extends CommandComponent<MatrixClient> {
   MatrixClient client;
 
   static RegExp sed_pattern = RegExp(r'^s\/([^\/]+)\/([^\n\r]*?)\/?\s*$');
-  final Set<String> _localCommands = const {"inviteall", "sharehistory"};
+  final Set<String> _localCommands = const {
+    "inviteall",
+    "roomupgrade",
+    "sharehistory",
+  };
 
   MatrixCommandComponent(this.client) {
     client.getMatrixClient().addCommand("sendjson", sendJson);
@@ -47,14 +53,20 @@ class MatrixCommandComponent extends CommandComponent<MatrixClient> {
   List<String> getCommands() {
     return {
       ...client.getMatrixClient().commands.keys,
-      ..._localCommands,
-    }.toList()
-      ..sort();
+      ..._localCommands.where(
+        (command) =>
+            command != 'roomupgrade' || preferences.developerMode.value,
+      ),
+    }.toList()..sort();
   }
 
   @override
-  Future<void> executeCommand(String string, Room room,
-      {TimelineEvent? interactingEvent, EventInteractionType? type}) async {
+  Future<void> executeCommand(
+    String string,
+    Room room, {
+    TimelineEvent? interactingEvent,
+    EventInteractionType? type,
+  }) async {
     var mxRoom = (room as MatrixRoom).matrixRoom;
     matrix.Event? event;
     if (interactingEvent != null) {
@@ -78,20 +90,22 @@ class MatrixCommandComponent extends CommandComponent<MatrixClient> {
       }
       if (editingEvent != null) {
         await room.sendMessage(
-            message:
-                editingEvent.plainTextBody.replaceFirst(match[1]!, match[2]!),
-            replaceEvent: editingEvent);
+          message: editingEvent.plainTextBody.replaceFirst(
+            match[1]!,
+            match[2]!,
+          ),
+          replaceEvent: editingEvent,
+        );
         return;
       }
     }
 
     await client.getMatrixClient().parseAndRunCommand(
-          mxRoom,
-          string,
-          inReplyTo: type == EventInteractionType.reply ? event : null,
-          editEventId:
-              type == EventInteractionType.edit ? event?.eventId : null,
-        );
+      mxRoom,
+      string,
+      inReplyTo: type == EventInteractionType.reply ? event : null,
+      editEventId: type == EventInteractionType.edit ? event?.eventId : null,
+    );
   }
 
   @override
@@ -100,7 +114,8 @@ class MatrixCommandComponent extends CommandComponent<MatrixClient> {
       var command = string.substring(1).split(" ").first;
       return client.getMatrixClient().commands.containsKey(command) ||
           _localCommands.contains(command);
-    } else if (sed_pattern.firstMatch(string) != null) return true;
+    } else if (sed_pattern.firstMatch(string) != null)
+      return true;
 
     return false;
   }
@@ -109,9 +124,12 @@ class MatrixCommandComponent extends CommandComponent<MatrixClient> {
     var json = const JsonDecoder().convert(args.msg) as Map<String, dynamic>;
 
     var tx = client.getMatrixClient().generateUniqueTransactionId();
-    client
-        .getMatrixClient()
-        .sendMessage(args.room!.id, json["type"], tx, json['content']);
+    client.getMatrixClient().sendMessage(
+      args.room!.id,
+      json["type"],
+      tx,
+      json['content'],
+    );
 
     return null;
   }
@@ -122,25 +140,33 @@ class MatrixCommandComponent extends CommandComponent<MatrixClient> {
   }
 
   FutureOr<String?> setStatus(
-      matrix.CommandArgs args, StringBuffer? out) async {
+    matrix.CommandArgs args,
+    StringBuffer? out,
+  ) async {
     client.getComponent<UserProfileComponent>()?.setStatus(args.msg);
 
     await client.getMatrixClient().setPresence(
-        client.getMatrixClient().userID!, PresenceType.online,
-        statusMsg: args.msg);
+      client.getMatrixClient().userID!,
+      PresenceType.online,
+      statusMsg: args.msg,
+    );
 
     return null;
   }
 
   FutureOr<String?> clearEmojiStats(
-      matrix.CommandArgs args, StringBuffer? out) async {
+    matrix.CommandArgs args,
+    StringBuffer? out,
+  ) async {
     var c = client.getComponent<RecentEmoticonComponent>();
     c?.clear();
     return null;
   }
 
   FutureOr<String?> setProfile(
-      matrix.CommandArgs args, StringBuffer? stdout) async {
+    matrix.CommandArgs args,
+    StringBuffer? stdout,
+  ) async {
     final parts = args.msg.split(" ");
     final field = parts[0];
     final content = parts.sublist(1).join(" ");
@@ -158,7 +184,9 @@ class MatrixCommandComponent extends CommandComponent<MatrixClient> {
   }
 
   FutureOr<String?> addWidget(
-      matrix.CommandArgs args, StringBuffer? out) async {
+    matrix.CommandArgs args,
+    StringBuffer? out,
+  ) async {
     if (args.room == null) return null;
 
     var url = Uri.parse(args.msg);
@@ -180,13 +208,19 @@ class MatrixCommandComponent extends CommandComponent<MatrixClient> {
     }
 
     await client.matrixClient.setRoomStateWithKey(
-        args.room!.id, "im.vector.modular.widgets", id, content);
+      args.room!.id,
+      "im.vector.modular.widgets",
+      id,
+      content,
+    );
 
     return null;
   }
 
   FutureOr<String?> sendRainbow(
-      matrix.CommandArgs args, StringBuffer? out) async {
+    matrix.CommandArgs args,
+    StringBuffer? out,
+  ) async {
     if (args.room == null) return null;
     if (args.msg.isEmpty) return null;
 
@@ -219,11 +253,90 @@ class MatrixCommandComponent extends CommandComponent<MatrixClient> {
     switch (command) {
       case "inviteall":
         return _executeInviteAll(parts, room);
+      case "roomupgrade":
+        if (!preferences.developerMode.value) {
+          await _showRoomUpgradeCommandIssue(
+            '/roomupgrade is available only in developer mode.',
+          );
+          return true;
+        }
+        return _executeRoomUpgrade(parts, room);
       case "sharehistory":
         return _executeShareHistory(parts, room);
       default:
         return false;
     }
+  }
+
+  Future<bool> _executeRoomUpgrade(List<String> parts, MatrixRoom room) async {
+    final version = parts.length > 1 ? parts[1].trim() : '';
+    if (version.isEmpty) {
+      await _showRoomUpgradeCommandIssue('Usage: /roomupgrade <room version>.');
+      return true;
+    }
+
+    final context = navigator.currentContext;
+    try {
+      final result = await MatrixRoomMigration(
+        client,
+      ).upgrade(source: room, targetVersion: version);
+      if (context != null) {
+        await AdaptiveDialog.show(
+          context,
+          title: result.isComplete
+              ? 'Migration ready'
+              : 'Migration needs attention',
+          builder: (_) => SelectableText(
+            result.isComplete
+                ? 'The successor room is ready. ${result.invitedMemberIds.length} member(s) were invited.'
+                : '${result.invitedMemberIds.length} member(s) were invited. '
+                      '${_roomUpgradeResultIssues(result)} need another attempt. '
+                      'Open Room Admin settings and use Recover missing members to retry safely.',
+          ),
+        );
+      }
+      if (result.isComplete) {
+        EventBus.openRoom.add((result.successorRoomId, client.identifier));
+      }
+    } catch (error, stackTrace) {
+      if (context != null) {
+        await AdaptiveDialog.showError(context, error, stackTrace);
+      }
+    }
+    return true;
+  }
+
+  String _roomUpgradeResultIssues(MatrixRoomMigrationResult result) {
+    final issues = <String>[];
+    if (result.failedMemberIds.isNotEmpty) {
+      issues.add('${result.failedMemberIds.length} invite(s)');
+    }
+    if (result.failedSpaceIds.isNotEmpty) {
+      issues.add(
+        '${result.failedSpaceIds.length} Space change(s)'
+        '${_roomUpgradeFailureDetail(result.spaceFailure)}',
+      );
+    }
+    if (!result.permissionsRestored) {
+      issues.add(
+        'the permission restore${_roomUpgradeFailureDetail(result.permissionFailure)}',
+      );
+    }
+    return issues.join(', ');
+  }
+
+  String _roomUpgradeFailureDetail(String? label) {
+    return label == null ? '' : ' [$label]';
+  }
+
+  Future<void> _showRoomUpgradeCommandIssue(String message) async {
+    final context = navigator.currentContext;
+    if (context == null) return;
+    await AdaptiveDialog.show(
+      context,
+      title: 'Room migration unavailable',
+      builder: (_) => SelectableText(message),
+    );
   }
 
   Future<bool> _executeShareHistory(List<String> parts, MatrixRoom room) async {
@@ -271,7 +384,8 @@ class MatrixCommandComponent extends CommandComponent<MatrixClient> {
     final context = navigator.currentContext;
     if (context == null) {
       Log.w(
-          "sharehistory: no context available - cannot show listener dialog.");
+        "sharehistory: no context available - cannot show listener dialog.",
+      );
       return true;
     }
 
@@ -334,8 +448,9 @@ class MatrixCommandComponent extends CommandComponent<MatrixClient> {
 
     final selfId = client.matrixClient.userID;
     if (selfId == null ||
-        !space.matrixRoom
-            .canChangeStateEvent(matrix.EventTypes.RoomPowerLevels)) {
+        !space.matrixRoom.canChangeStateEvent(
+          matrix.EventTypes.RoomPowerLevels,
+        )) {
       throw Exception("Only server admins can use /inviteall.");
     }
 
@@ -363,18 +478,20 @@ class MatrixCommandComponent extends CommandComponent<MatrixClient> {
       suppressWarning: true,
       cache: true,
     );
-    final currentRoomMemberIds =
-        currentRoomMembers.map((member) => member.id).toSet();
+    final currentRoomMemberIds = currentRoomMembers
+        .map((member) => member.id)
+        .toSet();
 
     final candidateUserIds = spaceMembers
         .map((member) => member.id)
         .where((userId) => userId != selfId)
         .toSet();
 
-    final targetUserIds = candidateUserIds
-        .where((userId) => !currentRoomMemberIds.contains(userId))
-        .toList()
-      ..sort();
+    final targetUserIds =
+        candidateUserIds
+            .where((userId) => !currentRoomMemberIds.contains(userId))
+            .toList()
+          ..sort();
 
     final report = MatrixInviteAllReport(
       spaceName: space.displayName,
@@ -449,10 +566,7 @@ class MatrixCommandComponent extends CommandComponent<MatrixClient> {
     await AdaptiveDialog.show(
       context,
       title: "Share History",
-      builder: (_) => SizedBox(
-        width: 460,
-        child: SelectableText(message),
-      ),
+      builder: (_) => SizedBox(width: 460, child: SelectableText(message)),
     );
   }
 
@@ -502,8 +616,9 @@ class MatrixCommandComponent extends CommandComponent<MatrixClient> {
               ),
               const SizedBox(height: 16),
               TextButton(
-                onPressed: () => Navigator.of(context)
-                    .pop(_HistoryShareDecision.eligibleOnly),
+                onPressed: () => Navigator.of(
+                  context,
+                ).pop(_HistoryShareDecision.eligibleOnly),
                 child: const Text("Share to eligible devices"),
               ),
               TextButton(
@@ -548,7 +663,8 @@ class MatrixCommandComponent extends CommandComponent<MatrixClient> {
       Log.onError(
         error,
         stack,
-        content: "inviteHistoryShare: failed "
+        content:
+            "inviteHistoryShare: failed "
             "room=${MatrixClient.hash(room.identifier).substring(0, 12)} "
             "target=${MatrixClient.hash(userId).substring(0, 12)}",
       );
@@ -573,11 +689,7 @@ class MatrixCommandComponent extends CommandComponent<MatrixClient> {
   }
 }
 
-enum _HistoryShareDecision {
-  eligibleOnly,
-  breakGlass,
-  cancel,
-}
+enum _HistoryShareDecision { eligibleOnly, breakGlass, cancel }
 
 class MatrixInviteAllReport {
   MatrixInviteAllReport({
@@ -726,18 +838,30 @@ class _HistoryShareListenerWidgetState
       allowIneligibleDevice = true;
     }
 
-    final sent = await widget.client.respondToRoomKeyRequest(
+    final outcome = await widget.client.respondToRoomKeyRequest(
       widget.room,
       request,
       widget.report,
       allowIneligibleDevice: allowIneligibleDevice,
     );
-    if (sent && mounted) setState(() {});
+    if (outcome == MatrixKeyRequestOutcome.deferred) {
+      // The break-glass approval above is deliberately KEPT. The user
+      // consented to this device and nothing was refused, so a repeat request
+      // should be answered rather than prompt them a second time.
+      Log.w(
+        "sharehistory: key request deferred, encryption storage resuming "
+        "user=${MatrixClient.hash(device.userId).substring(0, 12)} "
+        "device=${MatrixClient.hash(device.deviceId ?? '').substring(0, 12)}",
+      );
+    }
+    // Refresh on EVERY outcome. Refreshing only on a send is what made a
+    // deferral invisible here: the report had counted it and the dialog never
+    // redrew, so a user-consented share failed silently in exactly the
+    // suspend/resume window the gate exists for.
+    if (mounted) setState(() {});
   }
 
-  Future<bool?> _confirmIneligibleDevice(
-    matrix_crypto.RoomKeyRequest request,
-  ) {
+  Future<bool?> _confirmIneligibleDevice(matrix_crypto.RoomKeyRequest request) {
     if (!mounted) {
       return Future.value(false);
     }

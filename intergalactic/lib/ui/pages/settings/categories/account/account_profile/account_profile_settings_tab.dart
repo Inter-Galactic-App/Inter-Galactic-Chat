@@ -24,12 +24,15 @@ import 'package:tiamat/tiamat.dart' as tiamat;
 class AccountProfileSettingsTab extends StatefulWidget {
   const AccountProfileSettingsTab({required this.clientManager, super.key});
 
-  static const addAccountKey =
-      ValueKey("ACCOUNT_PROFILE_SETTINGS_ADD_ACCOUNT_BUTTON");
-  static const saveChangesKey =
-      ValueKey("ACCOUNT_PROFILE_SETTINGS_SAVE_CHANGES_BUTTON");
-  static const cancelChangesKey =
-      ValueKey("ACCOUNT_PROFILE_SETTINGS_CANCEL_CHANGES_BUTTON");
+  static const addAccountKey = ValueKey(
+    "ACCOUNT_PROFILE_SETTINGS_ADD_ACCOUNT_BUTTON",
+  );
+  static const saveChangesKey = ValueKey(
+    "ACCOUNT_PROFILE_SETTINGS_SAVE_CHANGES_BUTTON",
+  );
+  static const cancelChangesKey = ValueKey(
+    "ACCOUNT_PROFILE_SETTINGS_CANCEL_CHANGES_BUTTON",
+  );
 
   final ClientManager clientManager;
 
@@ -71,23 +74,30 @@ class _AccountProfileSettingsTabState extends State<AccountProfileSettingsTab> {
   Brightness? _draftProfileBrightness;
   Color? _draftLocalColorOverride;
 
-  String get promptAddAccount => Intl.message("Add Account",
-      desc: "Label for button in settings to add another account",
-      name: "promptAddAccount");
+  String get promptAddAccount => Intl.message(
+    "Add Account",
+    desc: "Label for button in settings to add another account",
+    name: "promptAddAccount",
+  );
 
-  String get promptProfileWriteBioHint => Intl.message("Write about yourself",
-      name: "promptProfileWriteBioHint",
-      desc: "Hint text for the profile bio editor");
+  String get promptProfileWriteBioHint => Intl.message(
+    "Write about yourself",
+    name: "promptProfileWriteBioHint",
+    desc: "Hint text for the profile bio editor",
+  );
 
-  String get labelProfileYourBadges => Intl.message("Your Badges",
-      name: "labelProfileYourBadges",
-      desc:
-          "label for the ui to select which badges to display on the users profile");
+  String get labelProfileYourBadges => Intl.message(
+    "Your Badges",
+    name: "labelProfileYourBadges",
+    desc:
+        "label for the ui to select which badges to display on the users profile",
+  );
 
-  String get labelProfileNoBadges =>
-      Intl.message("You don't have any badges available for this account yet.",
-          name: "labelProfileNoBadges",
-          desc: "text that is shown when the user has no badges");
+  String get labelProfileNoBadges => Intl.message(
+    "You don't have any badges available for this account yet.",
+    name: "labelProfileNoBadges",
+    desc: "text that is shown when the user has no badges",
+  );
 
   bool get _hasUnsavedChanges {
     return _draftDisplayName != _loadedDisplayName ||
@@ -211,11 +221,7 @@ class _AccountProfileSettingsTabState extends State<AccountProfileSettingsTab> {
                   padding: EdgeInsets.zero,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      preview,
-                      const SizedBox(height: 18),
-                      editor,
-                    ],
+                    children: [preview, const SizedBox(height: 18), editor],
                   ),
                 ),
               ),
@@ -282,10 +288,7 @@ class _AccountProfileSettingsTabState extends State<AccountProfileSettingsTab> {
             ),
             SettingsControlRow(
               title: "Color",
-              child: _buildColorControls(
-                context,
-                selectedClient,
-              ),
+              child: _buildColorControls(context, selectedClient),
             ),
             SettingsControlRow(
               title: "Bio",
@@ -304,9 +307,7 @@ class _AccountProfileSettingsTabState extends State<AccountProfileSettingsTab> {
               semanticOnTapHint: "Toggle timezone sharing",
               onActivate: _isSaving
                   ? null
-                  : () => unawaited(
-                        _setTimezoneSharing(!_draftShareTimezone),
-                      ),
+                  : () => unawaited(_setTimezoneSharing(!_draftShareTimezone)),
               enabled: !_isSaving,
               excludeChildSemantics: true,
               trailing: Padding(
@@ -387,10 +388,7 @@ class _AccountProfileSettingsTabState extends State<AccountProfileSettingsTab> {
                 child: Container(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: profileAccent,
-                      width: 2,
-                    ),
+                    border: Border.all(color: profileAccent, width: 2),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withValues(alpha: 0.28),
@@ -407,9 +405,10 @@ class _AccountProfileSettingsTabState extends State<AccountProfileSettingsTab> {
                       userBanner: _banner,
                       displayName: _draftDisplayName.isEmpty
                           ? selectedClient.self?.displayName ??
-                              selectedClient.identifier
+                                selectedClient.identifier
                           : _draftDisplayName,
-                      identifier: selectedClient.self?.identifier ??
+                      identifier:
+                          selectedClient.self?.identifier ??
                           selectedClient.identifier,
                       userColor: _currentProfileSwatchColor(context),
                       isSelf: true,
@@ -441,8 +440,9 @@ class _AccountProfileSettingsTabState extends State<AccountProfileSettingsTab> {
                       setColorOverride: (color) async =>
                           _setLocalColorOverride(color),
                       hasColorOverride: _draftLocalColorOverride != null,
-                      showSource:
-                          preferences.developerMode.value ? _showSource : null,
+                      showSource: preferences.developerMode.value
+                          ? _showSource
+                          : null,
                     ),
                   ),
                 ),
@@ -581,9 +581,8 @@ class _AccountProfileSettingsTabState extends State<AccountProfileSettingsTab> {
                         _ColorSwatch(
                           color: color,
                           selected: color == _draftLocalColorOverride,
-                          onTap: () => update(
-                            () => _setLocalColorOverride(color),
-                          ),
+                          onTap: () =>
+                              update(() => _setLocalColorOverride(color)),
                         ),
                     ],
                   ),
@@ -607,9 +606,7 @@ class _AccountProfileSettingsTabState extends State<AccountProfileSettingsTab> {
                       ),
                       tiamat.Button.secondary(
                         text: "Clear override",
-                        onTap: () => update(
-                          () => _setLocalColorOverride(null),
-                        ),
+                        onTap: () => update(() => _setLocalColorOverride(null)),
                       ),
                     ],
                   ),
@@ -629,8 +626,8 @@ class _AccountProfileSettingsTabState extends State<AccountProfileSettingsTab> {
     return Text(
       text,
       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Theme.of(context).colorScheme.onSurface,
-          ),
+        color: Theme.of(context).colorScheme.onSurface,
+      ),
     );
   }
 
@@ -708,19 +705,24 @@ class _AccountProfileSettingsTabState extends State<AccountProfileSettingsTab> {
     });
 
     final profile = await component.getProfile(userId);
-    final profileBadges =
-        profile is ProfileWithBadges ? profile as ProfileWithBadges : null;
-    final profilePronouns =
-        profile is ProfileWithPronouns ? profile as ProfileWithPronouns : null;
-    final profilePresence =
-        profile is ProfileWithPresence ? profile as ProfileWithPresence : null;
-    final profileBio =
-        profile is ProfileWithBio ? profile as ProfileWithBio : null;
+    final profileBadges = profile is ProfileWithBadges
+        ? profile as ProfileWithBadges
+        : null;
+    final profilePronouns = profile is ProfileWithPronouns
+        ? profile as ProfileWithPronouns
+        : null;
+    final profilePresence = profile is ProfileWithPresence
+        ? profile as ProfileWithPresence
+        : null;
+    final profileBio = profile is ProfileWithBio
+        ? profile as ProfileWithBio
+        : null;
     final profileColor = profile is ProfileWithColorScheme
         ? profile as ProfileWithColorScheme
         : null;
-    final profileTimezone =
-        profile is ProfileWithTimezone ? profile as ProfileWithTimezone : null;
+    final profileTimezone = profile is ProfileWithTimezone
+        ? profile as ProfileWithTimezone
+        : null;
     final badges = profileBadges != null
         ? await profileBadges.getBadges()
         : <ProfileBadge>[];
@@ -787,10 +789,10 @@ class _AccountProfileSettingsTabState extends State<AccountProfileSettingsTab> {
       if (_draftStatus != _loadedStatus) {
         await component.setStatus(_draftStatus.isEmpty ? null : _draftStatus);
         await client.getComponent<UserPresenceComponent>()?.setStatus(
-              UserPresenceStatus.online,
-              message: _draftStatus.isEmpty ? null : _draftStatus,
-              clearMessage: _draftStatus.isEmpty,
-            );
+          UserPresenceStatus.online,
+          message: _draftStatus.isEmpty ? null : _draftStatus,
+          clearMessage: _draftStatus.isEmpty,
+        );
       }
 
       if (_draftBio != _loadedBio) {
@@ -822,9 +824,10 @@ class _AccountProfileSettingsTabState extends State<AccountProfileSettingsTab> {
 
       if (_draftLocalColorOverride != _loadedLocalColorOverride) {
         final userId = client.self?.identifier ?? client.identifier;
-        await client
-            .getComponent<UserColorComponent>()
-            ?.setColor(userId, _draftLocalColorOverride);
+        await client.getComponent<UserColorComponent>()?.setColor(
+          userId,
+          _draftLocalColorOverride,
+        );
       }
     });
   }
@@ -833,30 +836,36 @@ class _AccountProfileSettingsTabState extends State<AccountProfileSettingsTab> {
     final client = _selectedClient;
     if (client == null) return;
 
-    await AdaptiveDialog.show(context, builder: (context) {
-      return SizedBox(
-        width: 600,
-        child: MessageInput(
-          hintText: promptProfileWriteBioHint,
-          initialText: _bioController.text,
-          showAttachmentButton: false,
-          client: client,
-          showGifSearch: false,
-          disableEnterToSend: true,
-          compact: true,
-          enableKeyboardAdapter: false,
-          availibleEmoticons:
-              client.getComponent<EmoticonComponent>()?.availablePacks,
-          onSendMessage: (message, {overrideClient}) {
-            setState(() {
-              _bioController.text = message;
-            });
-            Navigator.of(context).pop();
-            return MessageInputSendResult.success;
-          },
-        ),
-      );
-    });
+    await AdaptiveDialog.show(
+      context,
+      builder: (context) {
+        return SizedBox(
+          width: 600,
+          child: MessageInput(
+            // A settings preview composer never retains anything.
+            draftCacheKey: null,
+            hintText: promptProfileWriteBioHint,
+            initialText: _bioController.text,
+            showAttachmentButton: false,
+            client: client,
+            showGifSearch: false,
+            disableEnterToSend: true,
+            compact: true,
+            enableKeyboardAdapter: false,
+            availibleEmoticons: client
+                .getComponent<EmoticonComponent>()
+                ?.availablePacks,
+            onSendMessage: (message, {overrideClient}) {
+              setState(() {
+                _bioController.text = message;
+              });
+              Navigator.of(context).pop();
+              return MessageInputSendResult.success;
+            },
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _setAvatar() async {
@@ -890,8 +899,10 @@ class _AccountProfileSettingsTabState extends State<AccountProfileSettingsTab> {
 
     if (action != ImageEditAction.pick) return;
 
-    final result =
-        await PickerUtils.pickImageAndCrop(context, aspectRatio: 700 / 230);
+    final result = await PickerUtils.pickImageAndCrop(
+      context,
+      aspectRatio: 700 / 230,
+    );
     if (result == null) return;
 
     setState(() {
@@ -907,7 +918,8 @@ class _AccountProfileSettingsTabState extends State<AccountProfileSettingsTab> {
   }
 
   Future<void> _setProfileBrightness(Brightness brightness) async {
-    _draftProfileColor ??= _loadedProfileColor ??
+    _draftProfileColor ??=
+        _loadedProfileColor ??
         _profile?.defaultColor ??
         Theme.of(context).colorScheme.primary;
     _draftProfileBrightness = brightness;
@@ -926,7 +938,8 @@ class _AccountProfileSettingsTabState extends State<AccountProfileSettingsTab> {
       return;
     }
 
-    final timezone = _loadedTimezone ??
+    final timezone =
+        _loadedTimezone ??
         (await FlutterTimezone.getLocalTimezone()).identifier;
     if (!mounted) return;
 
@@ -949,9 +962,7 @@ class _AccountProfileSettingsTabState extends State<AccountProfileSettingsTab> {
         title: labelProfileYourBadges,
         builder: (context) => SizedBox(
           height: 180,
-          child: Center(
-            child: tiamat.Text.labelLow(labelProfileNoBadges),
-          ),
+          child: Center(child: tiamat.Text.labelLow(labelProfileNoBadges)),
         ),
       );
       return;
@@ -993,9 +1004,7 @@ class _AccountProfileSettingsTabState extends State<AccountProfileSettingsTab> {
       builder: (context) {
         return SizedBox(
           width: 1000,
-          child: SelectionArea(
-            child: Text(profile.source),
-          ),
+          child: SelectionArea(child: Text(profile.source)),
         );
       },
     );
@@ -1197,8 +1206,9 @@ class _ProfileColorOption extends StatelessWidget {
         _ColorSwatch(
           color: muted
               ? Color.alphaBlend(
-                  theme.colorScheme.surfaceContainerHigh
-                      .withValues(alpha: 0.35),
+                  theme.colorScheme.surfaceContainerHigh.withValues(
+                    alpha: 0.35,
+                  ),
                   color,
                 )
               : color,

@@ -67,12 +67,22 @@ unless prefixed otherwise (e.g. `plugins/`).
 | Timeline media | `lib/client/matrix/timeline_events/`, `lib/ui/molecules/timeline_events/` | Matrix event content, preview preferences |
 | GIFs | `lib/client/matrix/components/gif/`, `lib/ui/molecules/gif_picker.dart` | relay or user KLIPY key, Matrix upload |
 | URL previews | `lib/client/matrix/components/url_preview/`, `lib/ui/molecules/url_preview_widget.dart` | sanitized durable cache, homeserver preview API, optional Inter Galactic preview service, provider-limited direct fallback fetcher |
-| Emoji/stickers | `lib/client/matrix/components/emoticon/`, `lib/ui/molecules/emoticon_picker.dart` | Matrix image packs, room/space/account scope |
+| Emoji/stickers | `lib/client/matrix/components/emoticon/`, `lib/ui/molecules/emoticon_picker.dart` | Matrix image packs: room-local, canonical-Space ancestry, and account-global scope |
 | Message effects | `lib/client/components/message_effects/`, `lib/client/matrix/components/message_effects/`, `lib/ui/molecules/message_input.dart` | Matrix message events, composer commands, local render effects |
 | DM stories | `lib/client/components/stories/`, `lib/client/matrix/components/stories/`, `lib/ui/organisms/home_screen/home_story_*.dart`, Android/iOS runner bridges, `docs/architecture/features/dm-stories.md` | Matrix custom room events, WebRTC camera still capture, `camera` plugin capture/recording on Android, iOS and Windows, local 9:16 baked-image editor, Matrix media upload, encrypted file metadata. No video re-encoder on any platform since 2026-08-15 |
 | Voice messages | `lib/client/components/voice/`, Android/iOS runner bridges, `audio_player.dart` | native recorder, attachment upload |
 | Soundboard | `lib/client/components/soundboard/`, `lib/client/matrix/components/soundboard/` | Matrix state/events, active call playback |
 | Media plugins | `plugins/intergalactic_noise_suppression/`, `plugins/intergalactic_windows_share/` | native APIs, Flutter WebRTC |
+
+Space image packs are offered only along a valid canonical `m.space.parent`
+chain, not merely because a room appears in a Space's child list. When Inter
+Galactic adds a room or nested Space, it writes both Space links and marks the
+new parent canonical only if the child has no other canonical parent. The
+Space Admin settings offers an explicit repair for older child links without a
+canonical parent. It requires Space admin access, changes only child rooms
+where the account is also an admin with parent-state write permission, and
+never replaces a different existing canonical choice. A successful local write
+updates the link state cache so picker availability need not wait for sync.
 
 ## Timeline Photo Stacks
 
@@ -188,7 +198,10 @@ a full timeline refresh correctly renders one final stack (BUG-309).
   metadata instead of a plaintext `url`. Story rendering must use the story
   event's parsed media metadata directly rather than the standard Matrix event
   attachment helper, because the standard helper rejects non-attachment custom
-  event types. The Home story composer now opens on a 9:16 camera capture
+  event types. Before caching, story media downloads stream authenticated Matrix
+  media with an actual-byte cap for the parsed image or video type; `info.size`
+  is only an early rejection signal and must not authorize a larger body. The
+  Home story composer now opens on a 9:16 camera capture
   surface: desktop uses a low-load WebRTC webcam preview, while Android and
   iOS use the native camera plugin and release the active native controller
   before switching front/rear cameras. On iOS, album picks use the native image
@@ -271,6 +284,12 @@ a full timeline refresh correctly renders one final stack (BUG-309).
 - Durable URL preview entries skip unsafe schemes, userinfo, token-like query
   parameters, and token-like fragments. The cache stores preview text after log
   redaction, safe image identifiers only, and no Matrix event bodies.
+- Durable cache schema version 2 evicts legacy records that contain only a
+  site name and no image, title, description, posting account, or stats. It
+  also declines to persist that shape going forward. This lets an updated
+  provider result replace an older generic fallback without directing people
+  to clear application storage; an expired volatile-image-only record likewise
+  misses and follows the normal privacy-gated fetch order.
 - URL preview image rendering may use an in-memory provider when direct
   fallback fetches validate provider thumbnails locally. When the source image
   URI is safe to persist, `UrlPreviewData.imageUri` carries that identifier so

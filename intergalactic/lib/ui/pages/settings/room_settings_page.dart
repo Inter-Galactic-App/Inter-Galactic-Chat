@@ -13,11 +13,13 @@ class RoomSettingsPage extends StatefulWidget {
     required this.room,
     this.onLeaveRoom,
     this.initialTabId,
+    this.initialTabInline = false,
   });
   final Room room;
   final Space? contextSpace;
   final Function()? onLeaveRoom;
   final String? initialTabId;
+  final bool initialTabInline;
 
   @override
   State<RoomSettingsPage> createState() => _RoomSettingsPageState();
@@ -42,6 +44,7 @@ class _RoomSettingsPageState extends State<RoomSettingsPage> {
     return SettingsPage(
       contextAccount: widget.room.client,
       initialTabId: widget.initialTabId,
+      initialTabInline: widget.initialTabInline,
       settings: [SettingsCategoryRoom(widget.room, widget.contextSpace)],
       buttons: [
         SettingsButton(

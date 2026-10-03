@@ -1,20 +1,21 @@
 # DeepFilterNet `libDF` Rust crate-tree evidence
 
-Status: **PARTIAL — Windows and Android build-input correspondence and their
-feature-specific dependency closures are captured. The 109-package source
-licence roster is complete: 107 packages retain their own text, and two
-MIT-declared packages are explicitly mapped to canonical SPDX MIT text because
-their exact archives/source trees contain no licence file. Candidate packaging
-proof and source-offer classification remain insufficient to describe the
-shipped `df.dll` / `libdf.so` tree.**
+Status: **PARTIAL — Windows and Android build-input correspondence, Android
+release packaging correspondence, and their feature-specific dependency
+closures are captured. The 109-package source licence roster is complete: 107
+packages retain their own text, and two MIT-declared packages are explicitly
+mapped to canonical SPDX MIT text because their exact archives/source trees
+contain no licence file. The recipient-notice and permissive-only
+source-offer classification are complete in source; package inclusion of the
+new notice asset remains to be verified on a later Windows/Android candidate.**
 
 This is an engineering evidence record, not a legal-sufficiency conclusion and
 not an authorization to change a release notice, source offer, or publication.
 
 ## Component and delivered-payload boundary
 
-The tracked native-payload inventory currently identifies these payloads under
-the broader DeepFilterNet native runtime/model row:
+The tracked native-payload inventory identifies these payloads under the
+separate DeepFilterNet libDF Rust-tree component record:
 
 | Platform | Candidate path | Candidate-inventory SHA-256 |
 | --- | --- | --- |
@@ -42,9 +43,29 @@ Git records all three Android inputs as added by `3ec3fa9b` on 2026-07-12 and
 unchanged through the retained candidate-source commit `b40b2da2`; Windows
 `df.dll` was added by `0ebd2f70` on 2026-07-02. The Android candidate-inventory
 digests therefore identify a distinct APK artifact boundary. Do **not** replace
-one set with the other: RELEASE PIPELINE must explain any packaging transform
-or rebuild boundary before an exact source-input-to-candidate correspondence is
-claimed.
+one set with the other: the retained Gradle pipeline below records their
+specific stripping transformation, while both identities remain required for
+future candidate comparison.
+
+### Android committed-input to APK correspondence (captured 2026-09-05)
+
+The retained Android Gradle release intermediates preserve the delivery chain
+for the two shipped ABIs. `mergeReleaseNativeLibs` receives the committed JNI
+inputs unchanged; `stripReleaseDebugSymbols` emits the smaller payloads
+subsequently copied by `copyReleaseJniLibsProjectAndLocalJars` and stored in
+the signed `0.8.1+1004` APK.
+
+| ABI | Merged committed input | `stripReleaseDebugSymbols` output | `0.8.1+1004` APK entry |
+| --- | --- | --- | --- |
+| arm64-v8a | 18,722,328 bytes; `8EB64AC74752D2CD9EB7E60EF53B86F5B9A34E76298E7E02F7A2FCF1AA4991AC` | 13,293,888 bytes; `92EB2BE51D2462ADB93A958BBE8627115DF289C0BD292D202AC87B51F7608265` | `lib/arm64-v8a/libdf.so`, same stripped size and SHA-256 |
+| armeabi-v7a | 11,860,804 bytes; `2EA1B67AD8F73318E100EFC4ABA8DF2522E361196E6A27961ABD6D4F09F7443F` | 7,660,996 bytes; `38C96B0C5B35214FE4F1D8B56048DC08994C9916E835B74A47E2326F3EE65297` | `lib/armeabi-v7a/libdf.so`, same stripped size and SHA-256 |
+
+The signed candidate APK SHA-256 is
+`F93ABB58CA9AC264EEF53EBC1E2113F6986187711B6EC66687FDA58ED67BCC49`.
+This establishes Android committed-input-to-candidate packaging
+correspondence. It does not create a new source rebuild, choose licence arms
+for the full crate roster, or decide the recipient-facing notice and
+source-offer surfaces.
 
 ## Source and upstream comparison
 
@@ -281,16 +302,16 @@ and for final APK packaging, not a substitute for either proof.
 
 | Surface | State | Evidence or reason | Owner / next validation |
 | --- | --- | --- | --- |
-| Structured inventory | blocked | The three payload paths still point to the broader runtime/model row. Do not repoint them until release-candidate payload correspondence is cross-checked and the component record is reviewed. | S&C / REVIEW |
+| Structured inventory | required / captured | The three delivered payload paths point to the dedicated libDF Rust-tree record; the ONNX model archive remains separate. | S&C / REVIEW |
 | Upstream licence and notice capture | required / captured | Exact source text is captured for 107 packages. For `crunchy 0.2.2` and `realfft 3.3.0`, exact upstream/package MIT declarations, authors, source-file absence, and an explicit canonical SPDX-MIT mapping are captured. | S&C |
 | Crate roster | required / captured | Captured fingerprints and locked, feature-specific trees establish 95 Windows / 105 Android / 109 union package pairs; `crate-license-roster.json` maps every selected package to source and text evidence. | S&C |
-| Shipped artifact enumeration | required | Windows and Android payload identities above are pinned. A future record must compare each claimed crate/notice route with the actual candidate payloads. | RELEASE PIPELINE / S&C |
-| User-visible native notice | blocked | The source roster is complete, but candidate-package correspondence and final licence-arm/notice selection are not evidenced. Do not attach a notice surface yet. | S&C / app owner |
-| Release/policy notice | blocked | Do not add a summary until candidate packaging is cross-checked and final notice selection is reviewed. | S&C / REVIEW |
-| Corresponding source / public offer | partial / blocked | Windows and Android source-to-committed-input correspondence are captured, but final candidate packaging, full licence mix, and source-offer classification remain open. Do not infer a permissive-only outcome from `deep_filter`'s own licence. | S&C / RELEASE PIPELINE |
-| Package inclusion | required | Existing platform candidate evidence establishes the payload paths; a release candidate must re-verify them after any payload change. | RELEASE PIPELINE |
-| Tests and negative controls | required | Preserve the captured fingerprint hashes and exact target-output-to-committed-input equality; a future record also needs a control against mapping these paths to the model/runtime wrapper. | S&C / REVIEW |
-| Queue and handoff | required | `libdf.so/df.dll is a Rust crate tree recorded as a 'native C API runtime' - 2026-08-20` tracks this blocked evidence boundary. | S&C |
+| Shipped artifact enumeration | required / captured | Windows and Android payload identities above are pinned, including the committed-input-to-APK transformation for Android. | RELEASE PIPELINE / S&C |
+| User-visible native notice | required / source complete, candidate pending | `deepfilternet-libdf-rust-crates-NOTICE.txt` is registered under a component-specific Windows/Android label. A new candidate must prove the asset is packaged. | S&C / app owner |
+| Release/policy notice | required / source complete | The release index and notice-access policy name the separate libDF record and model boundary. Publication and package delivery remain distinct checks. | S&C / REVIEW |
+| Corresponding source / public offer | not applicable | The captured 109-package closure and Rust standard library are permissive-only. No corresponding-source offer is added solely for this tree. | S&C / RELEASE PIPELINE |
+| Package inclusion | required / pending | The existing 0.8.1+1004 artifacts establish runtime delivery but predate the new notice asset. Rebuild and inspect Windows/Android candidates before claiming recipient delivery. | RELEASE PIPELINE |
+| Tests and negative controls | required / source complete, execution pending | The notice generator verifies every captured text hash and byte count; focused source assertions pin the asset, component label, roster scope, and vodozemac negative control. | S&C / REVIEW |
+| Queue and handoff | required | `libdf.so/df.dll is a Rust crate tree recorded as a 'native C API runtime' - 2026-08-20` tracks candidate package verification and review. | S&C |
 
 ## Required next evidence
 
@@ -304,9 +325,9 @@ and for final APK packaging, not a substitute for either proof.
 3. Treat the mixed vendored `libDF` tree as a separate future-rebuild concern;
    it must not replace the evidenced `d375b2d8` source/lock state for these
    committed inputs. Record any future rebuild's patches and lockfile anew.
-4. Cross-check the completed graph against all three delivered payloads. This must state
-   what is proven from the candidate binaries versus what remains a source-only
-   inference.
-5. Only then add the `native_components` record, repoint the three payload
-   mappings, add applicable notice assets/attachments, and classify any source
-   offer obligation.
+4. Run the focused Flutter notice tests through the approved Windows test
+   workflow, then build and inspect a new Windows and Android candidate to
+   prove the recipient notice asset is packaged and attached to this component.
+5. Keep the model archive's acquisition, terms, and package evidence separate
+   from the libDF Rust-tree record; a future rebuild must record its own source
+   and lockfile state anew.

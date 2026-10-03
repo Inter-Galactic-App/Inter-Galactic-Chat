@@ -1,7 +1,6 @@
 # Troubleshooting Guidance Map
 
 Status: partial (inline tips only)
-Owner: DEBUG / Help & diagnostics
 Last updated: 2026-07-23
 
 The Report a Bug guided form shows a compact troubleshooting tips card after the

@@ -1,8 +1,8 @@
 # GIF Relay Public Build Policy
 
-Publication status: draft release-readiness policy until the submitted build's
-GIF provider path and disclosure copy are confirmed in
-`PUBLIC_RELEASE_READINESS_TRACKER.md`.
+Status: active release-readiness policy, enforced for public builds. See
+`PUBLIC_RELEASE_READINESS_TRACKER.md` for the current submitted build's
+confirmed provider path and disclosure copy.
 
 Public builds must not embed a direct GIF provider API key. GIF search should use a relay or provider configuration that can be rotated and rate-limited without shipping a new client.
 

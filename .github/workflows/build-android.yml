@@ -69,6 +69,9 @@ on:
       - 'intergalactic/pubspec.yaml'
       - 'intergalactic/pubspec.lock'
       - 'pubspec.yaml'
+      # The recorded SHA-256 digests the media_kit jar integrity gate compares
+      # against. Editing them changes what the build accepts, so it must re-run.
+      - 'docs/release/THIRD_PARTY_LICENSES.json'
       # Changing the gate itself must re-run the gate.
       - '.github/workflows/build-android.yml'
 

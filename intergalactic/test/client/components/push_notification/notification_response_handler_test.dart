@@ -6,6 +6,8 @@ import 'package:intergalactic/client/components/push_notification/notification_r
 import 'package:intergalactic/client/components/push_notification/room_notification_snooze.dart';
 import 'package:intergalactic/main.dart' as globals;
 import 'package:intergalactic/utils/custom_uri.dart';
+import 'package:intergalactic/utils/database/database_release_trigger.dart';
+import 'package:intergalactic/utils/database/releasable_connection.dart';
 import 'package:intergalactic/utils/event_bus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -275,6 +277,139 @@ void main() {
       await pumpEventQueue();
 
       expect(sent, ['first', 'second']);
+    });
+
+    test(
+      'waits for a released account database before routing a tap',
+      () async {
+        // A tap is a resume, and it arrives before the B5 trigger has
+        // re-established the database it released at suspension. Routing
+        // straight away opens a room whose timeline load throws against the
+        // released connection. The route has to wait on the trigger's gate,
+        // which is armed at release, and go the moment it completes.
+        NotificationResponseHandler.resetForTesting();
+        while (EventBus.takePendingOpenRoom() != null) {}
+        final db = _ReleasedDatabase();
+        final trigger = DatabaseReleaseTrigger(
+          databases: () => [db],
+          suspendSync: () async {},
+          resumeSync: () {},
+          hasLiveBackgroundExecution: () => false,
+          quiescenceTimeout: const Duration(milliseconds: 60),
+          pollInterval: const Duration(milliseconds: 2),
+        );
+        expect(await trigger.suspend(), DatabaseSuspendOutcome.released);
+        DatabaseReleaseTrigger.instance = trigger;
+
+        final events = <(String, String?)>[];
+        final subscription = EventBus.openRoom.stream.listen(events.add);
+        try {
+          final routing = NotificationResponseHandler.handleRemotePayload({
+            'event_id': r'$event:example.org',
+            'room_id': '!gated:example.org',
+            'client_id': '@gated:example.org',
+          });
+          await pumpEventQueue();
+          expect(events, isEmpty, reason: 'the database is still released');
+          expect(EventBus.takePendingOpenRoom(), isNull);
+
+          expect(await trigger.resume(), DatabaseResumeOutcome.established);
+          await routing;
+          await pumpEventQueue();
+          final route = events.isEmpty
+              ? EventBus.takePendingOpenRoom()
+              : events.single;
+          expect(route, ('!gated:example.org', '@gated:example.org'));
+        } finally {
+          DatabaseReleaseTrigger.instance = null;
+          await subscription.cancel();
+          while (EventBus.takePendingOpenRoom() != null) {}
+          NotificationResponseHandler.resetForTesting();
+        }
+      },
+    );
+
+    // The failure branch of the gate. It was documented and coded - "the tap
+    // still dispatches, because the pending-navigation retry is the recovery
+    // path" - and guarded by nothing: turning that `return` into a `rethrow`
+    // used to leave the whole suite green, which is the same shape as the
+    // untested call site found at PR #284.
+    test('a failed re-establish still dispatches the tap', () async {
+      NotificationResponseHandler.resetForTesting();
+      while (EventBus.takePendingOpenRoom() != null) {}
+      final db = _UnrecoverableDatabase();
+      final trigger = DatabaseReleaseTrigger(
+        databases: () => [db],
+        suspendSync: () async {},
+        resumeSync: () {},
+        hasLiveBackgroundExecution: () => false,
+        quiescenceTimeout: const Duration(milliseconds: 60),
+        pollInterval: const Duration(milliseconds: 2),
+      );
+      expect(await trigger.suspend(), DatabaseSuspendOutcome.released);
+      DatabaseReleaseTrigger.instance = trigger;
+
+      final events = <(String, String?)>[];
+      final subscription = EventBus.openRoom.stream.listen(events.add);
+      try {
+        final routing = NotificationResponseHandler.handleRemotePayload({
+          'event_id': r'$event:example.org',
+          'room_id': '!failed:example.org',
+          'client_id': '@failed:example.org',
+        });
+        await pumpEventQueue();
+
+        // The gate has to actually engage first. Without this, the test reads
+        // the same whether the gate blocks and then releases on the error, or
+        // never engages for this database at all and the tap dispatched
+        // immediately - and only the first of those is the failure path this
+        // test claims to cover.
+        expect(events, isEmpty, reason: 'the database is still released');
+        expect(EventBus.takePendingOpenRoom(), isNull);
+
+        // The resume fails; the gate completes with an error rather than
+        // hanging, and the route goes anyway.
+        expect(await trigger.resume(), DatabaseResumeOutcome.failed);
+        await routing;
+        await pumpEventQueue();
+
+        final route = events.isEmpty
+            ? EventBus.takePendingOpenRoom()
+            : events.single;
+        expect(
+          route,
+          ('!failed:example.org', '@failed:example.org'),
+          reason:
+              'a database that never comes back must not silently eat the '
+              'tap - the user pressed a notification and nothing happening is '
+              'worse than routing into a room that retries',
+        );
+      } finally {
+        DatabaseReleaseTrigger.instance = null;
+        await subscription.cancel();
+        while (EventBus.takePendingOpenRoom() != null) {}
+        NotificationResponseHandler.resetForTesting();
+      }
+    });
+
+    test('routes a tap without waiting when nothing was released', () async {
+      final db = _ReleasedDatabase();
+      final trigger = DatabaseReleaseTrigger(
+        databases: () => [db],
+        suspendSync: () async {},
+        resumeSync: () {},
+        hasLiveBackgroundExecution: () => false,
+      );
+      DatabaseReleaseTrigger.instance = trigger;
+      try {
+        final route = await _routeForPayload({
+          'room_id': '!ungated:example.org',
+          'client_id': '@ungated:example.org',
+        });
+        expect(route, ('!ungated:example.org', '@ungated:example.org'));
+      } finally {
+        DatabaseReleaseTrigger.instance = null;
+      }
     });
 
     test('routes direct open-story URI payloads', () async {
@@ -663,4 +798,49 @@ Future<StoryOpenRequest?> _storyRouteForPayload(Object? payload) async {
     while (EventBus.takePendingOpenStory() != null) {}
     NotificationResponseHandler.resetForTesting();
   }
+}
+
+/// Quiescent, releases on the first ask, re-establishes on the first ask.
+class _ReleasedDatabase implements ReleasableDatabase {
+  bool _established = true;
+
+  @override
+  String get databaseName => 'account';
+
+  @override
+  bool get isEstablished => _established;
+
+  @override
+  bool get isQuiescent => true;
+
+  @override
+  Future<bool> release() async {
+    _established = false;
+    return true;
+  }
+
+  @override
+  Future<ReestablishResult> reestablish() async {
+    _established = true;
+    return ReestablishResult.established;
+  }
+}
+
+/// Never comes back. The tap must still dispatch: the pending-navigation retry
+/// is the recovery path, so a failed re-establish must not swallow the route.
+class _UnrecoverableDatabase implements ReleasableDatabase {
+  @override
+  String get databaseName => 'account';
+
+  @override
+  bool get isEstablished => false;
+
+  @override
+  bool get isQuiescent => true;
+
+  @override
+  Future<bool> release() async => true;
+
+  @override
+  Future<ReestablishResult> reestablish() async => ReestablishResult.failed;
 }

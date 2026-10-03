@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:io' show SocketException;
+
 import 'package:flutter/foundation.dart';
 import 'package:intergalactic/config/build_config.dart';
 import 'package:intergalactic/debug/log.dart';
@@ -13,7 +16,9 @@ class MatrixUserAgentHttpClient extends http.BaseClient {
   static const Duration failureLogInterval = Duration(seconds: 30);
 
   final http.Client _inner;
+  final Stopwatch _clientAge = Stopwatch()..start();
   final Map<String, DateTime> _lastFailureLog = {};
+  final Set<String> _startupDispatches = {};
 
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
@@ -21,8 +26,10 @@ class MatrixUserAgentHttpClient extends http.BaseClient {
       'User-Agent',
       () => BuildConfig.matrixUserAgent,
     );
+    final requestPath = Log.matrixRequestPathHint(request.url.toString());
+    _logStartupDispatch(request, requestPath);
     try {
-      return await _inner.send(request);
+      return await _sendInner(request, requestPath);
     } catch (error) {
       // The zone-level handler only sees the error object, and the two most
       // common transient failures never name the endpoint in their message: a
@@ -32,8 +39,48 @@ class MatrixUserAgentHttpClient extends http.BaseClient {
       // here, so the failing endpoint is recorded before the original error is
       // rethrown untouched for the SDK's own retry handling.
       _logFailure(request, error);
+
       rethrow;
     }
+  }
+
+  Future<http.StreamedResponse> _sendInner(
+    http.BaseRequest request,
+    String requestPath,
+  ) {
+    return runZoned(
+      () => _inner.send(request),
+      zoneValues: {
+        Log.matrixNetworkOperationZoneKey:
+            Log.matrixHttpOperationForRequestPath(requestPath),
+      },
+    );
+  }
+
+  /// Records the first request for each redacted endpoint during startup.
+  ///
+  /// This is a diagnostic discriminator: if an unattributed DNS callback is
+  /// preceded by this marker, the injected Matrix HTTP boundary was reached.
+  /// It deliberately does not record URLs, request bodies, or every retry.
+  void _logStartupDispatch(http.BaseRequest request, String endpoint) {
+    final startupElapsedMilliseconds = Log.startupElapsedMilliseconds;
+    if (startupElapsedMilliseconds == null ||
+        startupElapsedMilliseconds >
+            Log.networkDiagnosticWindow.inMilliseconds) {
+      return;
+    }
+
+    final key = '${request.method}|$endpoint';
+    if (!_startupDispatches.add(key)) return;
+
+    Log.d(
+      'Matrix request dispatched request_path=$endpoint '
+      'method=${request.method} startup_ms=$startupElapsedMilliseconds '
+      'startup_phase=${Log.startupPhase} '
+      'client_age_ms=${_clientAge.elapsedMilliseconds}',
+      category: LogCategory.matrix,
+      source: 'matrix-http-dispatch',
+    );
   }
 
   void _logFailure(http.BaseRequest request, Object error) {
@@ -50,9 +97,20 @@ class MatrixUserAgentHttpClient extends http.BaseClient {
     }
 
     _lastFailureLog[key] = now;
+    final startupElapsedMilliseconds = Log.startupElapsedMilliseconds;
+    final inStartupWindow =
+        startupElapsedMilliseconds != null &&
+        startupElapsedMilliseconds <=
+            Log.networkDiagnosticWindow.inMilliseconds;
+    final startupFields = inStartupWindow
+        ? ' startup_ms=$startupElapsedMilliseconds '
+              'startup_phase=${Log.startupPhase} '
+              'client_age_ms=${_clientAge.elapsedMilliseconds} '
+              'resolver_outcome=${resolverOutcome(error)}'
+        : '';
     Log.w(
       'Matrix request failed request_path=$endpoint method=${request.method} '
-      'error=$summary',
+      'error=$summary$startupFields',
       category: LogCategory.matrix,
       source: 'matrix-http',
     );
@@ -67,6 +125,17 @@ class MatrixUserAgentHttpClient extends http.BaseClient {
     final separator = text.indexOf(':');
     final head = separator == -1 ? text : text.substring(0, separator);
     return head.trim();
+  }
+
+  /// Keeps the Windows NODATA distinction without retaining the exception's
+  /// endpoint-bearing message. `11004` is Winsock WSANO_DATA, a negative DNS
+  /// answer rather than a query timeout.
+  @visibleForTesting
+  static String resolverOutcome(Object error) {
+    if (error is! SocketException) {
+      return 'not_socket';
+    }
+    return error.osError?.errorCode == 11004 ? 'nodata' : 'socket_error';
   }
 
   @override

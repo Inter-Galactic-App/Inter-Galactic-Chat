@@ -1,4 +1,10 @@
 {
+  "notificationAttachmentSentImage": "Отправлено изображение",
+  "notificationAttachmentSentVideo": "Отправлено видео",
+  "notificationAttachmentSentAudio": "Отправлено голосовое сообщение",
+  "notificationAttachmentSentFile": "Отправлен файл",
+  "notificationAttachmentSharedLocation": "Отправлена геопозиция",
+  "notificationAttachmentSentSticker": "Отправлен стикер",
   "labelRoomsList": "Комнаты",
   "@labelRoomsList": {
     "description": "Header label for the list of rooms",

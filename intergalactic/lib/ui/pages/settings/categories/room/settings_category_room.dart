@@ -8,6 +8,7 @@ import 'package:intergalactic/ui/pages/settings/categories/room/appearance/room_
 import 'package:intergalactic/ui/pages/settings/categories/room/calendar/room_calendar_settings_page.dart';
 import 'package:intergalactic/ui/pages/settings/categories/room/developer/room_developer_settings_view.dart';
 import 'package:intergalactic/ui/pages/settings/categories/room/emoji_packs/room_emoji_pack_settings_page.dart';
+import 'package:intergalactic/ui/pages/settings/categories/room/general/room_general_settings_page.dart';
 import 'package:intergalactic/ui/pages/settings/categories/room/members/room_members_settings_page.dart';
 import 'package:intergalactic/ui/pages/settings/categories/room/nicknames/room_nicknames_settings_page.dart';
 import 'package:intergalactic/ui/pages/settings/categories/room/notifications/room_notifications_settings_page.dart';
@@ -20,6 +21,7 @@ import 'package:intl/intl.dart';
 
 class SettingsCategoryRoom implements SettingsCategory {
   SettingsCategoryRoom(this.room, this.contextSpace);
+  static const String tabIdGeneral = 'room.general';
   static const String tabIdNotifications = 'room.notifications';
   static const String tabIdAppearance = 'room.appearance';
   static const String tabIdEmoticons = 'room.emoticons';
@@ -42,7 +44,7 @@ class SettingsCategoryRoom implements SettingsCategory {
     desc: "Label for room appearance settings",
   );
 
-  String get labelRoomSettingsNotifications => Intl.message(
+  String get labelRoomSettingsNotificationsTab => Intl.message(
     "Notifications",
     name: "labelRoomSettingsNotificationsTab",
     desc: "Label for room notification settings",
@@ -116,8 +118,56 @@ class SettingsCategoryRoom implements SettingsCategory {
 
     return List.from([
       SettingsTab(
+        id: tabIdGeneral,
+        label: labelRoomSettingsGeneral,
+        icon: Icons.info_outline,
+        // The Addresses terms are gated on the same condition
+        // `RoomGeneralSettingsPage` renders that section under. Search names a
+        // control and then scrolls to it, so indexing one the page will not
+        // build sends the user to a tab where the promised row is simply
+        // absent - which reads as a broken search rather than an absent
+        // feature.
+        searchKeywords: [
+          'general',
+          'icon',
+          'avatar',
+          'name',
+          'topic',
+          'description',
+          if (room is MatrixRoom) ...[
+            'room addresses',
+            'addresses',
+            'aliases',
+            'address',
+          ],
+        ],
+        searchEntries: [
+          const SettingsSearchEntry(
+            title: 'Icon, name, and topic',
+            section: 'Room Profile',
+            keywords: [
+              'avatar',
+              'name',
+              'topic',
+              'description',
+              'appearance',
+              'general',
+            ],
+          ),
+          if (room is MatrixRoom)
+            const SettingsSearchEntry(
+              title: 'Room Addresses',
+              section: 'Addresses',
+              keywords: ['aliases', 'address', 'general'],
+            ),
+        ],
+        pageBuilder: (context) {
+          return RoomGeneralSettingsPage(room: room);
+        },
+      ),
+      SettingsTab(
         id: tabIdNotifications,
-        label: labelRoomSettingsNotifications,
+        label: labelRoomSettingsNotificationsTab,
         icon: Icons.notifications_outlined,
         searchKeywords: const [
           'general',
@@ -291,13 +341,6 @@ class SettingsCategoryRoom implements SettingsCategory {
         label: labelRoomSettingsAdmin,
         icon: Icons.admin_panel_settings_outlined,
         searchKeywords: const [
-          'general',
-          'icon',
-          'avatar',
-          'name',
-          'topic',
-          'room addresses',
-          'aliases',
           'room events',
           'join events',
           'leave events',
@@ -306,18 +349,13 @@ class SettingsCategoryRoom implements SettingsCategory {
           'discover',
           'server discovery',
           'room directory',
+          'conversation type',
+          'direct message',
+          'group room',
+          'room version',
+          'room migration',
         ],
         searchEntries: const [
-          SettingsSearchEntry(
-            title: 'Icon, name, and topic',
-            section: 'Room Profile',
-            keywords: ['avatar', 'name', 'topic', 'appearance', 'general'],
-          ),
-          SettingsSearchEntry(
-            title: 'Room Addresses',
-            section: 'Addresses',
-            keywords: ['aliases', 'address', 'general'],
-          ),
           SettingsSearchEntry(
             title: 'Room Events',
             section: 'Room Events',
@@ -328,6 +366,16 @@ class SettingsCategoryRoom implements SettingsCategory {
               'profile updates',
               'general',
             ],
+          ),
+          SettingsSearchEntry(
+            title: 'Conversation type',
+            section: 'Conversation type',
+            keywords: ['direct message', 'group room', 'convert room'],
+          ),
+          SettingsSearchEntry(
+            title: 'Matrix room version',
+            section: 'Matrix room version',
+            keywords: ['matrix room version', 'room migration', 'tombstone'],
           ),
           SettingsSearchEntry(
             title: 'Discover listing',

@@ -4,7 +4,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as path;
 
 void main() {
-  final appRoot = Directory.current;
+  // CI normally runs from `intergalactic/`, while the Android-only worktree
+  // runs Flutter from its repository root. Support both without guessing from
+  // the checkout's directory name.
+  final currentDirectory = Directory.current;
+  final nestedAppRoot = Directory(
+    path.join(currentDirectory.path, 'intergalactic'),
+  );
+  final appRoot = nestedAppRoot.existsSync() ? nestedAppRoot : currentDirectory;
   final repositoryRoot = appRoot.parent;
   final pluginRoot = Directory(
     path.join(
@@ -109,6 +116,22 @@ void main() {
       reason:
           'The Activity-only handler is unavailable to Firebase headless engines.',
     );
+    expect(
+      mainActivity,
+      allOf(
+        contains('override fun getCachedEngineId(): String'),
+        contains('provideEngine(this)'),
+        contains('FlutterEngineCache.getInstance().put(ENGINE_ID, existing)'),
+      ),
+      reason:
+          'A cold Android process must initialize the shared engine, while a '
+          'warm handoff must repopulate a stale Flutter cache before naming it.',
+    );
+    final cachedEngineMethod = RegExp(
+      r'override fun getCachedEngineId\(\): String \{([\s\S]*?)\n    \}',
+    ).firstMatch(mainActivity);
+    expect(cachedEngineMethod, isNotNull);
+    expect(cachedEngineMethod!.group(1), contains('provideEngine(this)'));
 
     // The plugin builds its authority from the package name; the manifest
     // declares it from the applicationId. They agree today and nothing
@@ -151,7 +174,15 @@ void main() {
     // stayed green with the channel call renamed and its invocation removed.
     expect(
       File(
-        'lib/client/components/push_notification/android/android_notifier.dart',
+        path.join(
+          appRoot.path,
+          'lib',
+          'client',
+          'components',
+          'push_notification',
+          'android',
+          'android_notifier.dart',
+        ),
       ).readAsStringSync(),
       contains("'revokeNotificationPreviewGrants',"),
       reason: 'the sweep deletes the files but never asks for the revoke',

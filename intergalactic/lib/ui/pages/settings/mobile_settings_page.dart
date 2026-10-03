@@ -24,11 +24,13 @@ class MobileSettingsPage extends StatefulWidget {
     required this.settings,
     this.buttons,
     this.initialTabId,
+    this.initialTabInline = false,
     super.key,
   });
   final List<SettingsButton>? buttons;
   final List<SettingsCategory> settings;
   final String? initialTabId;
+  final bool initialTabInline;
 
   @override
   State<MobileSettingsPage> createState() => _MobileSettingsPageState();
@@ -43,6 +45,7 @@ class _MobileSettingsPageState extends State<MobileSettingsPage> {
   int selectedTabIndex = 0;
   int selectedCategoryIndex = 0;
   bool _openedInitialTab = false;
+  SettingsSubPage? _inlineInitialTab;
 
   @override
   void initState() {
@@ -58,8 +61,10 @@ class _MobileSettingsPageState extends State<MobileSettingsPage> {
     if (settingsChanged) {
       tabs = widget.settings;
     }
-    if (oldWidget.initialTabId != widget.initialTabId) {
+    if (oldWidget.initialTabId != widget.initialTabId ||
+        oldWidget.initialTabInline != widget.initialTabInline) {
       _openedInitialTab = false;
+      _inlineInitialTab = null;
       WidgetsBinding.instance.addPostFrameCallback((_) => openInitialTab());
     } else if (settingsChanged &&
         !_openedInitialTab &&
@@ -88,13 +93,21 @@ class _MobileSettingsPageState extends State<MobileSettingsPage> {
       for (final tab in category.tabs) {
         if (tab.id == widget.initialTabId) {
           _openedInitialTab = true;
-          _pushSettingsSubPage(
-            SettingsSubPage(
-              makeScrollable: tab.makeScrollable,
-              builder: tab.pageBuilder,
-              accountController: SettingsAccountScope.maybeRead(context),
-            ),
+          final page = SettingsSubPage(
+            makeScrollable: tab.makeScrollable,
+            builder: tab.pageBuilder,
+            accountController: SettingsAccountScope.maybeRead(context),
+            onBack: widget.initialTabInline
+                ? () => setState(() => _inlineInitialTab = null)
+                : null,
           );
+          if (widget.initialTabInline) {
+            setState(() {
+              _inlineInitialTab = page;
+            });
+          } else {
+            _pushSettingsSubPage(page);
+          }
           return;
         }
       }
@@ -103,6 +116,11 @@ class _MobileSettingsPageState extends State<MobileSettingsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final inlineInitialTab = _inlineInitialTab;
+    if (inlineInitialTab != null) {
+      return inlineInitialTab;
+    }
+
     final visibleCategories = filteredCategories;
 
     return SettingsTypography(
@@ -446,12 +464,23 @@ class _MobileSettingsPageState extends State<MobileSettingsPage> {
   }
 
   void _pushSettingsSubPage(SettingsSubPage page) {
+    // A category is its own route, so the Scaffold `SettingsNavigation` puts
+    // on the settings route is not an ancestor of it and cannot draw its
+    // SnackBars. Wrap it here, chrome-free, for the same reason and on the
+    // same terms - transparent background, no keyboard resize - so the page
+    // looks exactly as it did before.
+    final surface = m.Scaffold(
+      backgroundColor: m.Colors.transparent,
+      resizeToAvoidBottomInset: false,
+      body: page,
+    );
+
     if (PlatformUtils.isIOS) {
-      Navigator.of(context).push(c.CupertinoPageRoute(builder: (_) => page));
+      Navigator.of(context).push(c.CupertinoPageRoute(builder: (_) => surface));
       return;
     }
 
-    NavigationUtils.navigateTo(context, page);
+    NavigationUtils.navigateTo(context, surface);
   }
 
   Widget searchResultButton({
@@ -569,11 +598,13 @@ class SettingsSubPage extends StatefulWidget {
     this.makeScrollable = true,
     this.accountController,
     this.initialSearchAnchorId,
+    this.onBack,
   });
   final Widget Function(BuildContext) builder;
   final bool makeScrollable;
   final SettingsAccountController? accountController;
   final String? initialSearchAnchorId;
+  final VoidCallback? onBack;
 
   @override
   State<SettingsSubPage> createState() => _SettingsSubPageState();
@@ -670,8 +701,9 @@ class _SettingsSubPageState extends State<SettingsSubPage> {
                                   CircleButton(
                                     radius: 25,
                                     icon: m.Icons.arrow_back_ios_new,
-                                    onPressed: () =>
-                                        Navigator.of(context).pop(),
+                                    onPressed:
+                                        widget.onBack ??
+                                        () => Navigator.of(context).pop(),
                                   ),
                                   const SizedBox(width: 12),
                                   const Expanded(

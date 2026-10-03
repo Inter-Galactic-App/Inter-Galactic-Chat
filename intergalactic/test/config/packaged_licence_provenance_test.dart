@@ -45,14 +45,6 @@ void main() {
             .allMatches(text)
             .map((m) => (m.group(1)!, m.group(2)!, m.group(3)!))
             .toList();
-    expect(
-      recorded.length,
-      greaterThanOrEqualTo(13),
-      reason:
-          'only ${recorded.length} rows parsed out of the table; the format '
-          'changed and this test would otherwise pass vacuously',
-    );
-
     // The path RELATIVE to assets/licenses, not the basename. Taking the last
     // segment merged `nested/libass-ISC.txt` into the root `libass-ISC.txt`, so
     // a nested file with a colliding name looked covered and the digest check
@@ -79,6 +71,35 @@ void main() {
         .where((n) => n.endsWith('.txt'))
         .toSet();
     final rowNames = recorded.map((r) => r.$1).toSet();
+
+    // Two floors, guarding two different vacuities.
+    //
+    // The first is on the LISTING. If `assets/licenses` stops yielding files -
+    // moved, renamed, or a changed extension filter - both set comparisons
+    // below become trivially true and the table is checked against nothing.
+    // Thirteen is the count recorded on 2026-08-18, a historical lower bound
+    // rather than today's total, so it does not need re-tuning as assets are
+    // added.
+    expect(
+      shipped.length,
+      greaterThanOrEqualTo(13),
+      reason:
+          'only ${shipped.length} licence texts were listed; the directory '
+          'moved and the comparisons below would pass vacuously',
+    );
+    // The second is on the TABLE, and it is derived rather than written down.
+    // It was the literal 13 while the directory already held 19, which is how a
+    // written-down floor fails: silently, and a re-tuned literal fails the same
+    // way one asset later. Every shipped text needs a row, so the parse must
+    // yield at least as many rows as there are files to describe.
+    expect(
+      recorded.length,
+      greaterThanOrEqualTo(shipped.length),
+      reason:
+          'only ${recorded.length} rows parsed out of the table for '
+          '${shipped.length} shipped texts; the format changed and this test '
+          'would otherwise pass vacuously',
+    );
 
     expect(
       shipped.difference(rowNames),
@@ -149,6 +170,7 @@ void main() {
       'sixteen': 16,
       'seventeen': 17,
       'eighteen': 18,
+      'nineteen': 19,
     };
 
     final sources = <String, String>{

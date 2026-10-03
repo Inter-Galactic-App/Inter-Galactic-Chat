@@ -79,7 +79,7 @@ const List<OnboardingStep> demoTutorialSteps = [
   OnboardingStep(
     id: 'messaging-1',
     title: 'Messages, Media, GIFs, and Reactions',
-    body: 'Send text, media, GIFs, stickers, and emoticons from the composer.',
+    body: 'Use the composer to send text, media, GIFs, and reactions.',
     icon: Icons.add_reaction_outlined,
     targetAnchorId: 'composer',
   ),
@@ -273,8 +273,7 @@ const List<OnboardingStep> demoTutorialSteps = [
   OnboardingStep(
     id: 'account-quick-access',
     title: 'Account Quick Access',
-    body:
-        'Quickly manage your account, update your status, or switch between activities by clicking your user bar.',
+    body: 'Use the user bar to manage your account, status, and activities.',
     icon: Icons.account_circle_outlined,
     targetAnchorId: 'account.popup',
   ),
@@ -282,7 +281,7 @@ const List<OnboardingStep> demoTutorialSteps = [
     id: 'privacy-default',
     title: 'Privacy and Encryption',
     body:
-        'Inter Galactic is a Matrix client. Messages may be end-to-end encrypted depending on room settings. Losing keys or devices can affect encrypted history recovery. Homeserver and account controls belong to the selected Matrix server.',
+        'Encryption follows room settings. Keep your keys and devices to recover encrypted history.',
     icon: Icons.enhanced_encryption_outlined,
     targetAnchorId: 'room.encryption',
   ),

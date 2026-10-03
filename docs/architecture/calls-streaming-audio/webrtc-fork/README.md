@@ -52,7 +52,7 @@ keep the object *reachable in our mirrors*, so that if upstream ever force-pushe
 or garbage-collects `m137_release`, the base commit is still fetchable from us
 instead of only from upstream.
 
-### Pinned commits — the 0.8.1+1004 candidate
+### Pinned commits — selected 0.8.2+1008 native component
 
 **This block is release-scoped and moves; the rest of this document does not.**
 Branch names are mutable. These are the exact patch tips the candidate build
@@ -62,16 +62,19 @@ the branch names, when you want a reproducible tree:
 | Tree | Commit |
 | --- | --- |
 | WebRTC core | `c6bf02fe64a993fa9d34d44957db71615ec98ddd` |
-| libwebrtc wrapper | `cdd3c9a98e93f911a67489ecaa3968b730baf8a4` |
+| libwebrtc wrapper | `c8619a6d98d49939b6affe642a037d9f5a6ed9d5` |
 | upstream WebRTC base | `a4bd28d99eb9ed3bc8e41ce7b9ce7254ee7308bd` |
-| host `depot_tools` | `ff41874736c800b2f79aa8cf9596c7919066eb02` |
+| host `depot_tools` | `0948b46c2396eb38ff61722815af0c218a159f04` |
 
-The Windows 0.8.1+1004 candidate uses this different patch pair. Earlier
-public 0.8.0 releases used the separately recorded `608468...` / `1f70ae...`
-pair. Reproducing 0.8.1 from the older table would produce the wrong DLL, so
-this candidate-scoped table moves with the four recorded source-pointer
-surfaces and remains a candidate record until its matching release is
-published.
+This pair identifies the selected 20,738,560-byte DLL with SHA-256
+`2899E370BC49BA746FB61E3E610CC473B945738EF87C67BBC311552F5810C209`.
+The historical public Windows 0.8.1+1004 used the same core but wrapper
+`cdd3c9a98e93f911a67489ecaa3968b730baf8a4`, host depot_tools
+`ff41874736c800b2f79aa8cf9596c7919066eb02` and DLL
+`ED53C3D4ADA4F442658465F487CCC091A858C0A541812D489CC3839992D0BE42`.
+Its versioned release record remains unchanged. Earlier public 0.8.0
+records retain their own patch pairs. The selected native component is not
+a claim that a new application release has been published.
 
 The two patch commits above are also named by the in-app notice
 (`native_licenses.dart`), `SOURCE_OFFER.md` and `THIRD_PARTY_LICENSES.json`.
@@ -83,7 +86,7 @@ a green state.
 queue row, and it cannot tell four surfaces updated in one commit from four
 updated across four. *"All four in the same change, or none"* is a separate
 release-process rule and is held by the *"first public 0.8.1 release"* row in
-`docs/agent-control/integration-queue.json`, not by any gate.
+the maintainer release tracker, not by an automated gate.
 
 The upstream base in the same table is checked against
 `pinned-dependency-revisions.json` beside this file, which is what actually pins
@@ -94,7 +97,7 @@ or step 3 and step 4 below contradict each other.
 `libwebrtc.zip.manifest.json` records the inputs of *that zip*, so it ties one
 particular `libwebrtc.dll` back to its own sources. A workspace that has already
 built ahead of the distributed line carries the newer pair there, by design. This
-table records the 0.8.1+1004 candidate; the separately recorded 0.8.0 tables
+table records the selected 0.8.2+1008 native component; historical release records
 cover the earlier public releases. The manifest tracks what is on the disk in
 front of you. Reading either as evidence for the other is how a source pointer
 ends up describing a binary nobody has.
@@ -118,15 +121,18 @@ recovered by syncing to the pinned `src` revision.
    Every step below is safe to re-run.
 
 1. Ensure `depot_tools` is on `PATH` (workspace has it at `depot_tools/`).
-   `depot_tools` auto-updates itself, so for a byte-reproducible rebuild pin it
+   `depot_tools` auto-updates itself, so to reconstruct the recorded inputs pin it
    to the revision this build used and stop it from rolling forward:
 
        cd depot_tools
-       git checkout ff41874736c800b2f79aa8cf9596c7919066eb02
+       git checkout 0948b46c2396eb38ff61722815af0c218a159f04
        set DEPOT_TOOLS_UPDATE=0
+       set DEPOT_TOOLS_WIN_TOOLCHAIN=0
 
-   A newer `depot_tools` will usually work; pin it only when you are trying to
-   reproduce this exact artifact.
+   The selected build used local Visual Studio 2022 BuildTools 14.44.35207,
+   GN 2233 (85cc21e94af5), Ninja 1.13.2 and Chromium clang-cl/LLD 21.0.0git
+   at LLVM `09006611151c7f85862a9da8da34872c456c2c37`. Matching inputs is
+   not a demonstrated byte-identical rebuild; measure the resulting DLL.
 
 2. Create the checkout root and gclient config:
 
@@ -159,7 +165,7 @@ recovered by syncing to the pinned `src` revision.
        cd src/libwebrtc
        git remote set-url wrapper https://github.com/Inter-Galactic-App/libwebrtc.git 2>nul || git remote add wrapper https://github.com/Inter-Galactic-App/libwebrtc.git
        git fetch wrapper intergalactic/windows-hardware-h264
-       git checkout cdd3c9a98e93f911a67489ecaa3968b730baf8a4
+       git checkout c8619a6d98d49939b6affe642a037d9f5a6ed9d5
 
 6. Build:
 
@@ -186,41 +192,43 @@ recovered by syncing to the pinned `src` revision.
    the receiver frame-id accessor, and so on), so a stock upstream build packaged
    into this layout will still be rejected - by design.
 
-8. Drop it at
-   `artifacts/libwebrtc/windows-hardware-h264/libwebrtc.zip` and refresh the
-   sidecar `libwebrtc.zip.manifest.json` (see below). `build.bat` finds it there
+8. Stage the new ZIP and matching sidecar in a versioned candidate location.
+   Preserve the historical canonical ZIP. The canonical default remains
+   `artifacts/libwebrtc/windows-hardware-h264/libwebrtc.zip`. `build.bat` finds it there
    by default; `--libwebrtc-zip` or `INTERGALACTIC_LIBWEBRTC_ZIP` override.
 
 ## Artifact provenance
 
-Each built zip carries a sidecar manifest,
-`artifacts/libwebrtc/windows-hardware-h264/libwebrtc.zip.manifest.json`,
+Each built ZIP carries a matching sidecar named `<zip-path>.manifest.json`,
 recording its SHA-256 plus the wrapper commit, the WebRTC core commit, the
 upstream synced revision, and the `args.gn` used.
 
 ### Regenerating it
 
-Whenever the zip is rebuilt, refresh the manifest — a stale hash is reported as a
-mismatch and fails the build:
+Whenever a candidate ZIP is rebuilt, refresh its matching sidecar in the
+versioned candidate location from step 8. Do not overwrite the historical
+canonical ZIP or its sidecar. A stale hash is reported as a mismatch and fails
+the build:
 
 ```powershell
-$zip = '<path to libwebrtc.zip>'
-$webRtcRoot = '<path to webrtc-build/src>'
-$wrapperRoot = '<path to webrtc-build/src/libwebrtc>'
+$zip = '<versioned-candidate-directory>\libwebrtc.zip'
 $m   = Get-Content -Raw "$zip.manifest.json" | ConvertFrom-Json
 $m.artifact.sha256 = (Get-FileHash -Algorithm SHA256 $zip).Hash
 $m.artifact.bytes  = (Get-Item $zip).Length
 $m.artifact.builtUtc = (Get-Item $zip).LastWriteTimeUtc.ToString('yyyy-MM-ddTHH:mm:ssZ')
-$m.provenance.webrtcCore.commit       = git -C $webRtcRoot rev-parse HEAD
-$m.provenance.libwebrtcWrapper.commit = git -C $wrapperRoot rev-parse HEAD
+$m.provenance.webrtcCore.commit       = git -C <webrtc-core-root> rev-parse HEAD
+$m.provenance.libwebrtcWrapper.commit = git -C <webrtc-wrapper-root> rev-parse HEAD
 $m | ConvertTo-Json -Depth 10 | Set-Content "$zip.manifest.json"
 ```
 
-Then confirm the installer accepts it:
+Then confirm the installer accepts that explicit candidate before building.
+This installs it into the selected build checkout; use the same candidate path
+for `--libwebrtc-zip` or `INTERGALACTIC_LIBWEBRTC_ZIP` when starting the build:
 
 ```powershell
 powershell -File intergalactic\scripts\install_patched_libwebrtc.ps1 `
-  -WorkspaceRoot <repo-root> -AppDir <repo-root>\intergalactic -Mode require
+  -WorkspaceRoot <repo-root> -AppDir <build-checkout>\intergalactic `
+  -Mode require -ZipPath $zip
 ```
 
 It prints the provenance banner on success and throws on a hash mismatch, a
@@ -233,15 +241,14 @@ signature.** It detects *drift*: a zip rebuilt without regenerating the manifest
 a stale hash, a truncated or corrupted archive, or the wrong artifact dropped
 into the artifacts directory.
 
-**Nothing here proves the pinned commits built the DLL that shipped.** The
-provenance gate compares records against records. Confirming that the packaged
-`libwebrtc.dll` is the recorded digest means opening the final Windows payload,
-and **no automated check does that today** — do not read the gate's green as
-covering it. That confirmation is a manual publication step owned by RELEASE
-PIPELINE and carried in `docs/release/LICENSE_RELEASE_CHECKLIST.md`, where it is
-an OPEN item blocking the first public 0.8.1 release: all four surfaces move
-together, and the packaged DLL is hashed out of the payload and matched against
-the digest recorded in `docs/release/THIRD_PARTY_LICENSES.json`.
+**Matching records does not prove source-to-binary correspondence.** The
+release pipeline separately opens the packaged DLL and compares its bytes
+with the selected native ZIP and inventory digest. The measured package
+receipt for app commit `2973eae254d090214d7c6254dd6eb8ae7054d65a` is recorded
+in `docs/release/evidence/license-sources/libwebrtc-windows/0.8.2+1008.md`.
+That receipt cannot establish package contents for a later application commit.
+Rebuild inputs, package byte identity and recipient source availability are
+separate checks; none is a byte-reproducibility or publication guarantee.
 
 **Scope: this zip is a build input and is not conveyed.**
 `install_patched_libwebrtc.ps1` consumes it at build time; there is no

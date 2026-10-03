@@ -25,10 +25,8 @@ import 'package:http/http.dart' as http;
 import 'package:matrix/matrix.dart' as matrix;
 import 'package:matrix/matrix_api_lite.dart';
 
-typedef UrlPreviewResponseFetcher = Future<Map<String, Object?>?> Function(
-  matrix.Client client,
-  Uri url,
-);
+typedef UrlPreviewResponseFetcher =
+    Future<Map<String, Object?>?> Function(matrix.Client client, Uri url);
 
 typedef UrlPreviewDirectFetcher = Future<UrlPreviewData?> Function(Uri url);
 
@@ -36,26 +34,79 @@ typedef UrlPreviewUriNormalizer = Future<Uri> Function(Uri uri);
 
 typedef UrlPreviewMatrixClientProvider = matrix.Client Function(Room room);
 
-typedef IntergalacticPreviewResponseFetcher = Future<Map<String, Object?>?>
-    Function(Uri url);
+typedef IntergalacticPreviewResponseFetcher =
+    Future<Map<String, Object?>?> Function(Uri url);
+
+/// Which backend actually answered a preview request.
+///
+/// `server_used` in the resolved log line only says that SOME server
+/// answered. [fetchConfiguredPreviewResponse] falls back from the Inter
+/// Galactic service to the homeserver's native preview SILENTLY, on every
+/// failure mode - non-2xx, a non-object body, a thrown exception, DNS - so a
+/// capture taken to measure the service can be measuring Synapse instead.
+/// That happened to the 2026-09-11 capture: at least 21 of its responses were
+/// Synapse's, and the service's own coverage for those hosts was never
+/// measured.
+enum UrlPreviewBackend {
+  /// The configured Inter Galactic URL preview service answered.
+  intergalactic,
+
+  /// The homeserver's native `preview_url` answered.
+  synapse,
+
+  /// Neither answered: both returned null, or the homeserver does not
+  /// support previews and the service did not answer.
+  none,
+}
 
 class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
   static const Duration _previewRequestTimeout = Duration(seconds: 6);
+
+  /// What is left of the caller's budget once the preview fetch has had its
+  /// own [_previewRequestTimeout]. `_fetchAndCachePreview` allows
+  /// `_previewRequestTimeout + 2s` for the whole build, so the site icon -
+  /// which is optional decoration - gets the remainder and never borrows from
+  /// the deadline that decides whether the preview itself survives.
+  static const Duration _siteIconBudget = Duration(seconds: 2);
+
+  /// Headroom the whole build gets ON TOP of both inner budgets.
+  ///
+  /// This exists because the two budgets used to sum to exactly the outer
+  /// deadline: the fetch could take all of [_previewRequestTimeout] and the
+  /// icon all of [_siteIconBudget], so any scheduling or parsing overhead
+  /// made the outer timeout fire first. `_fetchAndCachePreview` answers that
+  /// timeout by caching the URL as `invalidPreviewData`, which
+  /// [_invalidPreviewCacheTtl] then suppresses any retry of for ten minutes -
+  /// so a slow favicon destroyed a preview that had ALREADY resolved, the
+  /// exact failure [_siteIconBudget]'s comment says the split avoids.
+  ///
+  /// Derive the deadline from the budgets rather than writing a third number,
+  /// so raising either one cannot silently reintroduce the overlap.
+  static const Duration _previewBuildSlack = Duration(milliseconds: 500);
+
+  /// The whole-build deadline: both inner budgets in full, plus headroom.
+  ///
+  /// `static final`, not `const`: `Duration + Duration` is not a constant
+  /// expression, and `dart analyze` accepts it while the compiler rejects it.
+  static final Duration _previewBuildDeadline =
+      _previewRequestTimeout + _siteIconBudget + _previewBuildSlack;
+
   static const Duration _invalidPreviewCacheTtl = Duration(minutes: 10);
   static const Duration _missingImageRefreshRetryDelay = Duration(minutes: 5);
   static const Duration _intergalacticPreviewRetryDelay = Duration(minutes: 30);
-  static const Duration _intergalacticPreviewTransientFailureWindow =
-      Duration(minutes: 2);
+  static const Duration _intergalacticPreviewTransientFailureWindow = Duration(
+    minutes: 2,
+  );
   static const int _intergalacticPreviewTransientFailureThreshold = 3;
   static const int _maxLongLivedCacheEntries = 1000;
   static final LinkedHashMap<String, UrlPreviewData> _longLivedCache =
       LinkedHashMap();
   static final LinkedHashMap<String, DateTime>
-      _longLivedInvalidCacheTimestamps = LinkedHashMap();
+  _longLivedInvalidCacheTimestamps = LinkedHashMap();
   static final LinkedHashMap<String, UrlPreviewData> _longLivedEventCache =
       LinkedHashMap();
   static final LinkedHashMap<String, DateTime>
-      _longLivedInvalidEventCacheTimestamps = LinkedHashMap();
+  _longLivedInvalidEventCacheTimestamps = LinkedHashMap();
   @override
   MatrixClient client;
 
@@ -63,19 +114,23 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
     this.client, {
     UrlPreviewResponseFetcher? responseFetcher,
     UrlPreviewDirectFetcher? directFetcher,
+    Future<UrlPreviewSiteIcon?> Function(Uri uri)? siteIconFetcher,
     UrlPreviewUriNormalizer? uriNormalizer,
     UrlPreviewMatrixClientProvider? matrixClientProvider,
     UrlPreviewDurableCache? durableCache,
     IntergalacticPreviewResponseFetcher? intergalacticPreviewFetcher,
     DateTime Function()? now,
-  })  : _responseFetcher = responseFetcher,
-        _directFetcher =
-            directFetcher ?? UrlPreviewFallbackFetcher.fetchPreview,
-        _uriNormalizer = uriNormalizer,
-        _matrixClientProvider = matrixClientProvider,
-        _durableCache = durableCache ?? UrlPreviewDurableCache(),
-        _intergalacticPreviewFetcher = intergalacticPreviewFetcher,
-        _now = now ?? DateTime.now;
+    Duration? previewBuildDeadline,
+  }) : _responseFetcher = responseFetcher,
+       _directFetcher = directFetcher ?? UrlPreviewFallbackFetcher.fetchPreview,
+       _siteIconFetcher =
+           siteIconFetcher ?? UrlPreviewFallbackFetcher.fetchSiteIcon,
+       _uriNormalizer = uriNormalizer,
+       _matrixClientProvider = matrixClientProvider,
+       _durableCache = durableCache ?? UrlPreviewDurableCache(),
+       _intergalacticPreviewFetcher = intergalacticPreviewFetcher,
+       _now = now ?? DateTime.now,
+       _buildDeadline = previewBuildDeadline ?? _previewBuildDeadline;
 
   Map<String, UrlPreviewData> cache = {};
   final Map<String, UrlPreviewData> _eventCache = {};
@@ -87,11 +142,13 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
   final Map<String, int> _timelineWarmupGenerations = {};
   final UrlPreviewResponseFetcher? _responseFetcher;
   final UrlPreviewDirectFetcher _directFetcher;
+  final Future<UrlPreviewSiteIcon?> Function(Uri uri) _siteIconFetcher;
   final UrlPreviewUriNormalizer? _uriNormalizer;
   final UrlPreviewMatrixClientProvider? _matrixClientProvider;
   final UrlPreviewDurableCache _durableCache;
   final IntergalacticPreviewResponseFetcher? _intergalacticPreviewFetcher;
   final DateTime Function() _now;
+  final Duration _buildDeadline;
 
   bool? serverSupportsUrlPreview;
   DateTime? _intergalacticPreviewUnavailableAt;
@@ -101,7 +158,9 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
 
   @override
   Future<UrlPreviewData?> getPreview(
-      Timeline timeline, TimelineEvent event) async {
+    Timeline timeline,
+    TimelineEvent event,
+  ) async {
     if (event is! TimelineEventMessage) {
       return null;
     }
@@ -110,7 +169,8 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
 
     if (room.isE2EE && !preferences.shouldAllowUrlPreviewInE2EEChat) {
       Log.i(
-          "Not getting url preview because chat is encrypted and its not enabled");
+        "Not getting url preview because chat is encrypted and its not enabled",
+      );
       return null;
     }
 
@@ -132,7 +192,12 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
     final cachedData = _getCachedPreviewForUri(uri);
     if (cachedData != null) {
       _cachePreviewForEventAliases(
-          timeline, event, originalUri, uri, cachedData);
+        timeline,
+        event,
+        originalUri,
+        uri,
+        cachedData,
+      );
       _logCacheHit('url', uri);
       return cachedData;
     }
@@ -141,12 +206,14 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
       mxClient,
       uri,
       originalUri: originalUri,
+      roomIsE2EE: room.isE2EE,
     );
     if (durableHit != null) {
       final refreshedData = await _refreshMissingDurableImage(
         uri,
         originalUri,
         durableHit.data,
+        roomIsE2EE: room.isE2EE,
       );
       if (refreshedData != null) {
         _cachePreviewForEventAliases(
@@ -159,18 +226,21 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
         return refreshedData;
       }
 
-      final shouldRefreshMissingImage =
-          _shouldRefreshMissingDurableImage(uri, durableHit.data);
+      final shouldRefreshMissingImage = _shouldRefreshMissingDurableImage(
+        uri,
+        durableHit.data,
+      );
+      final fallbackData = _withoutVisiblyEmptyDurableData(durableHit.data);
       if (!durableHit.isStale && !shouldRefreshMissingImage) {
         _cachePreviewForEventAliases(
           timeline,
           event,
           originalUri,
           uri,
-          durableHit.data,
+          fallbackData,
         );
       }
-      return durableHit.data;
+      return fallbackData;
     }
 
     if (!_canFetchPreviewForUri(uri)) {
@@ -186,7 +256,12 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
       return data;
     }
 
-    final request = _fetchAndCachePreview(mxClient, uri, originalUri);
+    final request = _fetchAndCachePreview(
+      mxClient,
+      uri,
+      originalUri,
+      roomIsE2EE: room.isE2EE,
+    );
     _inFlight[uri.toString()] = request;
 
     try {
@@ -236,16 +311,23 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
     TimelineEvent event,
     UrlPreviewData failedData,
   ) async {
+    // Each of these returns used to be silent, and all three run BEFORE the
+    // refresh line below - so a capture showing an image error and no refresh
+    // line could not say whether the refresh was skipped here or never
+    // requested at all.
     if (event is! TimelineEventMessage) {
+      _logImageRefreshSkipped(failedData, 'not_a_message_event');
       return null;
     }
 
     if (!shouldGetPreviewsInRoom(timeline.room)) {
+      _logImageRefreshSkipped(failedData, 'previews_off_for_room');
       return null;
     }
 
     final originalUri = _firstPreviewUri(timeline, event);
     if (originalUri == null) {
+      _logImageRefreshSkipped(failedData, 'no_link_on_event');
       return null;
     }
 
@@ -274,6 +356,7 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
       _matrixClientForRoom(timeline.room),
       normalizedUri,
       originalUri,
+      roomIsE2EE: timeline.room.isE2EE,
       cacheInvalid: false,
     );
 
@@ -305,7 +388,9 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
 
   @override
   bool shouldGetPreviewDataForTimelineEvent(
-      Timeline timeline, TimelineEvent event) {
+    Timeline timeline,
+    TimelineEvent event,
+  ) {
     if (event is! TimelineEventMessage) {
       return false;
     }
@@ -399,17 +484,19 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
       _matrixClientForRoom(room),
       normalizedUri,
       originalUri: uri,
+      roomIsE2EE: room.isE2EE,
     );
     if (durableHit != null) {
       final refreshedData = await _refreshMissingDurableImage(
         normalizedUri,
         uri,
         durableHit.data,
+        roomIsE2EE: room.isE2EE,
       );
       if (refreshedData != null) {
         return refreshedData;
       }
-      return durableHit.data;
+      return _withoutVisiblyEmptyDurableData(durableHit.data);
     }
 
     if (!_canFetchPreviewForUri(normalizedUri)) {
@@ -426,6 +513,7 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
       _matrixClientForRoom(room),
       normalizedUri,
       uri,
+      roomIsE2EE: room.isE2EE,
     );
     _inFlight[cacheKey] = request;
 
@@ -436,42 +524,153 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
     }
   }
 
+  /// Wraps [_buildPreviewData] so the site-icon fallback covers EVERY return
+  /// path, not one branch.
+  ///
+  /// Owner QA 2026-09-03 found the real gap: the fallback used to live only
+  /// inside `UrlPreviewFallbackFetcher.fetchPreview`, so it decorated the
+  /// DIRECT fetch's own result and nothing else. TikTok and Instagram routinely
+  /// block a client-side fetch, in which case the card is assembled from
+  /// homeserver metadata instead - text with no image - and never passed
+  /// through the fallback at all. That is why one Instagram post showed the
+  /// icon (direct fetch succeeded, imageless) and another rendered as the bare
+  /// word "Instagram" (direct fetch failed, server text used).
+  ///
+  /// Scope is unchanged: `shouldPreferDirectFetch` still gates it, so no host
+  /// becomes fetchable that was not already. REVIEW 2026-09-09: it is ALSO now
+  /// gated on `preferences.shouldAllowDirectUrlPreviewFallback` - fetching the
+  /// provider's own site icon is a request to that same third-party origin,
+  /// and this method used to run it unconditionally on any preferred-host
+  /// preview with no image, which reached that origin even when the user had
+  /// declined the direct-fetch fallback entirely.
   Future<UrlPreviewData?> buildPreviewData(
-      matrix.Client client, Uri url) async {
+    matrix.Client client,
+    Uri url, {
+    required bool roomIsE2EE,
+  }) async {
     final timer = Stopwatch()..start();
-    final preferDirectByProvider =
-        UrlPreviewFallbackFetcher.shouldPreferDirectFetch(url);
-    final serverFuture = fetchConfiguredPreviewResponse(client, url);
-    final directFuture =
-        preferDirectByProvider ? _fetchDirectPreview(url) : null;
-    UrlPreviewData? directData;
+    final data = await _buildPreviewData(client, url, roomIsE2EE: roomIsE2EE);
+    final remaining = _buildDeadline - timer.elapsed - _previewBuildSlack;
+    return _withProviderSiteIcon(
+      url,
+      data,
+      roomIsE2EE: roomIsE2EE,
+      budget: remaining < _siteIconBudget ? remaining : _siteIconBudget,
+    );
+  }
 
-    if (directFuture != null) {
-      directData = sanitizeUrlPreviewDataForUri(url, await directFuture);
-      if (urlPreviewCompletenessScore(directData) >= 4) {
-        timer.stop();
-        serverFuture.catchError((_) => null);
-        Log.d(
-          "URL preview resolved host=${_safePreviewHost(url)} "
-          "direct_preferred=true direct_used=true server_used=false "
-          "duration_ms=${timer.elapsedMilliseconds}",
-        );
-        return directData;
-      }
+  Future<UrlPreviewData?> _withProviderSiteIcon(
+    Uri url,
+    UrlPreviewData? data, {
+    required bool roomIsE2EE,
+    required Duration budget,
+  }) async {
+    if (data == null || data == UrlPreviewComponent.invalidPreviewData) {
+      return data;
     }
 
-    final response = await serverFuture;
+    // kIsWeb matches the guard the sibling copy of this logic already carries
+    // (UrlPreviewFallbackFetcher._withSiteIconFallback). Without it, every
+    // imageless provider preview on web starts icon requests that CORS blocks.
+    if (kIsWeb || !UrlPreviewFallbackFetcher.shouldPreferDirectFetch(url)) {
+      return data;
+    }
+
+    // The same disclosure the direct-fetch fallback gates, to the same
+    // provider origin: a site-icon request is still a connection this device
+    // makes to instagram.com/tiktok.com/reddit.com rather than through the
+    // preferred service, and a user who declined that disclosure must not
+    // have it happen anyway just because the preview came back imageless.
+    // REVIEW 2026-09-09, found while answering an unrelated owner question -
+    // same shape as the durable-cache-hit bypass, a different entry path.
+    if (!preferences.shouldAllowDirectUrlPreviewFallback(
+      roomIsE2EE: roomIsE2EE,
+    )) {
+      return data;
+    }
+
+    if (!UrlPreviewFallbackFetcher.shouldUseSiteIconFallback(data)) {
+      return data;
+    }
+    if (budget <= Duration.zero) return data;
+
+    // Bounded, and its failure swallowed. The icon is decoration on a card
+    // that is otherwise complete, and it used to be able to destroy one:
+    // fetchSiteIcon tries three paths in sequence and each can redirect up to
+    // six times at four seconds a hop, so it can outlast the caller's whole
+    // budget - and _fetchAndCachePreview answers a timeout by caching the URL
+    // as invalidPreviewData for ten minutes. A slow favicon would take the
+    // preview with it, and then suppress the retry that would have fixed it.
+    UrlPreviewSiteIcon? icon;
+    try {
+      icon = await _siteIconFetcher(url).timeout(budget);
+    } on TimeoutException {
+      icon = null;
+    } catch (error, stackTrace) {
+      Log.onError(error, stackTrace, content: 'URL preview site icon failed');
+      icon = null;
+    }
+    if (icon == null) {
+      return data;
+    }
+
+    return data.copyWith(
+      image: icon.provider,
+      imageUri: icon.uri,
+      imageWidth: icon.width,
+      imageHeight: icon.height,
+    );
+  }
+
+  Future<UrlPreviewData?> _buildPreviewData(
+    matrix.Client client,
+    Uri url, {
+    required bool roomIsE2EE,
+  }) async {
+    final timer = Stopwatch()..start();
+
+    // Owner decision A, 2026-09-09: the homeserver/service path is preferred
+    // and runs FIRST, unconditionally - it used to race a direct fetch in
+    // parallel for these same hosts, which meant both the provider's CDN and
+    // our own service received the request regardless of which one the
+    // result actually used. Direct fetch is now attempted only as a
+    // FALLBACK, and only after the preferred path has already been given the
+    // chance to answer.
+    final configured = await fetchConfiguredPreviewResponse(client, url);
+    final response = configured.response;
     final rawServerData = response != null
         ? buildPreviewFromResponse(client, url, response)
         : null;
     final serverData = sanitizeUrlPreviewDataForUri(url, rawServerData);
 
-    if (preferDirectByProvider && directData == null) {
-      final rawDirectData = await _fetchDirectPreview(url);
+    // Owner decisions B/C and S&C's ruling, 2026-09-09: a direct fetch is a
+    // disclosure to a third-party CDN, and which recipient gets the
+    // disclosure must be something the user chose, not something service
+    // availability decided for them - so the fallback needs the user's
+    // opt-in for THIS room's encryption state before it can even be
+    // attempted, on top of the existing host-completeness signal
+    // (`shouldPreferDirectFetch`) this project already had for which hosts
+    // are worth a direct attempt at all.
+    final directFallbackEligible =
+        UrlPreviewFallbackFetcher.shouldPreferDirectFetch(url) &&
+        preferences.shouldAllowDirectUrlPreviewFallback(roomIsE2EE: roomIsE2EE);
+
+    UrlPreviewData? directData;
+    final remaining = _buildDeadline - timer.elapsed - _previewBuildSlack;
+    if (directFallbackEligible &&
+        urlPreviewCompletenessScore(serverData) < 4 &&
+        remaining > Duration.zero) {
+      final rawDirectData = await _fetchDirectPreview(
+        url,
+        timeout: remaining < _previewRequestTimeout
+            ? remaining
+            : _previewRequestTimeout,
+      );
       directData = sanitizeUrlPreviewDataForUri(url, rawDirectData);
     }
 
-    final sanitizedGenericTikTokServerData = isTikTokPreviewUri(url) &&
+    final sanitizedGenericTikTokServerData =
+        isTikTokPreviewUri(url) &&
         _didSanitizePreview(rawServerData, serverData) &&
         directData == null;
 
@@ -481,13 +680,22 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
         "${_safePreviewHost(url)} because direct metadata was unavailable.",
       );
 
-      // On web, direct TikTok fetches are always blocked by CORS, so
-      // directData will never be available. Rather than returning null and
-      // showing no preview at all, fall back to a stripped version of the
-      // server data: keep the site name, any thumbnail image, and the posting
-      // account, but drop the generic marketing title/description.
-      // Something > nothing for the user.
-      if (kIsWeb && rawServerData != null) {
+      // directData is null here for one of three reasons: web (CORS always
+      // blocks a direct TikTok fetch), the room's consent gate declined the
+      // direct-fetch fallback, or the fetch was attempted and simply
+      // returned nothing. This used to be gated `kIsWeb &&`, on the
+      // assumption that only web could reach this branch with directData
+      // null - REVIEW 2026-09-11: the 2026-09-09 consent gate falsified
+      // that, since a desktop/mobile room with the fallback declined reaches
+      // it too, and desktop's TikTok tiles went blank because of exactly
+      // that gap. Rather than returning null and showing no preview at all
+      // on ANY platform, fall back to a stripped version of the server data:
+      // keep the site name, any thumbnail image, and the posting account,
+      // but drop the generic marketing title/description. Something >
+      // nothing for the user. This reuses data the server already
+      // returned - it is not a new third-party disclosure, so it is not
+      // gated by the direct-fallback opt-in above.
+      if (rawServerData != null) {
         final fallbackSiteName = rawServerData.siteName;
         final fallbackImage = _safeTikTokWebFallbackImage(rawServerData.image);
         final fallbackAccount = rawServerData.postingAccount;
@@ -511,8 +719,9 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
       }
     }
 
-    final preferDirectFetch = directData != null &&
-        (UrlPreviewFallbackFetcher.shouldPreferDirectFetch(url) ||
+    final preferDirectFetch =
+        directData != null &&
+        (directFallbackEligible ||
             urlPreviewCompletenessScore(directData) >
                 urlPreviewCompletenessScore(serverData));
 
@@ -525,29 +734,40 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
     timer.stop();
     Log.d(
       "URL preview resolved host=${_safePreviewHost(url)} "
-      "direct_preferred=$preferDirectByProvider "
+      "direct_fallback_allowed=$directFallbackEligible "
       "direct_used=${directData != null} "
       "server_used=${serverData != null} "
+      // WHICH server, not merely that one answered. server_used can also be
+      // false while a backend did answer, when sanitization drops the whole
+      // card - the source still names who produced what was dropped.
+      "source=${configured.source.name} "
       "duration_ms=${timer.elapsedMilliseconds}",
     );
 
     return merged;
   }
 
-  Future<Map<String, Object?>?> fetchConfiguredPreviewResponse(
-    matrix.Client client,
-    Uri url,
-  ) async {
+  Future<({Map<String, Object?>? response, UrlPreviewBackend source})>
+  fetchConfiguredPreviewResponse(matrix.Client client, Uri url) async {
     final intergalacticResponse = await fetchIntergalacticPreviewResponse(url);
     if (intergalacticResponse != null) {
-      return intergalacticResponse;
+      return (
+        response: intergalacticResponse,
+        source: UrlPreviewBackend.intergalactic,
+      );
     }
 
     if (serverSupportsUrlPreview == false) {
-      return null;
+      return (response: null, source: UrlPreviewBackend.none);
     }
 
-    return fetchPreviewResponse(client, url);
+    final serverResponse = await fetchPreviewResponse(client, url);
+    return (
+      response: serverResponse,
+      source: serverResponse == null
+          ? UrlPreviewBackend.none
+          : UrlPreviewBackend.synapse,
+    );
   }
 
   Future<Map<String, Object?>?> fetchIntergalacticPreviewResponse(
@@ -599,19 +819,16 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
       return null;
     }
 
-    _logIntergalacticPreviewServiceStatus(
-      'configured and homeserver-scoped',
+    _logIntergalacticPreviewServiceStatus('configured and homeserver-scoped');
+
+    final requestUri = endpointUri.replace(
+      queryParameters: {...endpointUri.queryParameters, 'url': url.toString()},
     );
 
-    final requestUri = endpointUri.replace(queryParameters: {
-      ...endpointUri.queryParameters,
-      'url': url.toString(),
-    });
-
     try {
-      final response = await http.get(requestUri).timeout(
-            _previewRequestTimeout,
-          );
+      final response = await http
+          .get(requestUri)
+          .timeout(_previewRequestTimeout);
       if (response.statusCode < 200 || response.statusCode >= 300) {
         _logIntergalacticPreviewHttpStatus(url, response.statusCode);
         if (shouldTemporarilyDisableIntergalacticPreviewServiceForStatus(
@@ -643,7 +860,9 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
   }
 
   Future<Map<String, Object?>?> fetchPreviewResponse(
-      matrix.Client client, Uri url) async {
+    matrix.Client client,
+    Uri url,
+  ) async {
     final override = _responseFetcher;
     if (override != null) {
       return override(client, url);
@@ -651,9 +870,13 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
 
     late Map<String, Object?> response;
     try {
-      response = await client.request(
-          matrix.RequestType.GET, await getRequestPath(),
-          query: {"url": url.toString()}).timeout(_previewRequestTimeout);
+      response = await client
+          .request(
+            matrix.RequestType.GET,
+            await getRequestPath(),
+            query: {"url": url.toString()},
+          )
+          .timeout(_previewRequestTimeout);
     } catch (e) {
       if (e is MatrixException) {
         if (e.error == MatrixError.M_UNRECOGNIZED) {
@@ -679,15 +902,17 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
     matrix.Client mxClient,
     Uri normalizedUri,
     Uri originalUri, {
+    required bool roomIsE2EE,
     bool cacheInvalid = true,
   }) async {
     UrlPreviewData? data;
 
     try {
-      data = await buildPreviewData(mxClient, normalizedUri).timeout(
-        _previewRequestTimeout + const Duration(seconds: 2),
-        onTimeout: () => null,
-      );
+      data = await buildPreviewData(
+        mxClient,
+        normalizedUri,
+        roomIsE2EE: roomIsE2EE,
+      ).timeout(_buildDeadline, onTimeout: () => null);
     } catch (_) {
       return null;
     }
@@ -698,7 +923,9 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
       await _putDurableCacheBestEffort(normalizedUri, originalUri, data);
     } else if (cacheInvalid) {
       _cachePreviewForUri(
-          normalizedUri, UrlPreviewComponent.invalidPreviewData);
+        normalizedUri,
+        UrlPreviewComponent.invalidPreviewData,
+      );
       _cachePreviewForUri(originalUri, UrlPreviewComponent.invalidPreviewData);
       await _putDurableCacheBestEffort(
         normalizedUri,
@@ -748,15 +975,15 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
     }
   }
 
-  Future<UrlPreviewData?> _fetchDirectPreview(Uri url) async {
+  Future<UrlPreviewData?> _fetchDirectPreview(
+    Uri url, {
+    Duration timeout = _previewRequestTimeout,
+  }) async {
     try {
-      final directPreview = _directFetcher(url).then<UrlPreviewData?>(
-        (preview) => preview,
-      );
-      return await directPreview.timeout(
-        _previewRequestTimeout,
-        onTimeout: () => null,
-      );
+      final directPreview = _directFetcher(
+        url,
+      ).then<UrlPreviewData?>((preview) => preview);
+      return await directPreview.timeout(timeout, onTimeout: () => null);
     } catch (error) {
       Log.d(
         'Optional direct URL preview fallback failed for host '
@@ -883,17 +1110,17 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
         _matrixClientForRoom(timeline.room),
         normalizedUri,
         originalUri: uri,
+        roomIsE2EE: timeline.room.isE2EE,
       );
       if (durableHit != null) {
-        if (_shouldRefreshMissingDurableImage(
-          normalizedUri,
-          durableHit.data,
-        )) {
-          candidates.add(_UrlPreviewWarmupCandidate(
-            event: event,
-            originalUri: uri,
-            normalizedUri: normalizedUri,
-          ));
+        if (_shouldRefreshMissingDurableImage(normalizedUri, durableHit.data)) {
+          candidates.add(
+            _UrlPreviewWarmupCandidate(
+              event: event,
+              originalUri: uri,
+              normalizedUri: normalizedUri,
+            ),
+          );
           continue;
         }
 
@@ -903,17 +1130,19 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
             event,
             uri,
             normalizedUri,
-            durableHit.data,
+            _withoutVisiblyEmptyDurableData(durableHit.data),
           );
         }
         continue;
       }
 
-      candidates.add(_UrlPreviewWarmupCandidate(
-        event: event,
-        originalUri: uri,
-        normalizedUri: normalizedUri,
-      ));
+      candidates.add(
+        _UrlPreviewWarmupCandidate(
+          event: event,
+          originalUri: uri,
+          normalizedUri: normalizedUri,
+        ),
+      );
     }
 
     if (candidates.isEmpty) {
@@ -946,6 +1175,7 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
             _matrixClientForRoom(timeline.room),
             uri,
             candidate.originalUri,
+            roomIsE2EE: timeline.room.isE2EE,
           );
 
     if (data != null) {
@@ -963,6 +1193,7 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
     matrix.Client mxClient,
     Uri normalizedUri,
     Uri originalUri, {
+    required bool roomIsE2EE,
     bool cacheInvalid = true,
   }) async {
     final cacheKey = normalizedUri.toString();
@@ -975,6 +1206,7 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
       mxClient,
       normalizedUri,
       originalUri,
+      roomIsE2EE: roomIsE2EE,
       cacheInvalid: cacheInvalid,
     );
     _inFlight[cacheKey] = request;
@@ -989,14 +1221,17 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
     matrix.Client mxClient,
     Uri normalizedUri, {
     required Uri originalUri,
+    required bool roomIsE2EE,
   }) async {
     final hit = await _durableCache.get(normalizedUri, mxClient);
     if (hit == null) {
       return null;
     }
 
-    final shouldRefreshMissingImage =
-        _shouldRefreshMissingDurableImage(normalizedUri, hit.data);
+    final shouldRefreshMissingImage = _shouldRefreshMissingDurableImage(
+      normalizedUri,
+      hit.data,
+    );
     if ((!hit.isStale || hit.data == UrlPreviewComponent.invalidPreviewData) &&
         !shouldRefreshMissingImage) {
       _cachePreviewForUri(normalizedUri, hit.data);
@@ -1006,13 +1241,18 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
       shouldRefreshMissingImage
           ? 'durable-missing-image'
           : hit.isStale
-              ? 'durable-stale'
-              : 'durable',
+          ? 'durable-stale'
+          : 'durable',
       normalizedUri,
     );
 
     if (hit.isStale && hit.data != UrlPreviewComponent.invalidPreviewData) {
-      _refreshStaleDurablePreview(mxClient, normalizedUri, originalUri);
+      _refreshStaleDurablePreview(
+        mxClient,
+        normalizedUri,
+        originalUri,
+        roomIsE2EE: roomIsE2EE,
+      );
     }
 
     return hit;
@@ -1021,9 +1261,25 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
   Future<UrlPreviewData?> _refreshMissingDurableImage(
     Uri normalizedUri,
     Uri originalUri,
-    UrlPreviewData cachedData,
-  ) async {
+    UrlPreviewData cachedData, {
+    required bool roomIsE2EE,
+  }) async {
     if (!_shouldRefreshMissingDurableImage(normalizedUri, cachedData)) {
+      return null;
+    }
+
+    // This is the SAME direct-fetch disclosure the _buildPreviewData fallback
+    // gates, to the same provider CDN, via the same shouldPreferDirectFetch
+    // predicate (_isMissingImageRefreshCandidate uses it too) - it just
+    // arrives from a different call path: a durable-cache hit returns before
+    // control ever reaches _buildPreviewData. Without this check, a user who
+    // declined the fallback on first view would have that very refusal (a
+    // cached preview with volatileImageOmitted true, exactly what a decline
+    // produces) arm the direct fetch on the SECOND view - the refusal itself
+    // becoming the trigger. REVIEW 2026-09-09.
+    if (!preferences.shouldAllowDirectUrlPreviewFallback(
+      roomIsE2EE: roomIsE2EE,
+    )) {
       return null;
     }
 
@@ -1094,11 +1350,7 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
     _clearMissingImageRefreshFailure(normalizedUri, originalUri);
     _cachePreviewForUri(normalizedUri, cacheData);
     _cachePreviewForUri(originalUri, cacheData);
-    await _putDurableCacheBestEffort(
-      normalizedUri,
-      originalUri,
-      cacheData,
-    );
+    await _putDurableCacheBestEffort(normalizedUri, originalUri, cacheData);
     return cacheData;
   }
 
@@ -1113,6 +1365,36 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
         data.imageUri == null &&
         data.volatileImageOmitted &&
         UrlPreviewFallbackFetcher.shouldPreferDirectFetch(uri);
+  }
+
+  /// A durable-cache hit whose only content was a volatile social-CDN image
+  /// (TikTok/Instagram) can come back with title, description, postingAccount
+  /// and stats all null and no image, once that image's TTL expires -
+  /// [buildPreviewFromResponse]'s emptiness guard only runs when a preview is
+  /// built fresh from a response, never when one is reconstructed directly
+  /// from [UrlPreviewDurableCache], so nothing upstream of a caller ever
+  /// catches this. Call after a missing-image refresh attempt (just above
+  /// each call site) has already had its chance to restore the image -
+  /// substituting this before that would disable the refresh entirely, since
+  /// [_isMissingImageRefreshCandidate] treats the sentinel as never a
+  /// candidate.
+  UrlPreviewData _withoutVisiblyEmptyDurableData(UrlPreviewData data) {
+    if (data == UrlPreviewComponent.invalidPreviewData) {
+      return data;
+    }
+
+    if (data.image != null || data.imageUri != null) {
+      return data;
+    }
+
+    if (normalizeUrlPreviewText(data.title) != null ||
+        normalizeUrlPreviewText(data.description) != null ||
+        normalizeUrlPreviewText(data.postingAccount) != null ||
+        normalizeUrlPreviewText(data.stats) != null) {
+      return data;
+    }
+
+    return UrlPreviewComponent.invalidPreviewData;
   }
 
   void _cacheMissingImageRefreshFailure(
@@ -1154,13 +1436,21 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
   void _refreshStaleDurablePreview(
     matrix.Client mxClient,
     Uri normalizedUri,
-    Uri originalUri,
-  ) {
+    Uri originalUri, {
+    required bool roomIsE2EE,
+  }) {
     if (_inFlight.containsKey(normalizedUri.toString())) {
       return;
     }
 
-    unawaited(_startPreviewRequest(mxClient, normalizedUri, originalUri));
+    unawaited(
+      _startPreviewRequest(
+        mxClient,
+        normalizedUri,
+        originalUri,
+        roomIsE2EE: roomIsE2EE,
+      ),
+    );
   }
 
   UrlPreviewData? _getCachedPreviewForUri(Uri uri) {
@@ -1168,7 +1458,9 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
     final localCacheData = cache[localCacheKey];
     if (localCacheData != null) {
       if (_isExpiredInvalidPreview(
-          localCacheData, _invalidCacheTimestamps[localCacheKey])) {
+        localCacheData,
+        _invalidCacheTimestamps[localCacheKey],
+      )) {
         cache.remove(localCacheKey);
         _invalidCacheTimestamps.remove(localCacheKey);
       } else if (_isExpiredMissingImageRefreshPreview(uri, localCacheData)) {
@@ -1180,8 +1472,9 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
 
     final longLivedCacheKey = _longLivedCacheKey(uri);
     final longLivedCacheData = _longLivedCache.remove(longLivedCacheKey);
-    final invalidTimestamp =
-        _longLivedInvalidCacheTimestamps.remove(longLivedCacheKey);
+    final invalidTimestamp = _longLivedInvalidCacheTimestamps.remove(
+      longLivedCacheKey,
+    );
     if (longLivedCacheData == null) {
       return null;
     }
@@ -1261,7 +1554,9 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
     final localCacheData = _eventCache[localCacheKey];
     if (localCacheData != null) {
       if (_isExpiredInvalidPreview(
-          localCacheData, _invalidEventCacheTimestamps[localCacheKey])) {
+        localCacheData,
+        _invalidEventCacheTimestamps[localCacheKey],
+      )) {
         _eventCache.remove(localCacheKey);
         _invalidEventCacheTimestamps.remove(localCacheKey);
       } else if (_isExpiredMissingImageRefreshPreview(uri, localCacheData)) {
@@ -1273,8 +1568,9 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
 
     final longLivedCacheKey = _eventCacheKey(timeline, event, uri);
     final longLivedCacheData = _longLivedEventCache.remove(longLivedCacheKey);
-    final invalidTimestamp =
-        _longLivedInvalidEventCacheTimestamps.remove(longLivedCacheKey);
+    final invalidTimestamp = _longLivedInvalidEventCacheTimestamps.remove(
+      longLivedCacheKey,
+    );
     if (longLivedCacheData == null) {
       return null;
     }
@@ -1539,6 +1835,15 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
         allowedHosts.contains(serverName);
   }
 
+  void _logImageRefreshSkipped(UrlPreviewData failedData, String reason) {
+    Log.d(
+      'URL preview image refresh skipped '
+      'host=${_safePreviewHost(failedData.uri)} reason=$reason',
+      category: LogCategory.media,
+      source: 'url-preview',
+    );
+  }
+
   String _safePreviewHost(Uri uri) {
     final host = uri.host;
     return host.isEmpty ? "unknown" : host.toLowerCase();
@@ -1554,7 +1859,9 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
   }
 
   bool _didSanitizePreview(
-      UrlPreviewData? original, UrlPreviewData? sanitized) {
+    UrlPreviewData? original,
+    UrlPreviewData? sanitized,
+  ) {
     if (identical(original, sanitized)) {
       return false;
     }
@@ -1598,33 +1905,23 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
     Uri url,
     Map<String, Object?> response,
   ) {
-    var title = _firstString(response, [
-      'og:title',
-      'twitter:title',
-      'title',
-    ]);
-    var siteName = _firstString(response, [
+    var title = _firstString(response, ['og:title', 'twitter:title', 'title']);
+    var siteName =
+        _firstString(response, [
           'og:site_name',
           'twitter:site',
           'site_name',
           'siteName',
         ]) ??
         inferUrlPreviewSource(url);
-    var imageUrl = _firstString(response, [
-      'og:image:secure_url',
-      'og:image:url',
-      'og:image',
-      'twitter:image',
-      'twitter:image:src',
-      'image_url',
-      'imageUrl',
-      'image',
-    ]);
-    var description = trimUrlPreviewDescription(_firstString(response, [
-      'og:description',
-      'twitter:description',
-      'description',
-    ]));
+    var imageUrl = _firstImageString(response);
+    var description = trimUrlPreviewDescription(
+      _firstString(response, [
+        'og:description',
+        'twitter:description',
+        'description',
+      ]),
+    );
 
     var type = _firstString(response, ["og:image:type", "twitter:image:type"]);
     if (type != null) {
@@ -1635,10 +1932,13 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
 
     ImageProvider? image;
     Uri? imageUri;
-    var volatileImageOmitted = false;
+    var droppedThirdPartyImage = false;
     if (imageUrl != null) {
       final parsedImageUri = Uri.parse(imageUrl);
       if (parsedImageUri.scheme == "mxc") {
+        // The homeserver already downloaded the origin's image into its own
+        // media repository, so this renders through the homeserver's
+        // media/thumbnail endpoint and the third party never sees the client.
         try {
           image = MatrixMxcImage(parsedImageUri, client, doThumbnail: false);
           imageUri = parsedImageUri;
@@ -1648,25 +1948,31 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
         }
       } else if (parsedImageUri.scheme == "http" ||
           parsedImageUri.scheme == "https") {
-        if (isVolatileUrlPreviewImageUri(parsedImageUri)) {
-          Log.d(
-            'URL preview dropped volatile network image from server response '
-            'host=${_safePreviewHost(url)} '
-            'image_host=${_safePreviewHost(parsedImageUri)}',
-            category: LogCategory.media,
-            source: 'url-preview',
-          );
-          volatileImageOmitted = true;
-        } else {
-          image = NetworkImage(parsedImageUri.toString());
-          imageUri = parsedImageUri;
-        }
+        // The homeserver handed us a URL STRING, not bytes. Rendering it makes
+        // the CLIENT open a connection to fbcdn/tiktokcdn/Instagram, which
+        // discloses the user's IP, TLS fingerprint and default User-Agent to
+        // that CDN - including for a preview shown inside an end-to-end
+        // encrypted room. (An earlier comment here claimed the opposite; it
+        // was wrong, and this is the regression it caused.)
+        //
+        // There is no Matrix endpoint that proxies an arbitrary third-party
+        // URL, so an image the homeserver did not give us as `mxc://` cannot
+        // be routed through it. Dropping the image is the correct fallback and
+        // is the pre-regression behaviour.
+        droppedThirdPartyImage = true;
+        Log.d(
+          'URL preview dropped a third-party image URL that is not homeserver '
+          'media host=${_safePreviewHost(url)} '
+          'image_host=${_safePreviewHost(parsedImageUri)} '
+          'volatile=${isVolatileUrlPreviewImageUri(parsedImageUri)}',
+          category: LogCategory.media,
+          source: 'url-preview',
+        );
       }
     }
 
-    final postingAccount = normalizeUrlPreviewPostingAccount(_firstString(
-      response,
-      [
+    final postingAccount = normalizeUrlPreviewPostingAccount(
+      _firstString(response, [
         'author_name',
         'author',
         'article:author',
@@ -1674,8 +1980,8 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
         'twitter:creator',
         'posting_account',
         'postingAccount',
-      ],
-    ));
+      ]),
+    );
 
     final publishedAt = _parsePublishedDate(
       _firstString(response, [
@@ -1687,41 +1993,46 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
       ]),
     );
 
-    final stats = _firstString(response, [
-          'stats',
-          'stats_line',
-          'statsLine',
-        ]) ??
+    final stats =
+        _firstString(response, ['stats', 'stats_line', 'statsLine']) ??
         buildUrlPreviewStatsLine(
-          likes: _parseIntValue(_firstValue(response, [
-            'likes',
-            'like_count',
-            'og:likes',
-            'likeCount',
-          ])),
-          comments: _parseIntValue(_firstValue(response, [
-            'comments',
-            'comment_count',
-            'og:comments',
-            'commentCount',
-          ])),
+          likes: _parseIntValue(
+            _firstValue(response, [
+              'likes',
+              'like_count',
+              'og:likes',
+              'likeCount',
+            ]),
+          ),
+          comments: _parseIntValue(
+            _firstValue(response, [
+              'comments',
+              'comment_count',
+              'og:comments',
+              'commentCount',
+            ]),
+          ),
           publishedAt: publishedAt,
         );
 
-    final imageWidth = _parseIntValue(_firstValue(response, [
-      'og:image:width',
-      'twitter:image:width',
-      'image:width',
-      'image_width',
-      'imageWidth',
-    ]));
-    final imageHeight = _parseIntValue(_firstValue(response, [
-      'og:image:height',
-      'twitter:image:height',
-      'image:height',
-      'image_height',
-      'imageHeight',
-    ]));
+    final imageWidth = _parseIntValue(
+      _firstValue(response, [
+        'og:image:width',
+        'twitter:image:width',
+        'image:width',
+        'image_width',
+        'imageWidth',
+      ]),
+    );
+    final imageHeight = _parseIntValue(
+      _firstValue(response, [
+        'og:image:height',
+        'twitter:image:height',
+        'image:height',
+        'image_height',
+        'imageHeight',
+      ]),
+    );
 
     if (title == null && description == null && image == null) {
       return null;
@@ -1729,17 +2040,27 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
 
     final previewUrl = _previewUriFromResponse(response, url);
 
-    return UrlPreviewData(previewUrl,
-        siteName: siteName,
-        title: title,
-        image: image,
-        imageUri: imageUri,
-        imageWidth: imageWidth,
-        imageHeight: imageHeight,
-        description: description,
-        postingAccount: postingAccount,
-        stats: stats,
-        volatileImageOmitted: volatileImageOmitted);
+    return UrlPreviewData(
+      previewUrl,
+      siteName: siteName,
+      title: title,
+      image: image,
+      imageUri: imageUri,
+      imageWidth: imageWidth,
+      imageHeight: imageHeight,
+      description: description,
+      postingAccount: postingAccount,
+      stats: stats,
+      // Armed when a third-party image URL was dropped just above. It is what
+      // `_isMissingImageRefreshCandidate` reads, so for a provider host this
+      // is a CANDIDATE for a later direct-fetch refresh - not a standing
+      // permission. `_refreshMissingDurableImage` still checks
+      // `preferences.shouldAllowDirectUrlPreviewFallback` for the room's
+      // encryption state before that refresh fires; without the room, this
+      // flag alone says nothing about whether the client may make the
+      // request. For every other host the card simply renders without one.
+      volatileImageOmitted: droppedThirdPartyImage,
+    );
   }
 
   Future<Uri> _normalizePreviewUri(Uri uri) async {
@@ -1753,6 +2074,43 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
     } catch (_) {
       return uri;
     }
+  }
+
+  static const List<String> _imageResponseKeys = [
+    'og:image:secure_url',
+    'og:image:url',
+    'og:image',
+    'twitter:image',
+    'twitter:image:src',
+    'image_url',
+    'imageUrl',
+    'image',
+  ];
+
+  /// Picks the image candidate that can be fetched from the homeserver.
+  ///
+  /// `/_matrix/media/*/preview_url` rewrites `og:image` to an `mxc://` URI,
+  /// but a response can carry several image keys and the earlier ones
+  /// (`og:image:secure_url`, `twitter:image`) may still be the origin's own
+  /// https URL. Taking the first key present would then discard an `mxc://` we
+  /// could have routed through the homeserver, so scan every candidate for one
+  /// before falling back to the first value.
+  String? _firstImageString(Map<String, Object?> response) {
+    String? firstCandidate;
+    for (final key in _imageResponseKeys) {
+      final value = _firstString(response, [key]);
+      if (value == null) {
+        continue;
+      }
+
+      if (Uri.tryParse(value)?.scheme == 'mxc') {
+        return value;
+      }
+
+      firstCandidate ??= value;
+    }
+
+    return firstCandidate;
   }
 
   String? _firstString(Map<String, Object?> response, List<String> keys) {
@@ -1828,9 +2186,10 @@ class MatrixUrlPreviewComponent implements UrlPreviewComponent<MatrixClient> {
   }
 
   String _normalizedHost(String host) {
-    return host
-        .toLowerCase()
-        .replaceFirst(RegExp(r'^www\.', caseSensitive: false), '');
+    return host.toLowerCase().replaceFirst(
+      RegExp(r'^www\.', caseSensitive: false),
+      '',
+    );
   }
 
   int _effectivePort(Uri uri) {

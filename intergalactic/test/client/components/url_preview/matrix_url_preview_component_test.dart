@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -14,6 +15,7 @@ import 'package:intergalactic/client/matrix/components/url_preview/url_preview_f
 import 'package:intergalactic/client/timeline_events/timeline_event.dart';
 import 'package:intergalactic/client/timeline_events/timeline_event_message.dart';
 import 'package:intergalactic/config/app_globals.dart' as globals;
+import 'package:intergalactic/debug/log.dart';
 import 'package:intergalactic/ui/molecules/timeline_events/events/timeline_event_view_url_previews.dart';
 import 'package:intergalactic/ui/molecules/url_preview_widget.dart';
 import 'package:matrix/matrix.dart' as matrix;
@@ -27,6 +29,16 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     await globals.preferences.init();
     await globals.preferences.applyUrlPreviewE2EEConsentChoice(allow: true);
+    // Direct-fetch fallback is opt-in per room encryption state as of
+    // 2026-09-09 (owner decision, url-preview-privacy-routing). This suite
+    // predates that gate and exercises the FALLBACK MECHANICS assuming it is
+    // available - granting both here keeps its existing coverage meaningful
+    // rather than silently degrading it to server-only. The gate itself is
+    // pinned in url_preview_direct_fallback_consent_test.dart, including
+    // that leaving it ungranted (the real default) blocks the fallback.
+    await globals.preferences.allowDirectUrlPreviewFallbackInE2EEChat.set(true);
+    await globals.preferences.allowDirectUrlPreviewFallbackInUnencryptedChat
+        .set(true);
   });
 
   group('MatrixUrlPreviewComponent', () {
@@ -454,6 +466,56 @@ void main() {
     );
 
     test(
+      'a refresh skipped because previews are off for the room says so',
+      () async {
+        // Three early returns in refreshPreviewAfterImageFailure run BEFORE
+        // its existing 'refreshing cached preview' line, so a capture showing
+        // an image error and no refresh line could not distinguish a skip
+        // here from a refresh that was never requested. That ambiguity is the
+        // whole reason this row exists.
+        final mxClient = _FakeMatrixClient('client-a');
+        final room = _FakeRoom(
+          identifier: '!room:example.org',
+          client: mxClient,
+          shouldPreviewMedia: false,
+        );
+        final link = Uri.parse('https://example.org/article');
+        final event = _FakeMessageEvent(eventId: r'$1', links: [link]);
+        final timeline = _FakeTimeline(room: room, events: [event]);
+        final component = MatrixUrlPreviewComponent(
+          mxClient,
+          responseFetcher: (_, _) async => fail('nothing may be fetched'),
+          directFetcher: (_) async => null,
+          uriNormalizer: (uri) async => uri,
+          matrixClientProvider: (_) => _FakeSdkClient(),
+        );
+
+        Log.log.clear();
+        expect(
+          await component.refreshPreviewAfterImageFailure(
+            timeline,
+            event,
+            UrlPreviewData(link, title: 'Failed image'),
+          ),
+          isNull,
+        );
+
+        final skipped = Log.log
+            .where(
+              (entry) =>
+                  entry.content.contains('URL preview image refresh skipped'),
+            )
+            .toList();
+        expect(skipped, hasLength(1));
+        expect(
+          skipped.single.content,
+          contains('reason=previews_off_for_room'),
+        );
+        expect(skipped.single.content, contains('host=example.org'));
+      },
+    );
+
+    test(
       'room media preview preference prevents URL preview fetches',
       () async {
         final mxClient = _FakeMatrixClient('client-a');
@@ -568,6 +630,74 @@ void main() {
         'Stored title',
       );
     });
+
+    test(
+      'legacy site-name-only durable preview is evicted and refreshed',
+      () async {
+        final prefs = await SharedPreferences.getInstance();
+        const cachePrefix = 'url-preview-legacy-contentless-test';
+        final durableCache = UrlPreviewDurableCache(
+          preferences: prefs,
+          prefix: cachePrefix,
+        );
+        final previewUri = Uri.parse('https://www.tiktok.com/@demo/video/123');
+        final mxClient = _FakeMatrixClient('client-a');
+        final room = _FakeRoom(
+          identifier: '!room:example.org',
+          client: mxClient,
+        );
+        final event = _FakeMessageEvent(
+          eventId: r'$legacy-tiktok-preview',
+          links: [previewUri],
+        );
+        final timeline = _FakeTimeline(room: room, events: [event]);
+
+        // Seed a current entry, then make its persisted shape match the
+        // version-1 generic TikTok fallback seen in the owner capture.
+        await durableCache.put(
+          previewUri,
+          UrlPreviewData(
+            previewUri,
+            siteName: 'TikTok',
+            title: 'Temporary seed title',
+          ),
+        );
+        final entryKey = prefs.getStringList('$cachePrefix.index')!.single;
+        final legacy =
+            jsonDecode(prefs.getString(entryKey)!) as Map<String, dynamic>;
+        legacy
+          ..['version'] = 1
+          ..['title'] = null
+          ..['description'] = null
+          ..['posting_account'] = null
+          ..['stats'] = null
+          ..['image'] = null
+          ..['volatile_image'] = null
+          ..['volatile_image_omitted'] = false;
+        await prefs.setString(entryKey, jsonEncode(legacy));
+
+        var networkCalls = 0;
+        final component = MatrixUrlPreviewComponent(
+          mxClient,
+          responseFetcher: (_, __) async {
+            networkCalls += 1;
+            return {'og:site_name': 'TikTok', 'og:title': 'Fresh video'};
+          },
+          directFetcher: (_) async => null,
+          uriNormalizer: (uri) async => uri,
+          matrixClientProvider: (_) => _FakeSdkClient(),
+          durableCache: durableCache,
+        );
+
+        final preview = await component.getPreview(timeline, event);
+
+        expect(preview?.title, 'Fresh video');
+        expect(networkCalls, 1);
+        final refreshed =
+            jsonDecode(prefs.getString(entryKey)!) as Map<String, dynamic>;
+        expect(refreshed['version'], 2);
+      },
+    );
 
     test(
       'TikTok direct preview restores signed thumbnail after restart',
@@ -788,6 +918,80 @@ void main() {
       },
     );
 
+    test(
+      'a durable preview whose only content was a volatile image expires '
+      'and retries rather than returning a blank site-name-only card',
+      () async {
+        // REVIEW, 2026-09-11 (queue row "URL preview: blank TikTok and
+        // Instagram cards..."): the emptiness guard in
+        // buildPreviewFromResponse only runs when a preview is built fresh
+        // from a network response - a durable-cache hit is reconstructed
+        // directly from storage and never passes through it. A preview whose
+        // only content was a volatile social-CDN image (typical for
+        // TikTok/Instagram) has nothing else once that image's TTL expires,
+        // and if the refresh that would normally restore it also fails, the
+        // cache returned a technically non-null UrlPreviewData with
+        // everything null - a card with only a site name. No image error is
+        // ever logged for this path, which is why the 2026-09-11 capture
+        // showed none: the image was silently dropped by TTL, not by a
+        // failed load.
+        var now = DateTime(2026, 6, 24, 12);
+        final prefs = await SharedPreferences.getInstance();
+        final durableCache = UrlPreviewDurableCache(
+          preferences: prefs,
+          prefix: 'url-preview-durable-empty-after-expiry-test',
+          now: () => now,
+        );
+        final previewUri = Uri.parse('https://www.instagram.com/p/image-only/');
+        final mxClient = _FakeMatrixClient('client-a');
+        final room = _FakeRoom(
+          identifier: '!room:example.org',
+          client: mxClient,
+        );
+        final event = _FakeMessageEvent(
+          eventId: r'$instagram-image-only',
+          links: [previewUri],
+        );
+        final timeline = _FakeTimeline(room: room, events: [event]);
+        final volatileImageUri = Uri.parse(
+          'https://scontent-abc1.cdninstagram.com/pic.jpg?oe=64AB1234',
+        );
+
+        await durableCache.put(
+          previewUri,
+          UrlPreviewData(
+            previewUri,
+            siteName: 'Instagram',
+            imageUri: volatileImageUri,
+            image: NetworkImage(volatileImageUri.toString()),
+          ),
+        );
+
+        // Past the 12-hour volatile-image TTL, but well within the 5-day
+        // validTtl - the record is not stale, only its image is gone.
+        now = now.add(const Duration(hours: 13));
+
+        var responseCalls = 0;
+        final component = MatrixUrlPreviewComponent(
+          mxClient,
+          responseFetcher: (_, __) async {
+            responseCalls += 1;
+            return null;
+          },
+          directFetcher: (_) async => null,
+          uriNormalizer: (uri) async => uri,
+          matrixClientProvider: (_) => _FakeSdkClient(),
+          durableCache: durableCache,
+          now: () => now,
+        );
+
+        final preview = await component.getPreview(timeline, event);
+
+        expect(preview, isNull);
+        expect(responseCalls, 1);
+      },
+    );
+
     test('image failure refreshes stale durable thumbnail', () async {
       final prefs = await SharedPreferences.getInstance();
       final durableCache = UrlPreviewDurableCache(
@@ -798,8 +1002,12 @@ void main() {
       final staleThumbnailUri = Uri.parse(
         'https://static.example.org/stale.jpeg',
       );
+      // mxc, because this test is about the REFRESH replacing a stale
+      // thumbnail. A third-party https image is now dropped before it can be
+      // stored, so an https fixture here would refresh to no image and the
+      // test would stop covering what it names.
       final freshThumbnailUri = Uri.parse(
-        'https://static.example.org/fresh.jpeg',
+        'mxc://ourgalaxy.space/freshThumbnail',
       );
       final mxClient = _FakeMatrixClient('client-a');
       final sdkClient = _FakeSdkClient();
@@ -856,14 +1064,14 @@ void main() {
       );
 
       expect(refreshedPreview?.title, 'Fresh preview');
+      // Asserted through imageUri rather than by casting the provider: a
+      // homeserver-routed image is a MatrixMxcImage, and the identity that
+      // matters here is which image was stored, not which widget renders it.
+      expect(refreshedPreview!.image, isNotNull);
+      expect(refreshedPreview.imageUri, freshThumbnailUri);
       expect(
-        (refreshedPreview!.image as NetworkImage).url,
-        freshThumbnailUri.toString(),
-      );
-      expect(
-        (component.getCachedPreview(timeline, event)!.image as NetworkImage)
-            .url,
-        freshThumbnailUri.toString(),
+        component.getCachedPreview(timeline, event)!.imageUri,
+        freshThumbnailUri,
       );
       expect(networkCalls, 1);
     });
@@ -988,6 +1196,61 @@ void main() {
       );
     });
 
+    test('a generic TikTok server preview salvages into a site-name card on '
+        'desktop, not only on web', () async {
+      // REVIEW, 2026-09-11 (queue row "URL preview: blank TikTok and
+      // Instagram cards..."), FEATURES item 1. This salvage branch was
+      // gated `kIsWeb &&`, on the assumption its own comment stated - that
+      // only web reaches it with directData null, because CORS always
+      // blocks a direct TikTok fetch there. The 2026-09-09 consent gate
+      // falsified that: a desktop/mobile room with the direct-fetch
+      // fallback declined reaches this branch with directData null too,
+      // and previously fell through to sanitizeUrlPreviewDataForUri
+      // returning null (nothing else survived stripping TikTok's generic
+      // marketing title/description) - a blank tile instead of the site
+      // name the server actually gave it. kIsWeb is false in this (non-web)
+      // test target, so this scenario alone distinguishes the two: it only
+      // passes once the gate no longer excludes desktop/mobile.
+      final mxClient = _FakeMatrixClient('client-a');
+      await globals.preferences.allowDirectUrlPreviewFallbackInUnencryptedChat
+          .set(false);
+
+      final component = MatrixUrlPreviewComponent(
+        mxClient,
+        intergalacticPreviewFetcher: (_) async => null,
+        responseFetcher: (_, __) async => {
+          'og:title': 'TikTok - Make Your Day',
+          'og:description':
+              'Watch and discover millions of personalized short videos '
+              'on TikTok, trends start here.',
+        },
+        directFetcher: (_) async {
+          fail(
+            'directFetcher must not be called once the fallback is '
+            'declined',
+          );
+        },
+        uriNormalizer: (uri) async => uri,
+      );
+
+      final result = await component.buildPreviewData(
+        _FakeSdkClient(),
+        Uri.parse('https://www.tiktok.com/@someuser/video/123'),
+        roomIsE2EE: false,
+      );
+
+      expect(
+        result,
+        isNotNull,
+        reason:
+            'the server gave us a site name; that is something, not '
+            'nothing, and should render as such on every platform',
+      );
+      expect(result?.siteName, 'TikTok');
+      expect(result?.title, isNull);
+      expect(result?.description, isNull);
+    });
+
     test(
       'transient server preview failures keep retrying before cooldown',
       () async {
@@ -1014,10 +1277,12 @@ void main() {
         final firstResult = await component.buildPreviewData(
           _FakeSdkClient(),
           Uri.parse('https://fallback.example/article'),
+          roomIsE2EE: false,
         );
         final secondResult = await component.buildPreviewData(
           _FakeSdkClient(),
           Uri.parse('https://fallback.example/second'),
+          roomIsE2EE: false,
         );
 
         expect(firstResult?.title, 'Homeserver title');
@@ -1056,6 +1321,7 @@ void main() {
         await component.buildPreviewData(
           _FakeSdkClient(),
           Uri.parse('https://fallback.example/article-$i'),
+          roomIsE2EE: false,
         );
       }
 
@@ -1067,6 +1333,7 @@ void main() {
       await component.buildPreviewData(
         _FakeSdkClient(),
         Uri.parse('https://fallback.example/after-cooldown-started'),
+        roomIsE2EE: false,
       );
 
       expect(intergalacticCalls, 3);
@@ -1089,6 +1356,7 @@ void main() {
       final result = await component.buildPreviewData(
         _FakeSdkClient(),
         originalUrl,
+        roomIsE2EE: false,
       );
 
       expect(result?.uri, originalUrl);
@@ -1110,6 +1378,7 @@ void main() {
       final result = await component.buildPreviewData(
         _FakeSdkClient(),
         Uri.parse('https://example.com/article?utm_source=chat'),
+        roomIsE2EE: false,
       );
 
       expect(result?.uri, canonicalUrl);
@@ -1155,15 +1424,104 @@ void main() {
       expect(responseCalls, 2);
     });
 
+    // Owner decision A, 2026-09-09: this used to be the opposite assertion -
+    // a fast direct fetch for a preferred provider was allowed to win a race
+    // against a still-pending homeserver/service response, which meant BOTH
+    // the provider's CDN and our own service received the request every
+    // time, regardless of which answer was used. The service is now awaited
+    // FIRST and fully, so a complete server result means direct is never
+    // even attempted - proven here by a server response that never resolves
+    // slowly, it simply must be given the chance to answer before anything
+    // else happens, and completing it with enough data must mean the direct
+    // fetcher is never called.
+    test('a preferred provider does not start a direct fetch until the service '
+        'has answered', () async {
+      final mxClient = _FakeMatrixClient('client-a');
+      var directCalls = 0;
+      var serverCalls = 0;
+      final component = MatrixUrlPreviewComponent(
+        mxClient,
+        responseFetcher: (_, __) async {
+          serverCalls += 1;
+          return {
+            'og:site_name': 'Instagram',
+            'og:title': 'Instagram post',
+            'og:description': 'Service metadata',
+          };
+        },
+        directFetcher: (uri) {
+          directCalls += 1;
+          return Future<UrlPreviewData?>.value(
+            UrlPreviewData(
+              uri,
+              siteName: 'Instagram',
+              title: 'Instagram post',
+              postingAccount: '@example',
+              description: 'Direct metadata',
+            ),
+          );
+        },
+        uriNormalizer: (uri) async => uri,
+      );
+
+      final result = await component.buildPreviewData(
+        _FakeSdkClient(),
+        Uri.parse('https://www.instagram.com/p/example'),
+        roomIsE2EE: false,
+      );
+
+      expect(serverCalls, 1);
+      expect(
+        directCalls,
+        0,
+        reason:
+            'the service answer was complete (score >= 4), so the direct '
+            'fallback must never have been attempted at all - not raced, '
+            'not started and discarded',
+      );
+      expect(result?.description, 'Service metadata');
+    });
+
+    test('direct fallback waits for a pending preferred response', () async {
+      final responseStarted = Completer<void>();
+      final response = Completer<Map<String, Object?>?>();
+      var directCalls = 0;
+      final component = MatrixUrlPreviewComponent(
+        _FakeMatrixClient('client-a'),
+        responseFetcher: (_, __) {
+          responseStarted.complete();
+          return response.future;
+        },
+        directFetcher: (_) async {
+          directCalls += 1;
+          return null;
+        },
+      );
+
+      final preview = component.buildPreviewData(
+        _FakeSdkClient(),
+        Uri.parse('https://www.instagram.com/p/example'),
+        roomIsE2EE: false,
+      );
+      await responseStarted.future;
+      expect(directCalls, 0);
+
+      response.complete({'og:title': 'Instagram'});
+      await preview;
+      expect(directCalls, 1);
+    });
+
+    // The other half: when the service answer is genuinely insufficient, the
+    // opted-in fallback still runs - this is not a regression to "never use
+    // direct", only to "never use it in parallel or without consent".
     test(
-      'direct-preferred providers can return before homeserver timeout',
+      'an insufficient service answer still allows the opted-in fallback',
       () async {
-        final serverCompleter = Completer<Map<String, Object?>?>();
         final mxClient = _FakeMatrixClient('client-a');
         var directCalls = 0;
         final component = MatrixUrlPreviewComponent(
           mxClient,
-          responseFetcher: (_, __) => serverCompleter.future,
+          responseFetcher: (_, __) async => {'og:title': 'Instagram'},
           directFetcher: (uri) {
             directCalls += 1;
             return Future<UrlPreviewData?>.value(
@@ -1179,19 +1537,41 @@ void main() {
           uriNormalizer: (uri) async => uri,
         );
 
-        final result = await component
-            .buildPreviewData(
-              _FakeSdkClient(),
-              Uri.parse('https://www.instagram.com/p/example'),
-            )
-            .timeout(const Duration(seconds: 1));
-
-        serverCompleter.complete({'og:title': 'Late server metadata'});
+        final result = await component.buildPreviewData(
+          _FakeSdkClient(),
+          Uri.parse('https://www.instagram.com/p/example'),
+          roomIsE2EE: false,
+        );
 
         expect(directCalls, 1);
         expect(result?.description, 'Direct metadata');
       },
     );
+
+    test('expired preview budget does not start a direct fallback', () async {
+      final mxClient = _FakeMatrixClient('client-a');
+      var directCalls = 0;
+      final component = MatrixUrlPreviewComponent(
+        mxClient,
+        previewBuildDeadline: const Duration(milliseconds: 10),
+        responseFetcher: (_, __) async {
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+          return {'og:title': 'Instagram'};
+        },
+        directFetcher: (_) async {
+          directCalls += 1;
+          return null;
+        },
+      );
+
+      await component.buildPreviewData(
+        _FakeSdkClient(),
+        Uri.parse('https://www.instagram.com/p/example'),
+        roomIsE2EE: false,
+      );
+
+      expect(directCalls, 0);
+    });
 
     test(
       'unsupported homeserver preview endpoint still allows direct fallback',
@@ -1331,27 +1711,314 @@ void main() {
       },
     );
 
-    test('server previews drop volatile signed social CDN images', () {
+    // REVERSED AGAIN 2026-09-07, back to dropping. The 2026-09-03 reversal
+    // was made on a true symptom - Facebook cards rendered text-only - but its
+    // stated reason was false: "no new fetch is introduced, this URL arrives
+    // in the homeserver response" confuses a URL with bytes. The homeserver
+    // returned a STRING; NetworkImage then made THIS CLIENT connect to fbcdn,
+    // handing it the user's IP, TLS fingerprint and User-Agent for a link that
+    // may only have been read inside an encrypted room.
+    //
+    // The text-only symptom had a different cause, fixed separately: the image
+    // keys were read in an order that took `og:image:secure_url` (the origin's
+    // raw https URL, passed through unrewritten) in preference to `og:image`
+    // (which the homeserver rewrites to `mxc://`), so the routable value was
+    // discarded and the unroutable one was all that was left to drop.
+    test(
+      'server previews drop a third-party CDN image rather than fetch it',
+      () {
+        final component = MatrixUrlPreviewComponent(
+          _FakeMatrixClient('client-a'),
+        );
+        const volatileImageUrl =
+            'https://scontent.cdninstagram.com/v/t51.29350/demo.jpg'
+            '?stp=dst-jpg&_nc_cat=1&oh=signed-hash&oe=expiry';
+        final result = component.buildPreviewFromResponse(
+          _FakeSdkClient(),
+          Uri.parse('https://www.instagram.com/p/example'),
+          {
+            'og:site_name': 'Instagram',
+            'og:title': 'Instagram post',
+            'og:image': volatileImageUrl,
+          },
+        );
+
+        expect(result?.siteName, 'Instagram');
+        expect(result?.title, 'Instagram post');
+        expect(
+          result?.image,
+          isNull,
+          reason:
+              'rendering this would make the client itself connect to the CDN',
+        );
+        expect(result?.imageUri, isNull);
+        expect(
+          result?.volatileImageOmitted,
+          isTrue,
+          reason:
+              'arms the missing-image refresh path, which for Instagram may '
+              'recover an image through the direct fetch already allowed',
+        );
+      },
+    );
+
+    // Owner QA 2026-09-03. The site-icon fallback originally lived only inside
+    // UrlPreviewFallbackFetcher.fetchPreview, so it decorated the DIRECT
+    // fetch's result and nothing else. TikTok and Instagram routinely block a
+    // client-side fetch; the card is then assembled from homeserver metadata
+    // and never passed through the fallback. Symptom: a card rendering as the
+    // bare word "Instagram", or "TikTok @".
+    test(
+      'a provider preview built from server text still gets the site icon',
+      () async {
+        final mxClient = _FakeMatrixClient('client-a');
+        final sdkClient = _FakeSdkClient();
+        final iconUri = Uri.parse(
+          'https://www.instagram.com/apple-touch-icon.png',
+        );
+        var iconCalls = 0;
+        final component = MatrixUrlPreviewComponent(
+          mxClient,
+          responseFetcher: (_, __) async => {
+            'og:site_name': 'Instagram',
+            'og:title': 'A reel',
+          },
+          directFetcher: (_) async => null,
+          siteIconFetcher: (uri) async {
+            iconCalls += 1;
+            return UrlPreviewSiteIcon(
+              provider: NetworkImage(iconUri.toString()),
+              uri: iconUri,
+              width: 180,
+              height: 180,
+            );
+          },
+          uriNormalizer: (uri) async => uri,
+          matrixClientProvider: (_) => sdkClient,
+        );
+
+        final result = await component.buildPreviewData(
+          sdkClient,
+          Uri.parse('https://www.instagram.com/p/example'),
+          roomIsE2EE: false,
+        );
+
+        expect(result?.siteName, 'Instagram');
+        expect(
+          result?.imageUri,
+          iconUri,
+          reason:
+              'the direct fetch returned null, which is exactly the case '
+              'that used to render as the bare word "Instagram"',
+        );
+        expect(iconCalls, 1);
+      },
+    );
+
+    test('a non-provider host is never decorated with a site icon', () async {
+      final mxClient = _FakeMatrixClient('client-a');
+      final sdkClient = _FakeSdkClient();
+      var iconCalls = 0;
+      final component = MatrixUrlPreviewComponent(
+        mxClient,
+        responseFetcher: (_, __) async => {'og:title': 'An article'},
+        directFetcher: (_) async => null,
+        siteIconFetcher: (uri) async {
+          iconCalls += 1;
+          return null;
+        },
+        uriNormalizer: (uri) async => uri,
+        matrixClientProvider: (_) => sdkClient,
+      );
+
+      final result = await component.buildPreviewData(
+        sdkClient,
+        Uri.parse('https://example.org/article'),
+        roomIsE2EE: false,
+      );
+
+      expect(result?.title, 'An article');
+      expect(result?.imageUri, isNull);
+      expect(
+        iconCalls,
+        0,
+        reason:
+            'the icon fetch must stay inside the provider allowlist that '
+            '90f75c96 established; an arbitrary host is never fetched',
+      );
+    });
+
+    test(
+      'a server preview that already has an image is not decorated',
+      () async {
+        final mxClient = _FakeMatrixClient('client-a');
+        final sdkClient = _FakeSdkClient();
+        var iconCalls = 0;
+        final component = MatrixUrlPreviewComponent(
+          mxClient,
+          responseFetcher: (_, __) async => {
+            'og:site_name': 'Instagram',
+            'og:title': 'A reel',
+            // mxc, because the point of this test is that a real thumbnail is
+            // not displaced by the site icon. A third-party https URL is now
+            // dropped before it gets that far, which would make this pass for
+            // the wrong reason.
+            'og:image': 'mxc://ourgalaxy.space/realThumbnail',
+          },
+          directFetcher: (_) async => null,
+          siteIconFetcher: (uri) async {
+            iconCalls += 1;
+            return null;
+          },
+          uriNormalizer: (uri) async => uri,
+          matrixClientProvider: (_) => sdkClient,
+        );
+
+        final result = await component.buildPreviewData(
+          sdkClient,
+          Uri.parse('https://www.instagram.com/p/example'),
+          roomIsE2EE: false,
+        );
+
+        expect(
+          result?.imageUri.toString(),
+          'mxc://ourgalaxy.space/realThumbnail',
+        );
+        expect(iconCalls, 0, reason: 'a real thumbnail is never displaced');
+      },
+    );
+
+    test('a slow site icon cannot take the preview down with it', () async {
+      // The icon is decoration on a card that is otherwise complete, and it
+      // used to be able to destroy one. fetchSiteIcon tries three paths in
+      // sequence and each can redirect up to six times at four seconds a hop,
+      // so it can outlast the whole build budget - and _fetchAndCachePreview
+      // answers that timeout by caching the URL as invalidPreviewData for ten
+      // minutes, removing a preview that was complete except for the image and
+      // suppressing the retry that would have fixed it.
+      final sdkClient = _FakeSdkClient();
+      final component = MatrixUrlPreviewComponent(
+        _FakeMatrixClient('client-a'),
+        responseFetcher: (_, __) async => {
+          'og:site_name': 'Instagram',
+          'og:title': 'A reel',
+        },
+        directFetcher: (_) async => null,
+        // Never completes: the defect is that the caller waits on it.
+        siteIconFetcher: (_) => Completer<UrlPreviewSiteIcon?>().future,
+        uriNormalizer: (uri) async => uri,
+        matrixClientProvider: (_) => sdkClient,
+      );
+
+      final result = await component
+          .buildPreviewData(
+            sdkClient,
+            Uri.parse('https://www.instagram.com/p/example'),
+            roomIsE2EE: false,
+          )
+          // Fails fast rather than hanging the suite if the bound is removed.
+          .timeout(const Duration(seconds: 20));
+
+      expect(
+        result?.title,
+        'A reel',
+        reason: 'the preview was complete; only its decoration was missing',
+      );
+      expect(result?.image, isNull);
+    });
+
+    test('a timed-out site icon leaves the text preview cached', () async {
+      final mxClient = _FakeMatrixClient('client-a');
+      final sdkClient = _FakeSdkClient();
+      final previewUri = Uri.parse('https://www.instagram.com/p/slow-icon');
+      final room = _FakeRoom(identifier: '!room:example.org', client: mxClient);
+      final event = _FakeMessageEvent(
+        eventId: r'$slow-icon',
+        links: [previewUri],
+      );
+      final timeline = _FakeTimeline(room: room, events: [event]);
+      var responseCalls = 0;
+      var iconCalls = 0;
+      final component = MatrixUrlPreviewComponent(
+        mxClient,
+        previewBuildDeadline: const Duration(milliseconds: 750),
+        responseFetcher: (_, __) async {
+          responseCalls += 1;
+          return {'og:site_name': 'Instagram', 'og:title': 'A reel'};
+        },
+        directFetcher: (_) async => null,
+        siteIconFetcher: (_) {
+          iconCalls += 1;
+          return Completer<UrlPreviewSiteIcon?>().future;
+        },
+        uriNormalizer: (uri) async => uri,
+        matrixClientProvider: (_) => sdkClient,
+      );
+
+      final first = await component.getPreview(timeline, event);
+      final cached = await component.getPreview(timeline, event);
+
+      expect(first?.title, 'A reel');
+      expect(cached?.title, 'A reel');
+      expect(iconCalls, 1);
+      expect(responseCalls, 1);
+    });
+
+    test('a Facebook CDN thumbnail is dropped, not fetched by the client', () {
+      // The reported case. Facebook is NOT in shouldPreferDirectFetch, so
+      // unlike Instagram there is no recovery path: if the homeserver does not
+      // give this image as `mxc://`, the card renders without one. That is the
+      // cost of not connecting to fbcdn from the user's device, and it is the
+      // right side of the trade - the alternative discloses the user's IP to
+      // Meta for a link they may only have read in an encrypted room.
+      final component = MatrixUrlPreviewComponent(
+        _FakeMatrixClient('client-a'),
+      );
+      const fbImageUrl =
+          'https://scontent-lhr8-1.xx.fbcdn.net/v/t39.30808-6/demo.jpg'
+          '?_nc_cat=100&ccb=1-7&_nc_ohc=abc&oh=signed&oe=6700AAAA';
+      final result = component.buildPreviewFromResponse(
+        _FakeSdkClient(),
+        Uri.parse('https://www.facebook.com/some/post/1234'),
+        {
+          'og:site_name': 'Facebook',
+          'og:title': 'Facebook post',
+          'og:image': fbImageUrl,
+        },
+      );
+
+      expect(result?.image, isNull);
+      expect(result?.imageUri, isNull);
+      expect(result?.title, 'Facebook post', reason: 'the card still renders');
+    });
+
+    test('a Facebook preview keeps its image when the homeserver rewrote it', () {
+      // The other half of the same reported case, and the one that should be
+      // the common shape: `/preview_url` downloads the origin image into the
+      // homeserver's own media repository and returns `mxc://`. Rendering that
+      // fetches from the homeserver, so the image survives AND Meta never sees
+      // the client. This is what the image-key ordering used to throw away.
       final component = MatrixUrlPreviewComponent(
         _FakeMatrixClient('client-a'),
       );
       final result = component.buildPreviewFromResponse(
         _FakeSdkClient(),
-        Uri.parse('https://www.instagram.com/p/example'),
+        Uri.parse('https://www.facebook.com/some/post/1234'),
         {
-          'og:site_name': 'Instagram',
-          'og:title': 'Instagram post',
-          'og:image':
-              'https://scontent.cdninstagram.com/v/t51.29350/demo.jpg'
-              '?stp=dst-jpg&_nc_cat=1&oh=signed-hash&oe=expiry',
+          'og:site_name': 'Facebook',
+          'og:title': 'Facebook post',
+          'og:image:secure_url':
+              'https://scontent-lhr8-1.xx.fbcdn.net/v/demo.jpg?oh=signed',
+          'og:image': 'mxc://ourgalaxy.space/facebookThumb',
         },
       );
 
-      expect(result?.siteName, 'Instagram');
-      expect(result?.title, 'Instagram post');
-      expect(result?.image, isNull);
-      expect(result?.imageUri, isNull);
-      expect(result?.volatileImageOmitted, isTrue);
+      expect(result?.image, isNotNull);
+      expect(
+        result?.imageUri.toString(),
+        'mxc://ourgalaxy.space/facebookThumb',
+        reason: 'the unrewritten secure_url must not win over the routable mxc',
+      );
     });
 
     test(
@@ -1376,6 +2043,7 @@ void main() {
         final result = await component.buildPreviewData(
           _FakeSdkClient(),
           Uri.parse('https://example.org/article'),
+          roomIsE2EE: false,
         );
 
         expect(result?.title, 'Server title');
@@ -1405,6 +2073,7 @@ void main() {
         final result = await component.buildPreviewData(
           _FakeSdkClient(),
           Uri.parse('https://example.org/article'),
+          roomIsE2EE: false,
         );
 
         expect(result?.title, 'Server title');

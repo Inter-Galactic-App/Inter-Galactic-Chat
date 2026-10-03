@@ -245,7 +245,11 @@ void main() {
     await initializeMessages('en');
     Intl.defaultLocale = 'en';
 
-    expect(SettingsCategoryApp().labelSettingsAppAdvanced, 'Developer');
+    // The getter is named for its localization key on purpose: intl_translation
+    // keys a message off the member that declares it, so while this was
+    // `labelSettingsAppAdvanced` declaring `name: 'labelSettingsTabDeveloper'`
+    // the extractor skipped it and neither key reached the ARB.
+    expect(SettingsCategoryApp().labelSettingsTabDeveloper, 'Developer');
   });
 
   test('phase 6 developer tools are consolidated under Developer', () {

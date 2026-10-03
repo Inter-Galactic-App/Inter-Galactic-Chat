@@ -1,8 +1,7 @@
 # Media and Plugins
 
 Status: Stable media/plugin architecture map
-Owner: DOCUMENTATION for structure; runtime owners by section
-Last reviewed: 2026-06-27 by AUDIO
+Last reviewed: 2026-06-27
 
 ## Purpose
 
@@ -370,7 +369,14 @@ What matters for future work:
   loud-speech protection guard that blends limited dry microphone audio back
   into loud, speech-shaped frames when the model over-attenuates them.
   Diagnostics expose `dfProtect`, `dfWet`, and `dfAtten` for rebuilt call
-  validation.
+  validation. On Windows, normal Voice & Video settings offer an opt-in
+  `Loud-speech guard stability` switch alongside Hush. Off preserves the
+  original per-frame guard; on adds hysteresis and a five-frame hold when the
+  model heavily attenuates a loud input. It defaults off and remains available
+  without Developer Mode. `dfProtectStable` in Call Diagnostics and
+  `guard-on/off` in WAV capture folder names record the active native mode
+  for A/B reports. This is a test control, not a claim that loud-speech
+  flutter is resolved in calls.
 - Android now has a platform-specific Enhanced DeepFilterNet backend packaged
   in `plugins/intergalactic_noise_suppression/android/`. The plugin bundles
   `libdf.so`, `libintergalactic_noise_suppression.so`, and the
@@ -379,7 +385,8 @@ What matters for future work:
   Enhanced pipeline is selected. Android call diagnostics report the platform,
   requested WebRTC AEC/NS state, hardware AEC/NS availability, and native
   backend status so rebuilt device smoke can prove the real capture path.
-- Android `df_create` aborts the process instead of returning an error, so the
+- The currently bundled Android `libdf.so` can abort during `df_create` instead
+  of returning an error, so the
   plugin writes an on-disk attempt guard before calling it and refuses the call
   outright if that guard cannot be persisted. Both the guard and the extracted
   model archive are stamped with the app build (`versionName+versionCode`):
@@ -390,7 +397,7 @@ What matters for future work:
   a fix shipped in either the code or the model takes effect. Do not make the
   guard unconditional again, and do not reuse the extracted archive across
   builds without the stamp check.
-  **QA caveat:** "build" here means the fingerprint `versionName+versionCode`,
+  **Testing caveat:** "build" here means the fingerprint `versionName+versionCode`,
   which comes from `pubspec.yaml`. A rebuilt APK with an *unchanged* version
   produces an identical fingerprint, so neither the guard nor the model is
   refreshed. A tester who rebuilds a fix locally without bumping the version
@@ -398,6 +405,12 @@ What matters for future work:
   when it is working as designed. Validate on device by bumping the version
   between installs, or by clearing app data. On a correct refresh the plugin
   logs `Re-extracting the DeepFilterNet model: on disk from build X, running Y`.
+- The vendored libDF source now catches model-load errors and Rust panics at
+  `df_create` and returns null. The bundled Windows `df.dll` and Android
+  `libdf.so` predate that source change; the fail-closed behavior needs a
+  provenance-approved rebuild and native runtime proof before it can be claimed
+  for an installed app. Windows Hush recovery source also bounds the start of
+  its per-sample gain ramp by the current frame's peak-safe gain.
 - the Windows DeepFilterNet path also has opt-in post-model support layers for
   smoke testing. `Transient click guard` targets short keyboard/mouse spikes and
   reports `dfClickOn`, `dfClick`, `dfClickSamples`, and `dfClickGain`. `Hush
@@ -582,7 +595,7 @@ What matters for future work:
   diagnostic WAV-capture counters, and guard flags before deeper native tuning
   work
 - the VoIP Developer diagnostics surface also exposes an `Enhanced
-  DeepFilterNet` selector/status path backed by the AUDIO service. On Windows,
+  DeepFilterNet` selector/status path. On Windows,
   the same native `deepfilternet` processor is the promoted baseline and the
   status reports runtime/frame counters, model presence, fallback labels, and
   whether call-room processing is proven. If the runtime is unavailable, the
@@ -770,8 +783,6 @@ rules.
 
 ## Windows Call Audio Ducking Guidance
 
-Owner: AUDIO.
-
 Windows attenuates ("ducks") other applications' audio while a communications
 audio stream is active. Inter Galactic call audio runs through the Windows ADM
 inside the packaged `libwebrtc.dll`, which selects `AudioDeviceWindowsCore`,
@@ -825,8 +836,9 @@ What matters for future work:
   WAV recorder, not the call path. Do not apply the fix there. Making
   diagnostics runs stop ducking is a separate follow-up.
 - Whether opting out on the render stream alone is enough is not yet proven on
-  hardware; the ADM also opens an `eCommunications` capture stream. See the
-  A/B item in `integration-queue.json` before assuming this is closed.
+  hardware; the ADM also opens an `eCommunications` capture stream, and
+  whether that capture stream also needs an explicit opt-out has not been
+  separately tested. Do not assume this is closed.
 
 ## Lifecycle Rules
 
@@ -908,7 +920,6 @@ If changing plugins:
 
 ## Follow-Ups To Verify In Repo
 
-Owner: DOCUMENTATION with runtime owner input as needed.
 Status: open checks; do not treat these as implementation instructions.
 
 - Verify whether any additional native media helpers live outside `plugins/` before documenting more plugin ownership beyond the current noise suppression path.

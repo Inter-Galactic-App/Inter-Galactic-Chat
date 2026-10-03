@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:intergalactic/client/components/message_effects/message_effect_component.dart';
 import 'package:intergalactic/client/components/read_receipts/read_receipt_component.dart';
+import 'package:intergalactic/client/room.dart';
 import 'package:intergalactic/client/timeline.dart';
 import 'package:intergalactic/client/timeline_events/timeline_event.dart';
 import 'package:intergalactic/config/build_config.dart';
@@ -198,6 +199,7 @@ class RoomTimelineWidgetViewState extends State<RoomTimelineWidgetView> {
   MessageEffectComponent? effects;
   StreamSubscription<String>? _jumpToEventSubscription;
   VoidCallback? _removeInboxJumpTarget;
+  RoomTimelineLease? _jumpTimelineLease;
 
   @override
   void initState() {
@@ -289,8 +291,17 @@ class RoomTimelineWidgetViewState extends State<RoomTimelineWidgetView> {
     }
     _jumpToEventSubscription?.cancel();
     _removeInboxJumpTarget?.call();
+    _releaseJumpTimelineLease();
 
     super.dispose();
+  }
+
+  void _releaseJumpTimelineLease() {
+    final lease = _jumpTimelineLease;
+    _jumpTimelineLease = null;
+    if (lease != null) {
+      unawaited(lease.close());
+    }
   }
 
   @override
@@ -812,6 +823,7 @@ class RoomTimelineWidgetViewState extends State<RoomTimelineWidgetView> {
 
     setState(() {
       initFromTimeline(widget.timeline);
+      _releaseJumpTimelineLease();
       animatingToBottom = true;
     });
 
@@ -1157,21 +1169,49 @@ class RoomTimelineWidgetViewState extends State<RoomTimelineWidgetView> {
       setState(() {
         loading = true;
       });
-      var newTimeline = await timeline.room.getTimeline(
-        contextEventId: eventId,
-      );
+      late final RoomTimelineLease newLease;
+      try {
+        newLease = await timeline.room.getTimelineForEventContext(eventId);
+      } catch (error, stackTrace) {
+        Log.onError(
+          error,
+          stackTrace,
+          content: 'Failed to load timeline event context',
+          category: LogCategory.matrix,
+          source: 'timeline-event-context',
+        );
+        if (mounted) setState(() => loading = false);
+        return;
+      }
+      final newTimeline = newLease.timeline;
+
+      if (!mounted) {
+        await newLease.close();
+        return;
+      }
 
       index = newTimeline.events.indexWhere(
         (event) => event.eventId == eventId,
       );
 
       if (index == -1) {
+        await newLease.close();
+        if (mounted) {
+          setState(() {
+            loading = false;
+          });
+        }
         return;
       }
 
+      final oldLease = _jumpTimelineLease;
       setState(() {
+        _jumpTimelineLease = newLease;
         initFromTimeline(newTimeline);
       });
+      if (oldLease != null) {
+        unawaited(oldLease.close());
+      }
     }
 
     WidgetsBinding.instance.addPostFrameCallback((_) {

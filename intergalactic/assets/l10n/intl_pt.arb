@@ -1,4 +1,10 @@
 {
+  "notificationAttachmentSentImage": "Enviou uma imagem",
+  "notificationAttachmentSentVideo": "Enviou um vídeo",
+  "notificationAttachmentSentAudio": "Enviou uma mensagem de áudio",
+  "notificationAttachmentSentFile": "Enviou um ficheiro",
+  "notificationAttachmentSharedLocation": "Partilhou uma localização",
+  "notificationAttachmentSentSticker": "Enviou um autocolante",
   "labelSpacePermissionSettings": "Permissões",
   "@labelSpacePermissionSettings": {
     "description": "Label for space permission settings",

@@ -115,23 +115,60 @@ class MatrixRoomNotificationSnoozes {
   /// push rule by itself while every Inter Galactic client is offline.
   Future<void> reconcile({DateTime? now}) => _runSerialized(() async {
     final currentTime = now ?? DateTime.now();
-    for (final room in _client.rooms) {
-      final snooze = _pending[room.id] ?? _fromAccountData(room.id);
+    final activeRuleIds = <String>{};
+    // A locally pending snooze can name a room the client has not synced yet,
+    // so its rule must be recognised as active before the sweep below.
+    for (final roomId in _snoozeRoomIds()) {
+      final snooze = _pending[roomId] ?? _fromAccountData(roomId);
       if (snooze == null) {
         continue;
       }
       if (snooze.isActive(currentTime)) {
-        await _ensurePushRule(room.id);
+        await _ensurePushRule(roomId);
+        activeRuleIds.add(ruleId(roomId));
         continue;
       }
 
-      await _deleteSnoozeRule(room.id);
-      await _writeAccountData(room.id, const {});
-      _pending.remove(room.id);
-      onRoomChanged(room.id);
+      await _deleteSnoozeRule(roomId);
+      await _writeAccountData(roomId, const {});
+      _pending.remove(roomId);
+      onRoomChanged(roomId);
     }
+    await _sweepOrphanRules(activeRuleIds);
     _scheduleExpiry();
   });
+
+  /// Deletes snooze rules that no active record accounts for.
+  ///
+  /// The loop above resolves rules *from* records, so a rule whose record was
+  /// never written is invisible to it. `set()` reaches that state when its
+  /// account-data write fails and the compensating `deletePushRule` fails too:
+  /// the room stays muted indefinitely while the UI shows it un-snoozed, and
+  /// no client can recover it. The sweep also removes rules left behind by a
+  /// build that wrote them under an earlier record format.
+  Future<void> _sweepOrphanRules(Set<String> activeRuleIds) async {
+    final overrideRules = _client.globalPushRules?.override;
+    if (overrideRules == null) {
+      return;
+    }
+    // Snapshot before awaiting: a sync can replace the rule list mid-sweep.
+    final orphanRuleIds = overrideRules.map((rule) => rule.ruleId).where((id) {
+      if (!id.startsWith(_rulePrefix) || activeRuleIds.contains(id)) {
+        return false;
+      }
+      // Only sweep a rule whose room this client can resolve. Another
+      // device can snooze a room that an early sync has not delivered
+      // yet; there an unresolved room means "the record has not arrived",
+      // not "no record exists", and deleting the rule cancels a live
+      // snooze with nothing left to restore it from. Defer instead: the
+      // rule is swept by a later reconcile once the room resolves.
+      final roomId = _roomIdFromRuleId(id);
+      return roomId != null && _client.getRoomById(roomId) != null;
+    }).toSet();
+    for (final orphanRuleId in orphanRuleIds) {
+      await _deleteRule(orphanRuleId);
+    }
+  }
 
   Future<void> dispose() async {
     // Set first: it is what stops _runSerialized and _scheduleExpiry from
@@ -156,6 +193,20 @@ class MatrixRoomNotificationSnoozes {
 
   String ruleId(String roomId) =>
       '$_rulePrefix${base64UrlEncode(utf8.encode(roomId)).replaceAll('=', '')}';
+
+  /// Inverse of [ruleId] for an id already known to carry [_rulePrefix].
+  /// Returns null when the remainder was not written by [ruleId], such as a
+  /// rule from a build that encoded the room differently.
+  String? _roomIdFromRuleId(String id) {
+    final encoded = id.substring(_rulePrefix.length);
+    // ruleId strips the padding that base64Url.decode requires back.
+    final padding = '=' * ((4 - encoded.length % 4) % 4);
+    try {
+      return utf8.decode(base64Url.decode('$encoded$padding'));
+    } on FormatException {
+      return null;
+    }
+  }
 
   RoomNotificationSnooze? _fromAccountData(String roomId) {
     final room = _client.getRoomById(roomId);
@@ -209,12 +260,11 @@ class MatrixRoomNotificationSnoozes {
     );
   }
 
-  Future<void> _deleteSnoozeRule(String roomId) async {
+  Future<void> _deleteSnoozeRule(String roomId) => _deleteRule(ruleId(roomId));
+
+  Future<void> _deleteRule(String ruleId) async {
     try {
-      await _client.deletePushRule(
-        matrix.PushRuleKind.override,
-        ruleId(roomId),
-      );
+      await _client.deletePushRule(matrix.PushRuleKind.override, ruleId);
     } on matrix.MatrixException catch (error) {
       if (error.error != matrix.MatrixError.M_NOT_FOUND) {
         rethrow;
@@ -246,6 +296,17 @@ class MatrixRoomNotificationSnoozes {
     });
   }
 
+  /// Every room that can currently carry a snooze: the synced ones plus the
+  /// locally pending ones.
+  ///
+  /// [get] already answers from `_pending` for a room `_client.rooms` does not
+  /// list, so anything that acts on live snoozes has to look at both sets or
+  /// it silently disagrees with what the rest of the class reports.
+  Set<String> _snoozeRoomIds() => <String>{
+    for (final room in _client.rooms) room.id,
+    ..._pending.keys,
+  };
+
   void _scheduleExpiry() {
     if (_disposed) {
       return;
@@ -253,8 +314,11 @@ class MatrixRoomNotificationSnoozes {
 
     _expiryTimer?.cancel();
     DateTime? nearest;
-    for (final room in _client.rooms) {
-      final snooze = _pending[room.id] ?? _fromAccountData(room.id);
+    // Pending rooms included: without them a snooze set on a room this client
+    // has not synced yet gets no timer at all, so its override push rule
+    // outlives snoozedUntil until some later sync happens to reconcile.
+    for (final roomId in _snoozeRoomIds()) {
+      final snooze = _pending[roomId] ?? _fromAccountData(roomId);
       if (snooze == null) {
         continue;
       }

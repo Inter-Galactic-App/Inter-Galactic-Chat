@@ -16,43 +16,43 @@ import 'package:tiamat/tiamat.dart' as tiamat;
 /// reflects on both platforms (single implementation, no duplication).
 
 class EmoticonCreatorStrings {
-  static String get promptSelectPhoto => Intl.message(
+  static String get promptEmoticonCreatorSelectPhoto => Intl.message(
     "Select photo",
     name: "promptEmoticonCreatorSelectPhoto",
     desc: "Button text for picking a source photo for emoticon creation",
   );
 
-  static String get promptChangePhoto => Intl.message(
+  static String get promptEmoticonCreatorChangePhoto => Intl.message(
     "Change photo",
     name: "promptEmoticonCreatorChangePhoto",
     desc: "Button text for replacing the source photo",
   );
 
-  static String get promptCropPhoto => Intl.message(
+  static String get promptEmoticonCreatorCropPhoto => Intl.message(
     "Crop",
     name: "promptEmoticonCreatorCropPhoto",
     desc: "Button text for cropping the selected source photo",
   );
 
-  static String get promptAutoCutout => Intl.message(
+  static String get promptEmoticonCreatorAutoCutout => Intl.message(
     "Auto",
     name: "promptEmoticonCreatorAutoCutout",
     desc: "Button text for automatic background removal",
   );
 
-  static String get promptEraseBrush => Intl.message(
+  static String get promptEmoticonCreatorEraseBrush => Intl.message(
     "Erase",
     name: "promptEmoticonCreatorEraseBrush",
     desc: "Button text for manual erase brush",
   );
 
-  static String get promptRestoreBrush => Intl.message(
+  static String get promptEmoticonCreatorRestoreBrush => Intl.message(
     "Restore",
     name: "promptEmoticonCreatorRestoreBrush",
     desc: "Button text for manual restore brush",
   );
 
-  static String get promptResetCutout => Intl.message(
+  static String get promptEmoticonCreatorResetCutout => Intl.message(
     "Reset",
     name: "promptEmoticonCreatorResetCutout",
     desc: "Button text for resetting the generated cutout",
@@ -71,19 +71,19 @@ class EmoticonCreatorStrings {
         "Prompt to confirm the creation of an Emoticon Pack, Emoji, or Sticker",
   );
 
-  static String get promptAdvancedEdit => Intl.message(
+  static String get promptEmoticonCreatorAdvancedEdit => Intl.message(
     "Advanced edit",
     name: "promptEmoticonCreatorAdvancedEdit",
     desc: "Button text that opens the full cutout editor",
   );
 
-  static String get titleCutoutEditor => Intl.message(
+  static String get titleEmoticonCutoutEditor => Intl.message(
     "Cutout editor",
     name: "titleEmoticonCutoutEditor",
     desc: "Title of the full emoticon cutout editor surface",
   );
 
-  static String get promptDone => Intl.message(
+  static String get promptEmoticonEditorDone => Intl.message(
     "Done",
     name: "promptEmoticonEditorDone",
     desc: "Button that keeps the editor result and returns to the quick card",
@@ -1134,7 +1134,7 @@ class _EmoticonCutoutCanvasState extends State<EmoticonCutoutCanvas> {
         // label twice.
         excludeSemantics: true,
         button: true,
-        label: EmoticonCreatorStrings.promptSelectPhoto,
+        label: EmoticonCreatorStrings.promptEmoticonCreatorSelectPhoto,
         child: InkWell(
           key: const ValueKey('emoticon-canvas-pick-photo'),
           onTap: onPick,
@@ -1148,7 +1148,7 @@ class _EmoticonCutoutCanvasState extends State<EmoticonCutoutCanvas> {
                 icon,
                 const SizedBox(height: 8),
                 Text(
-                  EmoticonCreatorStrings.promptSelectPhoto,
+                  EmoticonCreatorStrings.promptEmoticonCreatorSelectPhoto,
                   style: theme.textTheme.labelLarge?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -1313,14 +1313,14 @@ class EmoticonCutoutEngineActions extends StatelessWidget {
           label: Text(
             controller.processingCutout
                 ? 'Processing...'
-                : EmoticonCreatorStrings.promptAutoCutout,
+                : EmoticonCreatorStrings.promptEmoticonCreatorAutoCutout,
           ),
         ),
         OutlinedButton.icon(
           key: const ValueKey('emoticon-reset-cutout'),
           onPressed: busy ? null : controller.resetCutout,
           icon: const Icon(Icons.restart_alt_rounded, size: 18),
-          label: Text(EmoticonCreatorStrings.promptResetCutout),
+          label: Text(EmoticonCreatorStrings.promptEmoticonCreatorResetCutout),
         ),
       ],
     );
@@ -1348,7 +1348,7 @@ class EmoticonBrushControls extends StatelessWidget {
       runSpacing: 8,
       children: [
         FilterChip(
-          label: Text(EmoticonCreatorStrings.promptEraseBrush),
+          label: Text(EmoticonCreatorStrings.promptEmoticonCreatorEraseBrush),
           selected: controller.brushMode == CutoutBrushMode.erase,
           onSelected: enabled
               ? (_) => controller.setBrushMode(CutoutBrushMode.erase)
@@ -1357,7 +1357,7 @@ class EmoticonBrushControls extends StatelessWidget {
           visualDensity: compact ? VisualDensity.compact : null,
         ),
         FilterChip(
-          label: Text(EmoticonCreatorStrings.promptRestoreBrush),
+          label: Text(EmoticonCreatorStrings.promptEmoticonCreatorRestoreBrush),
           selected: controller.brushMode == CutoutBrushMode.restore,
           onSelected: enabled
               ? (_) => controller.setBrushMode(CutoutBrushMode.restore)
@@ -1468,8 +1468,8 @@ class EmoticonCanvasOverlayButton extends StatelessWidget {
     final theme = Theme.of(context);
     final enabled = onPressed != null;
 
-    return Tooltip(
-      message: tooltip,
+    return tiamat.Tooltip(
+      text: tooltip,
       child: Semantics(
         button: true,
         enabled: enabled,
@@ -2118,8 +2118,8 @@ class EmoticonDraftTile extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 TextButton(onPressed: onLoad, child: const Text('Load')),
-                Tooltip(
-                  message: 'Delete local draft',
+                tiamat.Tooltip(
+                  text: 'Delete local draft',
                   child: IconButton(
                     onPressed: onDelete,
                     icon: const Icon(Icons.delete_outline_rounded, size: 18),
@@ -2309,8 +2309,8 @@ class EmoticonImagePickTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Tooltip(
-      message: tooltip,
+    return tiamat.Tooltip(
+      text: tooltip,
       child: Material(
         color: theme.colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(8),

@@ -1,34 +1,3 @@
 # Material tooltip sites, grandfathered. Counts may fall, never rise.
 # Regenerate: bash scripts/ci/check-tooltip-component.sh --update
 # See scripts/ci/check-tooltip-component.sh for why this gate exists.
-2 intergalactic/lib/ui/atoms/rich_text/matrix_html_parser.dart
-1 intergalactic/lib/ui/atoms/room_header.dart
-2 intergalactic/lib/ui/molecules/editable_label.dart
-1 intergalactic/lib/ui/molecules/markdown_selection_toolbar.dart
-2 intergalactic/lib/ui/molecules/message_input.dart
-2 intergalactic/lib/ui/molecules/timeline_events/events/timeline_event_view_attachments.dart
-1 intergalactic/lib/ui/molecules/timeline_events/timeline_view_entry.dart
-2 intergalactic/lib/ui/molecules/user_panel.dart
-2 intergalactic/lib/ui/organisms/account_popup/account_popup.dart
-3 intergalactic/lib/ui/organisms/activity/local_activity_panel.dart
-1 intergalactic/lib/ui/organisms/call_view/call_control_action_button.dart
-3 intergalactic/lib/ui/organisms/call_view/call_view.dart
-1 intergalactic/lib/ui/organisms/home_screen/home_status_strip.dart
-3 intergalactic/lib/ui/organisms/home_screen/home_story_composer.dart
-1 intergalactic/lib/ui/organisms/home_screen/home_story_viewer.dart
-1 intergalactic/lib/ui/organisms/invitation_view/send_invitation.dart
-1 intergalactic/lib/ui/organisms/photo_albums/photo_album_view.dart
-1 intergalactic/lib/ui/organisms/soundboard/call_connection_health_indicator.dart
-2 intergalactic/lib/ui/organisms/soundboard/call_soundboard_panel.dart
-1 intergalactic/lib/ui/pages/inbox/inbox_trigger.dart
-1 intergalactic/lib/ui/pages/inbox/inbox_view.dart
-2 intergalactic/lib/ui/pages/main/main_page_view_desktop.dart
-1 intergalactic/lib/ui/pages/settings/categories/app/soundboard_settings_page.dart
-1 intergalactic/lib/ui/pages/settings/categories/app/theme_settings/custom_theme_editor.dart
-1 intergalactic/lib/ui/pages/settings/categories/app/theme_settings/theme_preview_panel.dart
-6 intergalactic/lib/ui/pages/settings/categories/app/theme_settings/theme_settings_widget_html.dart
-6 intergalactic/lib/ui/pages/settings/categories/app/theme_settings/theme_settings_widget_io.dart
-3 intergalactic/lib/ui/pages/settings/categories/room/emoji_packs/controls/emoticon_editor_controls.dart
-2 intergalactic/lib/ui/pages/settings/categories/space/space_soundboard_settings_page.dart
-1 intergalactic/lib/ui/windows/desktop_window_chrome_io.dart
-1 intergalactic/lib/ui/windows/developer_title_bar_menu.dart

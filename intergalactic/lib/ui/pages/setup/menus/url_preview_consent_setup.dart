@@ -42,9 +42,7 @@ class UrlPreviewConsentSetup implements SetupMenu {
 }
 
 class UrlPreviewE2EEConsentChoice extends StatefulWidget {
-  const UrlPreviewE2EEConsentChoice({
-    super.key,
-  });
+  const UrlPreviewE2EEConsentChoice({super.key});
 
   @override
   State<UrlPreviewE2EEConsentChoice> createState() =>
@@ -105,7 +103,7 @@ class _UrlPreviewE2EEConsentChoiceState
             icon: Icons.link_outlined,
             title: 'Allow encrypted previews',
             description:
-                'Fetch previews using your homeserver, configured preview service, or supported provider fallback.',
+                'Fetch through your configured preview service or homeserver. Direct provider fallback is a separate setting, off by default.',
             enabled: !_isApplying,
             onChanged: _choose,
           ),
@@ -139,8 +137,9 @@ class _UrlPreviewConsentOption extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final foreground =
-        isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurface;
+    final foreground = isSelected
+        ? theme.colorScheme.primary
+        : theme.colorScheme.onSurface;
     final borderColor = isSelected
         ? theme.colorScheme.primary
         : theme.colorScheme.outline.withValues(alpha: 0.64);
@@ -192,10 +191,7 @@ class _UrlPreviewConsentOption extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Radio<bool>(
-                value: value,
-                enabled: enabled,
-              ),
+              Radio<bool>(value: value, enabled: enabled),
             ],
           ),
         ),

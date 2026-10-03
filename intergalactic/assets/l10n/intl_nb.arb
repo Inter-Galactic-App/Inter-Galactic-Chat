@@ -1,4 +1,10 @@
 {
+  "notificationAttachmentSentImage": "Sendte et bilde",
+  "notificationAttachmentSentVideo": "Sendte en video",
+  "notificationAttachmentSentAudio": "Sendte en lydmelding",
+  "notificationAttachmentSentFile": "Sendte en fil",
+  "notificationAttachmentSharedLocation": "Delte en posisjon",
+  "notificationAttachmentSentSticker": "Sendte et klistremerke",
   "labelRoomsList": "Rom",
   "@labelRoomsList": {
     "description": "Header label for the list of rooms",

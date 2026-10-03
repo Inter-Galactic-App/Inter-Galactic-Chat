@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:collection/collection.dart';
 import 'package:intergalactic/client/auth.dart';
 import 'package:intergalactic/client/client.dart';
 import 'package:intergalactic/client/components/component.dart';
@@ -18,6 +19,19 @@ import 'package:matrix/matrix.dart' as matrix;
 import 'package:matrix_dart_sdk_drift_db/database.dart';
 import 'package:matrix_dart_sdk_drift_db/matrix_dart_sdk_drift_db.dart';
 
+bool hasUsableMatrixBackgroundAccount(Map<String, dynamic>? account) {
+  final homeserver = account?['homeserver_url'];
+  final accessToken = account?['token'];
+  // Trimmed, not just non-empty. `Uri.parse('   ')` succeeds, so a whitespace
+  // homeserver read as usable and the background client went on to build an
+  // api against it - failing later, in a background isolate, where the reason
+  // is hardest to see. Whitespace is not a credential.
+  return homeserver is String &&
+      homeserver.trim().isNotEmpty &&
+      accessToken is String &&
+      accessToken.trim().isNotEmpty;
+}
+
 class MatrixBackgroundClient implements Client {
   @override
   Profile? self;
@@ -29,6 +43,10 @@ class MatrixBackgroundClient implements Client {
 
   late MatrixSdkDriftDatabase database;
   late matrix.MatrixApi api;
+  bool _isInitialized = false;
+
+  bool get isInitialized => _isInitialized;
+
   matrix.Client? _decryptClient;
   Future<matrix.Client?>? _decryptClientLoading;
 
@@ -40,9 +58,7 @@ class MatrixBackgroundClient implements Client {
   late final List<Component<MatrixBackgroundClient>> componentsInternal;
 
   MatrixBackgroundClient({required this.databaseId}) {
-    componentsInternal = [
-      MatrixBackgroundClientDirectMessagesComponent(this),
-    ];
+    componentsInternal = [MatrixBackgroundClientDirectMessagesComponent(this)];
   }
 
   @override
@@ -85,21 +101,31 @@ class MatrixBackgroundClient implements Client {
 
   @override
   StoredStreamController<ClientConnectionStatusUpdate>
-      get connectionStatusChanged =>
-          StoredStreamController<ClientConnectionStatusUpdate>.new();
+  get connectionStatusChanged =>
+      StoredStreamController<ClientConnectionStatusUpdate>.new();
 
   @override
-  Future<void> init(bool loadingFromCache,
-      {bool isBackgroundService = false}) async {
+  Future<void> init(
+    bool loadingFromCache, {
+    bool isBackgroundService = false,
+  }) async {
     final db = await getMatrixDatabase(databaseId);
     if (db is MatrixSdkDriftDatabase) {
       database = db;
     }
 
-    final account = await database.getClient(databaseId);
-    var homeserver = Uri.parse(account!['homeserver_url']);
-    var accessToken = account['token'];
-    deviceId = account['device_id'];
+    final persistedAccount = await database.getClient(databaseId);
+    if (persistedAccount == null ||
+        !hasUsableMatrixBackgroundAccount(persistedAccount)) {
+      Log.w(
+        'Skipping background Matrix client because its persisted account is unavailable',
+      );
+      return;
+    }
+
+    var homeserver = Uri.parse(persistedAccount['homeserver_url'] as String);
+    var accessToken = persistedAccount['token'] as String;
+    deviceId = persistedAccount['device_id'];
 
     api = matrix.MatrixApi(
       httpClient: MatrixUserAgentHttpClient(),
@@ -111,11 +137,15 @@ class MatrixBackgroundClient implements Client {
 
     allRooms = await database.db.select(database.db.roomData).get();
 
-    preloadRoomStates =
-        await database.db.select(database.db.preloadRoomState).get();
+    preloadRoomStates = await database.db
+        .select(database.db.preloadRoomState)
+        .get();
 
-    nonPreloadRoomStates =
-        await database.db.select(database.db.nonPreloadRoomState).get();
+    nonPreloadRoomStates = await database.db
+        .select(database.db.nonPreloadRoomState)
+        .get();
+
+    _isInitialized = true;
   }
 
   Future<matrix.Client?> getDecryptClient() {
@@ -147,10 +177,7 @@ class MatrixBackgroundClient implements Client {
 
       client.backgroundSync = false;
       await client
-          .init(
-            waitForFirstSync: true,
-            waitUntilLoadCompletedLoaded: true,
-          )
+          .init(waitForFirstSync: true, waitUntilLoadCompletedLoaded: true)
           .timeout(const Duration(seconds: 15));
       client.backgroundSync = false;
       _decryptClient = client;
@@ -223,11 +250,16 @@ class MatrixBackgroundClient implements Client {
 
   @override
   Room? getRoom(String identifier) {
-    var data = allRooms.firstWhere((e) => e.roomId == identifier);
-    var preload =
-        preloadRoomStates.where((e) => e.roomId == identifier).toList();
-    var nonPreload =
-        nonPreloadRoomStates.where((e) => e.roomId == identifier).toList();
+    final data = allRooms.firstWhereOrNull((e) => e.roomId == identifier);
+    if (data == null) {
+      return null;
+    }
+    var preload = preloadRoomStates
+        .where((e) => e.roomId == identifier)
+        .toList();
+    var nonPreload = nonPreloadRoomStates
+        .where((e) => e.roomId == identifier)
+        .toList();
     return MatrixBackgroundRoom(
       this,
       roomId: identifier,

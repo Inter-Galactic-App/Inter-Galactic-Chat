@@ -1,4 +1,10 @@
 {
+  "notificationAttachmentSentImage": "Irudi bat bidali du",
+  "notificationAttachmentSentVideo": "Bideo bat bidali du",
+  "notificationAttachmentSentAudio": "Audio-mezu bat bidali du",
+  "notificationAttachmentSentFile": "Fitxategi bat bidali du",
+  "notificationAttachmentSharedLocation": "Kokapen bat partekatu du",
+  "notificationAttachmentSentSticker": "Eranskailu bat bidali du",
   "messagePlaceholderSticker": "{user}(e)k pegatina bidali du",
   "@messagePlaceholderSticker": {
     "description": "Message body for when a user sends a sticker",

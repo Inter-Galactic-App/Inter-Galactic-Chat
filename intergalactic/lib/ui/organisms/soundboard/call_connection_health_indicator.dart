@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intergalactic/client/components/voip/call_health.dart';
+import 'package:tiamat/tiamat.dart' as tiamat;
 
 class CallConnectionHealthIndicator extends StatefulWidget {
   const CallConnectionHealthIndicator({
@@ -44,8 +45,8 @@ class _CallConnectionHealthIndicatorState
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Tooltip(
-            message: tooltip,
+          tiamat.Tooltip(
+            text: tooltip,
             child: Material(
               color: Colors.transparent,
               child: InkWell(

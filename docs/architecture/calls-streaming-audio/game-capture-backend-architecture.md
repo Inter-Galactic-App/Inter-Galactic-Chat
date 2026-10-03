@@ -3,13 +3,11 @@
 Status: Active debug architecture; DX11 BG3 Smooth 720p30 average gate met
 twice through the developer-gated D3D11 native NV12 source-adapter branch;
 productization remains review-gated by classifier and native-tail follow-up
-Owner: EXPERIMENTAL
 Date: 2026-06-13
-Last reviewed: 2026-06-16 by DOCUMENTATION
 Scope: Windows gameplay/window capture, with a BG3 DX11 proof of concept as the
 first target.
 
-This document responds to `docs/streaming/archive/historical-plans/GAME_STREAMING_GPU_FIRST_ROADMAP.md`. It records the
+This document responds to the historical game-streaming GPU-first roadmap. It records the
 debug-only game-capture backend direction. The current app integration promotes
 the D3D11 path only for developer-mode Windows game-like app-default window
 shares with safe fallback, or for the explicit developer GPU pipeline test mode
@@ -229,13 +227,10 @@ Phase 4D validation status:
     `frame_pacing_unstable` from 100 ms-class native delivery/source-to-submit
     gaps
   - Phase 2 native-stage proof is now implemented in the live WebRTC source and
-    parsed by stream-test reports. Exact build fingerprints are kept in the
-    private validation evidence bundle, not in this public architecture note.
+    parsed by stream-test reports.
   - June 8 helper-feed headroom follow-up:
     - native source feed now runs at a minimum `60 FPS` while Smooth delivery
       remains `1280x720@30`
-    - patched artifact and Debug runner fingerprints were recorded in private
-      validation evidence
     - 30-second BG3 Smooth internal validation report had `gpuScaled=1055`,
       `gpuScaleFailures=0`, `cpuFallback=0`, `repeated=0/1055`, and delivery
       wall gaps `29-37 ms`
@@ -420,9 +415,7 @@ timing, dropped/overwritten frames, and metadata, but skips local PNG readback
 so proof-frame export does not distort p95/max gap measurements. The default
 remains five proof frames for "can we see the game?" validation.
 
-Output lives under the configured local game-capture results directory. Keep
-exact result paths and build hashes in private workspace evidence, not in this
-public architecture note.
+Output lives under the configured local game-capture results directory.
 
 This is still a diagnostic prototype. It does not publish frames, replace
 window-GDI/WGC, alter stream profiles, or change default capture behavior.
@@ -1027,7 +1020,7 @@ or black output while numeric FPS looked better.
 - Decide whether the first prototype lives under patched libwebrtc or a
   sibling native Windows plugin that feeds a WebRTC source.
 - Phase 1 readiness is captured in
-  `docs/streaming/archive/historical-plans/stream-optimization-plan-2026-06-21.md`.
+  the historical stream-optimization plan.
 
 Exit criteria:
 

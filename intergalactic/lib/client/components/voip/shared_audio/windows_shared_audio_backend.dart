@@ -44,24 +44,46 @@ class WindowsSharedAudioBackend implements SharedAudioBackend {
 
   /// Last observation of the capture, kept so the call UI can read it while
   /// building a frame. Updated wherever the backend already learns something
-  /// about the capture, so it cannot silently go stale relative to [_session].
+  /// about the capture, so it cannot silently go stale relative to [_sessions].
+  ///
+  /// Still singular while one key is in use. Per-share status is step 3's
+  /// problem, not something this step can answer: with two live captures there
+  /// is no single "the" status to report through this interface.
   SharedAudioCaptureStatus _lastStatus =
       const SharedAudioCaptureStatus.inactive();
 
   @override
   SharedAudioCaptureStatus get lastStatus => _lastStatus;
 
-  /// The one field that owns a native session.
+  /// The one field that owns native sessions, keyed by share.
   ///
   /// Written only by [_openSession] (the only place a session is created) and
   /// [_releaseSession] (the only place one is released). Nothing else records
   /// that a capture exists, so there is no second field that can disagree with
   /// this one about whether a session is live or which backend it runs on.
-  _SharedAudioSession? _session;
+  ///
+  /// Keyed rather than singular so that "one live session per share" is a
+  /// property of the container instead of a rule each call site has to keep.
+  /// [_openSession] releases the incumbent *for its own key*, which is what
+  /// makes a second concurrent session for one share unexpressible - the shape
+  /// BUG-301 exploited, where two per-source backends each held a session and
+  /// neither could see the other's.
+  ///
+  /// Exactly one key is in use today ([_defaultSessionKey]); the caller does
+  /// not yet register a share per video publication. Until it does, every
+  /// keyed path below has the same behaviour the single field had.
+  final Map<Object, _SharedAudioSession> _sessions =
+      <Object, _SharedAudioSession>{};
+
+  /// The single key in use while the caller still creates one share session.
+  ///
+  /// Named rather than inlined so the step that introduces real per-share keys
+  /// changes call sites the compiler can find, instead of a bare literal.
+  static const Object _defaultSessionKey = 'default';
 
   /// Serializes [start], [stop], and [dispose].
   ///
-  /// All three mutate [_session] across awaits, so overlapping calls
+  /// All three mutate [_sessions] across awaits, so overlapping calls
   /// interleave: without the gate two concurrent starts each create a native
   /// session, and only one of them can be the owned one. Same hazard between a
   /// stop or dispose and an in-flight start.
@@ -94,10 +116,15 @@ class WindowsSharedAudioBackend implements SharedAudioBackend {
   /// or released capture cannot still be reported as live.
   @override
   SharedAudioBackendKind get kind {
-    final session = _session;
-    return session != null && session.capturing
-        ? session.backend
-        : SharedAudioBackendKind.windowsProcessLoopback;
+    // First capturing session rather than a named key: with one key in use
+    // this is that key, and it keeps the getter honest if a second is ever
+    // registered before this interface grows a key of its own.
+    for (final session in _sessions.values) {
+      if (session.capturing) {
+        return session.backend;
+      }
+    }
+    return SharedAudioBackendKind.windowsProcessLoopback;
   }
 
   @override
@@ -380,7 +407,7 @@ class WindowsSharedAudioBackend implements SharedAudioBackend {
       );
     }
 
-    final session = await _openSession(request, resolved);
+    final session = await _openSession(_defaultSessionKey, request, resolved);
     if (session == null) {
       // Nothing was created, so there is nothing to release.
       return SharedAudioStartResult.failed(
@@ -399,11 +426,11 @@ class WindowsSharedAudioBackend implements SharedAudioBackend {
     try {
       final result = await _captureWith(request, session);
       if (!result.started) {
-        await _releaseSession();
+        await _releaseSession(_defaultSessionKey);
       }
       return result;
     } catch (_) {
-      await _releaseSession();
+      await _releaseSession(_defaultSessionKey);
       rethrow;
     }
   }
@@ -489,7 +516,7 @@ class WindowsSharedAudioBackend implements SharedAudioBackend {
       return initial;
     }
 
-    // No re-check of _session inside the loop: this runs inside the lifecycle
+    // No re-check of _sessions inside the loop: this runs inside the lifecycle
     // gate, so a superseding start, stop or dispose queued behind it cannot run
     // until this returns. The session polled here is therefore still the owned
     // one for the whole wait. The cost is that a stop issued during a slow
@@ -510,19 +537,24 @@ class WindowsSharedAudioBackend implements SharedAudioBackend {
 
   /// The only place a native session is created.
   ///
-  /// Releases the currently owned session first: overwriting [_session] would
-  /// otherwise drop the only handle to a capture that keeps running with
+  /// Releases the session already held for [key] first: overwriting the entry
+  /// would otherwise drop the only handle to a capture that keeps running with
   /// nothing able to stop it.
+  ///
+  /// The release is scoped to [key] on purpose. Releasing every key here would
+  /// make a second share silently stop the first, which is the behaviour change
+  /// this step is specifically not making.
   ///
   /// Returns null when the native side declined to create one. [createSession]
   /// is a platform-channel call and can throw instead; either way nothing was
-  /// acquired, and [_session] is already null because of the release above - so
-  /// neither outcome can leave a session or a backend claim behind.
+  /// acquired, and the entry for [key] is already absent because of the release
+  /// above - so neither outcome can leave a session or a backend claim behind.
   Future<_SharedAudioSession?> _openSession(
+    Object key,
     SharedAudioRequest request,
     _ResolvedWindowsMode resolved,
   ) async {
-    await _releaseSession();
+    await _releaseSession(key);
 
     final sessionId = await _binding.createSession(
       targetType: request.sharingWholeScreen
@@ -537,7 +569,7 @@ class WindowsSharedAudioBackend implements SharedAudioBackend {
       return null;
     }
 
-    return _session = _SharedAudioSession(
+    return _sessions[key] = _SharedAudioSession(
       id: sessionId,
       backend: resolved.backend,
     );
@@ -611,9 +643,10 @@ class WindowsSharedAudioBackend implements SharedAudioBackend {
 
   /// The only way a session stops being owned.
   ///
-  /// Stops the capture and disposes it, then clears [_session]. It takes no
-  /// session argument on purpose: releasing anything other than the one owned
-  /// session is not something a caller can ask for.
+  /// Stops the capture and disposes it, then drops [key] from [_sessions]. It
+  /// takes a key rather than a session on purpose: releasing anything other
+  /// than the session the owner holds for that key is not something a caller
+  /// can ask for.
   ///
   /// This is also the reason a session created by a failed [start] does not
   /// leak. [start] returns a failure result on those paths, so the caller never
@@ -633,12 +666,11 @@ class WindowsSharedAudioBackend implements SharedAudioBackend {
   /// rather than dropped. Swallowing the error AND forgetting the id would make
   /// the leak permanent and invisible — [dispose] could not retry, because
   /// nothing would remember the session existed.
-  Future<void> _releaseSession({bool reportFailure = false}) async {
-    final session = _session;
+  Future<void> _releaseSession(Object key, {bool reportFailure = false}) async {
+    final session = _sessions.remove(key);
     if (session == null) {
       return;
     }
-    _session = null;
     session.capturing = false;
     _lastStatus = _lastStatus.asStopped();
 
@@ -694,11 +726,23 @@ class WindowsSharedAudioBackend implements SharedAudioBackend {
     }
   }
 
+  /// Releases every key. Call teardown ends all of this owner's captures, and
+  /// doing it one key at a time keeps each release's failure handling - the
+  /// [_sessionsAwaitingDispose] retry in particular - identical to the single
+  /// case rather than a second implementation of it.
+  ///
+  /// Iterates a copy: [_releaseSession] mutates [_sessions].
+  Future<void> _releaseAllSessions({bool reportFailure = false}) async {
+    for (final key in _sessions.keys.toList()) {
+      await _releaseSession(key, reportFailure: reportFailure);
+    }
+  }
+
   /// Sessions the native side still holds because a release attempt failed.
-  /// Retried on [dispose]; kept separate from [_session] so a subsequent
+  /// Retried on [dispose]; kept separate from [_sessions] so a subsequent
   /// [start] cannot overwrite the only handle to a leaked session.
   ///
-  /// Written from [_releaseSession] only, so an id can leave [_session] without
+  /// Written from [_releaseSession] only, so an id can leave [_sessions] without
   /// landing here in exactly one case: the native side confirmed the disposal.
   final Set<int> _sessionsAwaitingDispose = <int>{};
 
@@ -743,10 +787,10 @@ class WindowsSharedAudioBackend implements SharedAudioBackend {
   Future<SharedAudioCaptureStatus> refreshStatus() =>
       _serialized(_refreshStatusLocked);
 
-  /// Serialized like everything else that reads [_session] across an await: a
+  /// Serialized like everything else that reads [_sessions] across an await: a
   /// refresh racing a teardown would otherwise query a disposed id.
   Future<SharedAudioCaptureStatus> _refreshStatusLocked() async {
-    final session = _session;
+    final session = _sessions[_defaultSessionKey];
     if (session == null || !session.capturing) {
       return _lastStatus;
     }
@@ -807,12 +851,12 @@ class WindowsSharedAudioBackend implements SharedAudioBackend {
   Future<MediaStream?> createPublicationStream() =>
       _serialized(_createPublicationStreamLocked);
 
-  /// Serialized with [start]/[stop]/[dispose] because it reads [_session] across
-  /// an await. Without the gate a publication could be opened against a session
-  /// that a concurrent stop or supersede is already tearing down, which is the
-  /// orphan this whole handle exists to prevent.
+  /// Serialized with [start]/[stop]/[dispose] because it reads [_sessions]
+  /// across an await. Without the gate a publication could be opened against a
+  /// session that a concurrent stop or supersede is already tearing down, which
+  /// is the orphan this whole handle exists to prevent.
   Future<MediaStream?> _createPublicationStreamLocked() async {
-    final session = _session;
+    final session = _sessions[_defaultSessionKey];
     if (session == null || !session.capturing) {
       return null;
     }
@@ -847,7 +891,7 @@ class WindowsSharedAudioBackend implements SharedAudioBackend {
     // suspension point, and a superseding start could have replaced the session
     // while the native call was in flight. Publishing the new session's stream
     // under the old session's handle would attach the capture to the wrong one.
-    final current = _session;
+    final current = _sessions[_defaultSessionKey];
     if (!identical(current, session)) {
       await _disposeNativePublication(session);
       return null;
@@ -860,13 +904,14 @@ class WindowsSharedAudioBackend implements SharedAudioBackend {
   }
 
   @override
-  Future<void> disposePublicationStream() =>
-      _serialized(() => _disposePublicationLocked(_session));
+  Future<void> disposePublicationStream() => _serialized(
+    () => _disposePublicationLocked(_sessions[_defaultSessionKey]),
+  );
 
-  /// The `_session` argument is read inside the gate, not at call time.
+  /// The session argument is read inside the gate, not at call time.
   ///
   /// This reads like an eager capture and is not one: [_serialized] invokes the
-  /// closure from inside its queued `.then`, so `_session` is evaluated after
+  /// closure from inside its queued `.then`, so the lookup is evaluated after
   /// every earlier lifecycle operation has settled - the same instant every
   /// `*Locked` body reads the field directly. A disposal queued behind a
   /// pending `start()` therefore sees the session that start created, which is
@@ -916,7 +961,7 @@ class WindowsSharedAudioBackend implements SharedAudioBackend {
   Future<void> stop() => _serialized(_stopLocked);
 
   Future<void> _stopLocked() async {
-    final session = _session;
+    final session = _sessions[_defaultSessionKey];
     if (session == null || !session.capturing) {
       return;
     }
@@ -938,7 +983,7 @@ class WindowsSharedAudioBackend implements SharedAudioBackend {
     // Earlier failed releases first, and unconditionally: they are the whole
     // reason those ids were kept, and there may be no owned session below.
     await _drainPendingDisposals();
-    await _releaseSession(reportFailure: true);
+    await _releaseAllSessions(reportFailure: true);
   }
 
   SharedAudioCapabilityReport _unavailableReport(
@@ -970,11 +1015,11 @@ class WindowsSharedAudioBackend implements SharedAudioBackend {
   }
 }
 
-/// One native capture session, owned by exactly one field.
+/// One native capture session, owned by exactly one entry of one field.
 ///
 /// This type exists so that "a session" is something that can be owned rather
 /// than a set of loose fields kept consistent by hand.
-/// [WindowsSharedAudioBackend._session] is the only field that holds one,
+/// [WindowsSharedAudioBackend._sessions] is the only field that holds them,
 /// [WindowsSharedAudioBackend._openSession] the only place one is made, and
 /// [WindowsSharedAudioBackend._releaseSession] the only way out of it - so a
 /// session nothing can tear down is not a state this class can reach, instead

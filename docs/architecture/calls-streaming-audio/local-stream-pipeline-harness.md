@@ -1,7 +1,6 @@
 # Local Stream Pipeline Harness
 
 Status: Debug-only measurement harness
-Owner: EXPERIMENTAL
 Last updated: 2026-06-19
 
 Inter Galactic has a local stream-pipeline harness for collecting capture-path
@@ -249,7 +248,7 @@ game_capture_output_freshness stats sampleMode=... sampleFrames=... uniqueFrames
 This is the preferred proof source for continuous output copies because it
 analyzes output after encode/send/receive without putting a recording load on
 the sender hot path. Sender-side proof should stay bounded to proof frames.
-Server/SFU recording remains a separate SERVER/LiveKit/storage/consent design
+Server/SFU recording remains a separate server/LiveKit/storage/consent design
 branch.
 
 Validation note: `local-capture-20260617-121038` launched the synthetic D3D11

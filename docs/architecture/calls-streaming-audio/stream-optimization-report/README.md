@@ -35,6 +35,6 @@ they need. The top-level report remains the current index and routing document.
 - Add new current evidence to the newest dated archive or create a new dated
   slice instead of growing the top-level index.
 - Keep `../streaming-guidance-status.md` as the current implementation-decision summary.
-- Keep RNNoise/noise-suppression tuning in AUDIO-owned docs such as
+- Keep RNNoise/noise-suppression tuning in
   `../media-and-plugins.md`, `../RNNOISE_TUNING_BASELINE.md`, and
   `../rnnoise-native-resampler-plan.md`.

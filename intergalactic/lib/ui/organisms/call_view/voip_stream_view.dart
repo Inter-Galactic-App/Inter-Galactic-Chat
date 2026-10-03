@@ -35,6 +35,7 @@ class VoipStreamView extends StatefulWidget {
     this.showLocalPreviewPerformanceWarning = false,
     this.onFullscreen,
     this.onTap,
+    this.onDoubleTap,
     this.onPopout,
     this.gameActivity,
     this.gameActivityPresenceText,
@@ -60,6 +61,7 @@ class VoipStreamView extends StatefulWidget {
   final BoxFit fit;
   final Function()? onFullscreen;
   final VoidCallback? onTap;
+  final VoidCallback? onDoubleTap;
   final VoidCallback? onPopout;
   final UserActivity? gameActivity;
   final String? gameActivityPresenceText;
@@ -674,6 +676,7 @@ class _VoipStreamViewState extends State<VoipStreamView>
         Widget tile = GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: _tapAction,
+          onDoubleTap: widget.isVideoHidden ? null : widget.onDoubleTap,
           child: AnimatedContainer(
             duration: InterGalacticMotion.duration(
               context,

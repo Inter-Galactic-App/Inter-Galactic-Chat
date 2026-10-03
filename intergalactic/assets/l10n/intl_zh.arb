@@ -1,4 +1,10 @@
 {
+  "notificationAttachmentSentImage": "发送了一张图片",
+  "notificationAttachmentSentVideo": "发送了一个视频",
+  "notificationAttachmentSentAudio": "发送了一条语音消息",
+  "notificationAttachmentSentFile": "发送了一个文件",
+  "notificationAttachmentSharedLocation": "分享了一个位置",
+  "notificationAttachmentSentSticker": "发送了一个贴纸",
   "labelRoomsList": "房间",
   "@labelRoomsList": {
     "description": "Header label for the list of rooms",

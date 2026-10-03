@@ -21,14 +21,17 @@ String? trimUrlPreviewDescription(String? value, {int maxWords = 20}) {
 }
 
 String inferUrlPreviewSource(Uri uri) {
-  final host =
-      uri.host.replaceFirst(RegExp(r"^www\.", caseSensitive: false), "");
+  final host = uri.host.replaceFirst(
+    RegExp(r"^www\.", caseSensitive: false),
+    "",
+  );
   if (host.isEmpty) {
     return uri.toString();
   }
 
   final parts = host.split(".");
   final label = parts.length >= 2 ? parts[parts.length - 2] : parts.first;
+  if (label.toLowerCase() == 'tiktok') return 'TikTok';
   final words = label.split(RegExp(r"[-_]+"));
   return words
       .where((word) => word.isNotEmpty)
@@ -42,7 +45,25 @@ String? normalizeUrlPreviewPostingAccount(String? value) {
     return null;
   }
 
-  return normalized.replaceFirst(RegExp(r"^by\s+", caseSensitive: false), "");
+  final withoutByPrefix = normalized.replaceFirst(
+    RegExp(r"^by\s+", caseSensitive: false),
+    "",
+  );
+
+  // A handle with no name behind it - a bare "@" - is what several providers
+  // return when the author is unknown, and TikTok's metadata does it often. It
+  // rendered on the card as a stray "@" beside the site name, which is the
+  // owner's original 2026-09-03 report. Carrying no name, it is absent rather
+  // than short.
+  //
+  // The test is for any letter or digit in the UNICODE sense, not [A-Za-z0-9]:
+  // handles are routinely non-Latin and an ASCII-only check would silently
+  // discard them.
+  if (!RegExp(r"[\p{L}\p{N}]", unicode: true).hasMatch(withoutByPrefix)) {
+    return null;
+  }
+
+  return withoutByPrefix;
 }
 
 UrlPreviewData? sanitizeUrlPreviewDataForUri(Uri uri, UrlPreviewData? data) {
@@ -232,11 +253,13 @@ bool _isBlockedBrowserErrorPreview(UrlPreviewData data) {
   final description = _normalizedComparisonText(data.description);
   final previewFields = <String?>[siteName, title, description];
 
-  final hasExplicitBrowserBlockSignal = previewFields.any((value) =>
-      value != null &&
-      (value.contains("err_blocked_by_response") ||
-          value.contains("blocked by response") ||
-          value.contains("refused to connect")));
+  final hasExplicitBrowserBlockSignal = previewFields.any(
+    (value) =>
+        value != null &&
+        (value.contains("err_blocked_by_response") ||
+            value.contains("blocked by response") ||
+            value.contains("refused to connect")),
+  );
   if (hasExplicitBrowserBlockSignal) {
     return true;
   }
@@ -274,7 +297,8 @@ bool _isGenericTikTokDescription(String? value) {
   return normalized.contains("trends start here") ||
       normalized.contains("on a device or on the web") ||
       normalized.contains(
-          "watch and discover millions of personalized short videos") ||
+        "watch and discover millions of personalized short videos",
+      ) ||
       normalized.contains("discover videos, music and livestreams") ||
       normalized.contains("create your own with easy-to-use tools") ||
       normalized.contains("global video community");

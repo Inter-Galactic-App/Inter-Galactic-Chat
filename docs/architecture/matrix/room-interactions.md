@@ -90,6 +90,48 @@ region, and its decorative animation is disabled when reduced motion is active.
 Treat receipt and typing settings as privacy-sensitive user choices: do not
 replace account or room preferences with a hard-coded send policy.
 
+The typing stream fires on every sync that carries `m.typing`, and once more
+when the SDK's own `typingIndicatorTimeout` has elapsed. The SDK drops the
+ephemeral at that point without notifying anyone, so without the second
+emission a missed "stopped typing" update leaves the indicator on screen until
+the next typing event in that room.
+
+### Timeline rows and in-place refresh
+
+`MatrixTimeline` mirrors the SDK timeline into the app's row list, but not
+one-to-one: the types in `hiddenTimelineEventTypes`
+(`matrix_timeline_rows.dart`) never become rows, and history and future page
+requests ask the server to omit them. Today that set is exactly the MatrixRTC
+membership `org.matrix.msc3401.call.member`, which every call participant
+republishes every 25 seconds and which the VoIP component reads from room
+state and sync rather than from the timeline. Rows for it were invisible but
+still counted, and in a call room they starved history pagination. The set is
+closed on purpose: growing it hides events from every chat with nothing on
+screen to say so.
+
+The invariant behind the index mapping is that the app's Matrix rows are
+exactly the SDK's non-hidden events, in order, interleaved with local-only rows
+such as a pending media send. The three mapping functions are pure and
+unit-tested; keep them that way rather than reaching into the SDK list from
+the widget layer.
+
+Rows refresh two ways. A change of `index` means the row now shows a different
+event. A bump of `updateRevision`, threaded from `TimelineViewEntry` through
+`TimelineEventViewMessage` to the URL-preview, reactions and poll views, means
+the same event was replaced in place - a local echo that synced, a reaction on
+an already-reacted message, a poll vote. Every child view that derives state
+from its event must react to both. The URL-preview view treats them
+differently on purpose: an index change starts over, while a revision bump
+neither restarts a request in flight nor re-keys an unchanged preview, because
+room updates arrive many times a minute and each one is a revision bump.
+
+For a link-only message, the message row initially keeps the raw link visible
+while preview data is loading. When `TimelineEventViewUrlPreviews` resolves a
+valid card, it reports that visibility to its parent so the raw link is hidden
+inside the same event row. Failed or invalid preview data reports no visible
+card and preserves the raw link; the preview card must never become a second
+visual message or leave the original message blank.
+
 ### Invitations and knocks
 
 `InvitationComponent` maintains the incoming invitation list and provides
@@ -113,6 +155,7 @@ guarantee old encrypted messages can be decrypted.
 | Search | `intergalactic/lib/client/components/event_search/`, `intergalactic/lib/client/matrix/components/event_search/`, `intergalactic/lib/ui/organisms/room_event_search/` |
 | Receipts and typing | `intergalactic/lib/client/components/read_receipts/`, `intergalactic/lib/client/components/typing_indicators/`, `intergalactic/lib/client/matrix/components/read_receipts/`, `intergalactic/lib/client/matrix/components/typing_indicators/`, `intergalactic/lib/ui/molecules/typing_indicators_widget.dart` |
 | Invitations | `intergalactic/lib/client/components/invitation/`, `intergalactic/lib/client/matrix/components/invitation/`, `intergalactic/lib/ui/organisms/invitation_view/` |
+| Timeline rows and refresh | `intergalactic/lib/client/matrix/matrix_timeline.dart`, `intergalactic/lib/client/matrix/matrix_timeline_rows.dart`, `intergalactic/lib/ui/molecules/timeline_events/timeline_view_entry.dart`, `intergalactic/lib/ui/molecules/timeline_events/events/` |
 
 ## How To Modify Safely
 
@@ -125,6 +168,9 @@ guarantee old encrypted messages can be decrypted.
    distinct outcomes in encrypted rooms.
 6. Add focused component and UI coverage when behavior changes; docs-only edits
    should still verify every listed path exists.
+7. A timeline child view that derives state from its event must react to both
+   `index` and `updateRevision`; a new hidden row type is a recorded decision,
+   not a code edit.
 
 ## Related Docs
 

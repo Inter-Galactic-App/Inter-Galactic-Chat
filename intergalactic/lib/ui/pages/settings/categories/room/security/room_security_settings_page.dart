@@ -34,15 +34,17 @@ class _RoomSecuritySettingsPageState extends State<RoomSecuritySettingsPage> {
   late RoomVisibility visibility;
   matrix.HistoryVisibility? historyVisibility;
 
-  String get promptEnableEncryptionRoomSettings =>
-      Intl.message("Enable Encryption",
-          name: "promptEnableEncryptionRoomSettings",
-          desc: "Short prompt to enable encryption for a room");
+  String get promptEnableEncryptionRoomSettings => Intl.message(
+    "Enable Encryption",
+    name: "promptEnableEncryptionRoomSettings",
+    desc: "Short prompt to enable encryption for a room",
+  );
 
-  String get encryptionCannotBeDisabledExplanationRoomSettings =>
-      Intl.message("If enabled, encryption cannot be disabled later",
-          name: "encryptionCannotBeDisabledExplanationRoomSettings",
-          desc: "Explains that encryption cannot be disabled once enabled");
+  String get encryptionCannotBeDisabledExplanationRoomSettings => Intl.message(
+    "If enabled, encryption cannot be disabled later",
+    name: "encryptionCannotBeDisabledExplanationRoomSettings",
+    desc: "Explains that encryption cannot be disabled once enabled",
+  );
 
   @override
   void initState() {
@@ -61,10 +63,43 @@ class _RoomSecuritySettingsPageState extends State<RoomSecuritySettingsPage> {
       children: [
         if (widget.room.client.supportsE2EE && widget.showEncryptionToggle)
           buildE2EEToggle(),
+        if (widget.room.client.supportsE2EE && widget.showEncryptionToggle)
+          buildCallEncryptionNote(),
         buildRoomVisibility(),
         if (widget.room case MatrixRoom matrixRoom)
           buildHistoryVisibility(matrixRoom),
       ],
+    );
+  }
+
+  /// States what room encryption does NOT cover, next to the control that
+  /// turns it on.
+  ///
+  /// BUG-335. Three surfaces on the call view claimed or implied that a call in
+  /// an encrypted room was itself end-to-end encrypted; all three are gone. The
+  /// app has no call-media E2EE on any path - no `e2eeOptions` reaches
+  /// `lk.Room`, and `matrix_voip_component.dart:291` declines the Matrix SDK's
+  /// group-call key hook with `throw UnimplementedError()`.
+  ///
+  /// It sits HERE, not on the call surface, for two reasons. The call surface
+  /// is the one the owner could not get past on mobile, which is the bug. And
+  /// this is where the expectation is formed: a room labelled encrypted, whose
+  /// messages, previews and notifications are all handled as encrypted, invites
+  /// the inference that its calls are too. The app manufactures that belief, so
+  /// the correction belongs where it is manufactured.
+  ///
+  /// NOT gated on whether the room is already encrypted. Call media is exposed
+  /// identically either way, so showing this only in encrypted rooms would make
+  /// silence in an unencrypted room read as "nothing to say here", which is the
+  /// same false reassurance one step removed.
+  Widget buildCallEncryptionNote() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: tiamat.Text.labelLow(
+        "Room encryption covers messages, not calls. Calls are not end-to-end "
+        "encrypted - the call server that relays them can access the audio and "
+        "video.",
+      ),
     );
   }
 
@@ -79,7 +114,7 @@ class _RoomSecuritySettingsPageState extends State<RoomSecuritySettingsPage> {
         semanticValue: settingsToggleStateLabel(isE2EEEnabled),
         toggled: isE2EEEnabled,
         semanticOnTapHint: canEnable ? "Enable room encryption" : null,
-        onActivate: canEnable ? () => _setEncryptionEnabled(true) : null,
+        onActivate: canEnable ? _confirmAndEnableEncryption : null,
         enabled: widget.room.permissions.canEnableE2EE,
         excludeChildSemantics: true,
         trailing: IgnorePointer(
@@ -91,7 +126,7 @@ class _RoomSecuritySettingsPageState extends State<RoomSecuritySettingsPage> {
                 state: isE2EEEnabled,
                 onChanged: (value) {
                   if (value != true) return;
-                  _setEncryptionEnabled(value);
+                  _confirmAndEnableEncryption();
                 },
               ),
             ),
@@ -99,6 +134,28 @@ class _RoomSecuritySettingsPageState extends State<RoomSecuritySettingsPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _confirmAndEnableEncryption() async {
+    if (isE2EEEnabled || !widget.room.permissions.canEnableE2EE) {
+      return;
+    }
+
+    final confirmed = await AdaptiveDialog.confirmation(
+      context,
+      title: 'Enable encryption?',
+      prompt:
+          'Encryption protects messages in this room and cannot be turned '
+          'off later. Existing room history is not changed.',
+      confirmationText: 'Enable encryption',
+      dangerous: true,
+    );
+
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    _setEncryptionEnabled(true);
   }
 
   void _setEncryptionEnabled(bool value) {
@@ -141,8 +198,11 @@ class _RoomSecuritySettingsPageState extends State<RoomSecuritySettingsPage> {
               }
 
               if (spaces.isEmpty) {
-                var parents = widget.room.client.spaces.where((i) => i.subspaces
-                    .any((i) => i.identifier == widget.room.identifier));
+                var parents = widget.room.client.spaces.where(
+                  (i) => i.subspaces.any(
+                    (i) => i.identifier == widget.room.identifier,
+                  ),
+                );
 
                 for (var p in parents) {
                   spaces.add(p.identifier);
@@ -171,7 +231,9 @@ class _RoomSecuritySettingsPageState extends State<RoomSecuritySettingsPage> {
                       child: Padding(
                         padding: const EdgeInsets.all(8.0),
                         child: RoomFieldVisibility.buildRoomVisibility(
-                            widget.room.client, item),
+                          widget.room.client,
+                          item,
+                        ),
                       ),
                     ),
                   );
@@ -262,10 +324,7 @@ class _RoomSecuritySettingsPageState extends State<RoomSecuritySettingsPage> {
 }
 
 class _VisibilityCard extends StatelessWidget {
-  const _VisibilityCard({
-    required this.child,
-    required this.onTap,
-  });
+  const _VisibilityCard({required this.child, required this.onTap});
 
   final Widget child;
   final VoidCallback onTap;

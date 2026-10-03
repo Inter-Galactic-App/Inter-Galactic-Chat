@@ -1,5 +1,9 @@
 # Overview
 
+For the concise, source-routing architecture map, start with
+[`system-overview.md`](system-overview.md). This page provides product framing
+and broader context; `codebase-map.md` remains the folder-ownership guide.
+
 ## What Inter Galactic Is
 
 Inter Galactic is a Matrix-native client built from the upstream Commet codebase and adapted toward a more community-oriented chat experience.

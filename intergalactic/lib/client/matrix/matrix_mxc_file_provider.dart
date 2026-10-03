@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
+
 import 'package:intergalactic/cache/file_provider.dart';
 import 'package:intergalactic/debug/log.dart';
 import 'package:intergalactic/main.dart';
@@ -15,6 +16,45 @@ class MxcFileProvider implements FileProvider {
   String get fileIdentifier => uri.toString();
 
   MxcFileProvider(this.client, this.uri, {this.event});
+
+  /// Downloads an event-backed attachment with a short-lived client.
+  ///
+  /// Event attachment downloads cannot use the Matrix client's shared HTTP
+  /// client because the SDK supplies a fully resolved media URL to the
+  /// callback. Keeping creation and disposal together makes every uncached
+  /// event-backed download release its connection, including unencrypted
+  /// attachments.
+  static Future<Uint8List> downloadEventBackedMedia(
+    Uri url, {
+    required String? accessToken,
+    required http.Client Function() createClient,
+    void Function(int downloaded, int? total)? onChunk,
+  }) async {
+    final httpClient = createClient();
+    try {
+      final request = http.Request('GET', url);
+      if (accessToken != null && accessToken.isNotEmpty) {
+        request.headers['authorization'] = 'Bearer $accessToken';
+      }
+
+      final response = await httpClient.send(request);
+      if (response.statusCode != 200) {
+        throw Exception('Unexpected response: ${response.statusCode}');
+      }
+
+      final downloadedBytes = BytesBuilder(copy: false);
+      var downloaded = 0;
+      await for (final chunk in response.stream) {
+        downloadedBytes.add(chunk);
+        downloaded += chunk.length;
+        onChunk?.call(downloaded, response.contentLength);
+      }
+
+      return downloadedBytes.takeBytes();
+    } finally {
+      httpClient.close();
+    }
+  }
 
   StreamController<DownloadProgress> fileDownloadProgress =
       StreamController.broadcast();
@@ -54,45 +94,21 @@ class MxcFileProvider implements FileProvider {
     if (event != null) {
       var file = await event!.downloadAndDecryptAttachment(
         downloadCallback: (url) async {
-          var request = http.Request('GET', url);
-          request.headers
-              .addAll({'authorization': 'Bearer ${client.accessToken}'});
-          final response = await http.Client().send(request);
-
-          List<int> downloadedBytes = response.contentLength != null
-              ? Uint8List(response.contentLength!)
-              : [];
-
-          int downloaded = 0;
-          if (response.statusCode != 200) {
-            throw Exception('Unexpected response: ${response.statusCode}');
-          }
-
           var lastUpdatedProgress = DateTime.now();
-
-          var data = response.stream.listen(
-            (event) {
-              if (response.contentLength != null) {
-                downloadedBytes.setAll(downloaded, event);
-              } else {
-                downloadedBytes.addAll(event);
-              }
-              downloaded += event.length;
-
-              var now = DateTime.now();
+          return downloadEventBackedMedia(
+            url,
+            accessToken: client.accessToken,
+            createClient: () => http.Client(),
+            onChunk: (downloaded, total) {
+              final now = DateTime.now();
               if (now.difference(lastUpdatedProgress).inMilliseconds > 16) {
                 lastUpdatedProgress = now;
-
                 fileDownloadProgress.add(
-                    DownloadProgress(downloaded, response.contentLength ?? -1));
+                  DownloadProgress(downloaded, total ?? -1),
+                );
               }
             },
-            cancelOnError: true,
-          ).asFuture();
-
-          await data;
-
-          return Uint8List.fromList(downloadedBytes);
+          );
         },
       );
       bytes = file.bytes;

@@ -9,10 +9,10 @@ changes should be made, and which templates or checklists to start from.
 
 - `architecture/` explains stable app behavior, package boundaries, data flow,
   and safe modification guidance.
-- `ci/` documents the repository's own continuous-integration surface: what the
-  workflows gate, and how to get the output of a run. Start with
-  `ci/forgejo-ci-transcripts.md` when a Forgejo run is red and you need to see
-  why.
+- `architecture/core/ci-and-validation.md` documents the repository's own
+  continuous-integration surface: what the workflows gate, and what they do
+  not prove. The Forgejo runner itself is private infrastructure, so its
+  transcript/log-access detail is not published here.
 - `design/` documents the app design system and UI implementation patterns.
 - `testing/` describes validation expectations that contributors can reproduce
   or adapt locally.

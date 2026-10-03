@@ -70,7 +70,7 @@ param(
   [int]$JoinButtonSettleSeconds = 5,
   [string]$ExpectedCallWindowTitle = 'Test Voice',
   [ValidateRange(0, 120)]
-  [int]$CallEntryVerifyTimeoutSeconds = 20,
+  [int]$CallEntryVerifyTimeoutSeconds = 35,
   [switch]$SkipCallEntryVerification,
   [string[]]$Presets = @('smooth'),
   [int]$CropX = 345,

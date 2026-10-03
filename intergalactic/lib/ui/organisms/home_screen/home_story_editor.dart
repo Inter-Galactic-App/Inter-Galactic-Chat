@@ -90,223 +90,223 @@ class _HomeStoryEditorState extends State<HomeStoryEditor> {
   Size _canvasSize = Size.zero;
   _OverlayGestureStart? _gestureStart;
 
-  String get done => Intl.message(
+  String get homeStoryEditorDone => Intl.message(
     'Done',
     name: 'homeStoryEditorDone',
     desc: 'Button text for applying story editor changes',
   );
 
-  String get crop => Intl.message(
+  String get homeStoryEditorCrop => Intl.message(
     'Crop',
     name: 'homeStoryEditorCrop',
     desc: 'Tooltip for story crop editor action',
   );
 
-  String get fillCanvas => Intl.message(
+  String get homeStoryEditorFillCanvas => Intl.message(
     'Fill canvas',
     name: 'homeStoryEditorFillCanvas',
     desc: 'Tooltip for filling the story canvas with a cropped photo',
   );
 
-  String get fitWholePhoto => Intl.message(
+  String get homeStoryEditorFitWholePhoto => Intl.message(
     'Fit whole photo',
     name: 'homeStoryEditorFitWholePhoto',
     desc: 'Tooltip for fitting the whole story photo on a black canvas',
   );
 
-  String get backgroundColor => Intl.message(
+  String get homeStoryEditorBackgroundColor => Intl.message(
     'Background color',
     name: 'homeStoryEditorBackgroundColor',
     desc: 'Tooltip for changing the story canvas background color',
   );
 
-  String get filter => Intl.message(
+  String get homeStoryEditorFilter => Intl.message(
     'Filter',
     name: 'homeStoryEditorFilter',
     desc: 'Tooltip for changing the story photo filter',
   );
 
-  String get filterIntensity => Intl.message(
+  String get homeStoryEditorFilterIntensity => Intl.message(
     'Intensity',
     name: 'homeStoryEditorFilterIntensity',
     desc: 'Label for story filter intensity slider',
   );
 
-  String get previousFilter => Intl.message(
+  String get homeStoryEditorPreviousFilter => Intl.message(
     'Previous filter',
     name: 'homeStoryEditorPreviousFilter',
     desc: 'Tooltip for cycling to the previous story photo filter',
   );
 
-  String get nextFilter => Intl.message(
+  String get homeStoryEditorNextFilter => Intl.message(
     'Next filter',
     name: 'homeStoryEditorNextFilter',
     desc: 'Tooltip for cycling to the next story photo filter',
   );
 
-  String get mention => Intl.message(
+  String get homeStoryEditorMention => Intl.message(
     'Mention',
     name: 'homeStoryEditorMention',
     desc: 'Tooltip for adding a visual story mention sticker',
   );
 
-  String get text => Intl.message(
+  String get homeStoryEditorText => Intl.message(
     'Text',
     name: 'homeStoryEditorText',
     desc: 'Tooltip for adding text to a story',
   );
 
-  String get emoji => Intl.message(
+  String get homeStoryEditorEmoji => Intl.message(
     'Emoji',
     name: 'homeStoryEditorEmoji',
     desc: 'Tooltip for adding emoji to a story',
   );
 
-  String get sticker => Intl.message(
+  String get homeStoryEditorSticker => Intl.message(
     'Sticker',
     name: 'homeStoryEditorSticker',
     desc: 'Tooltip for adding a sticker to a story',
   );
 
-  String get delete => Intl.message(
+  String get homeStoryEditorDelete => Intl.message(
     'Delete',
     name: 'homeStoryEditorDelete',
     desc: 'Tooltip for deleting the selected story overlay',
   );
 
-  String get previousOverlay => Intl.message(
+  String get homeStoryEditorPreviousOverlay => Intl.message(
     'Previous overlay',
     name: 'homeStoryEditorPreviousOverlay',
     desc: 'Tooltip for selecting the previous story overlay',
   );
 
-  String get nextOverlay => Intl.message(
+  String get homeStoryEditorNextOverlay => Intl.message(
     'Next overlay',
     name: 'homeStoryEditorNextOverlay',
     desc: 'Tooltip for selecting the next story overlay',
   );
 
-  String get editSelectedText => Intl.message(
+  String get homeStoryEditorEditSelectedText => Intl.message(
     'Edit text',
     name: 'homeStoryEditorEditSelectedText',
     desc: 'Tooltip for editing the selected story text overlay',
   );
 
-  String get moveOverlayUp => Intl.message(
+  String get homeStoryEditorMoveOverlayUp => Intl.message(
     'Move up',
     name: 'homeStoryEditorMoveOverlayUp',
     desc: 'Tooltip for moving the selected story overlay up',
   );
 
-  String get moveOverlayDown => Intl.message(
+  String get homeStoryEditorMoveOverlayDown => Intl.message(
     'Move down',
     name: 'homeStoryEditorMoveOverlayDown',
     desc: 'Tooltip for moving the selected story overlay down',
   );
 
-  String get moveOverlayLeft => Intl.message(
+  String get homeStoryEditorMoveOverlayLeft => Intl.message(
     'Move left',
     name: 'homeStoryEditorMoveOverlayLeft',
     desc: 'Tooltip for moving the selected story overlay left',
   );
 
-  String get moveOverlayRight => Intl.message(
+  String get homeStoryEditorMoveOverlayRight => Intl.message(
     'Move right',
     name: 'homeStoryEditorMoveOverlayRight',
     desc: 'Tooltip for moving the selected story overlay right',
   );
 
-  String get increaseTextSize => Intl.message(
+  String get homeStoryEditorIncreaseTextSize => Intl.message(
     'Increase text size',
     name: 'homeStoryEditorIncreaseTextSize',
     desc: 'Tooltip for increasing selected story text size',
   );
 
-  String get decreaseTextSize => Intl.message(
+  String get homeStoryEditorDecreaseTextSize => Intl.message(
     'Decrease text size',
     name: 'homeStoryEditorDecreaseTextSize',
     desc: 'Tooltip for decreasing selected story text size',
   );
 
-  String get rotateTextLeft => Intl.message(
+  String get homeStoryEditorRotateTextLeft => Intl.message(
     'Rotate text left',
     name: 'homeStoryEditorRotateTextLeft',
     desc: 'Tooltip for rotating selected story text counter-clockwise',
   );
 
-  String get rotateTextRight => Intl.message(
+  String get homeStoryEditorRotateTextRight => Intl.message(
     'Rotate text right',
     name: 'homeStoryEditorRotateTextRight',
     desc: 'Tooltip for rotating selected story text clockwise',
   );
 
-  String get boldText => Intl.message(
+  String get homeStoryEditorBoldText => Intl.message(
     'Bold text',
     name: 'homeStoryEditorBoldText',
     desc: 'Tooltip for toggling bold on selected story text',
   );
 
-  String get italicText => Intl.message(
+  String get homeStoryEditorItalicText => Intl.message(
     'Italic text',
     name: 'homeStoryEditorItalicText',
     desc: 'Tooltip for toggling italic on selected story text',
   );
 
-  String get textBackgroundColor => Intl.message(
+  String get homeStoryEditorTextBackgroundColor => Intl.message(
     'Text fill',
     name: 'homeStoryEditorTextBackgroundColor',
     desc: 'Tooltip for changing selected story text background color',
   );
 
-  String get increaseOverlaySize => Intl.message(
+  String get homeStoryEditorIncreaseOverlaySize => Intl.message(
     'Increase size',
     name: 'homeStoryEditorIncreaseOverlaySize',
     desc: 'Tooltip for increasing selected story overlay size',
   );
 
-  String get decreaseOverlaySize => Intl.message(
+  String get homeStoryEditorDecreaseOverlaySize => Intl.message(
     'Decrease size',
     name: 'homeStoryEditorDecreaseOverlaySize',
     desc: 'Tooltip for decreasing selected story overlay size',
   );
 
-  String get rotateOverlayLeft => Intl.message(
+  String get homeStoryEditorRotateOverlayLeft => Intl.message(
     'Rotate left',
     name: 'homeStoryEditorRotateOverlayLeft',
     desc: 'Tooltip for rotating selected story overlay counter-clockwise',
   );
 
-  String get rotateOverlayRight => Intl.message(
+  String get homeStoryEditorRotateOverlayRight => Intl.message(
     'Rotate right',
     name: 'homeStoryEditorRotateOverlayRight',
     desc: 'Tooltip for rotating selected story overlay clockwise',
   );
 
-  String get renderError => Intl.message(
+  String get homeStoryEditorRenderError => Intl.message(
     'Story edits could not be applied.',
     name: 'homeStoryEditorRenderError',
     desc: 'Error shown when story editor rendering fails',
   );
 
-  String get cropError => Intl.message(
+  String get homeStoryEditorCropError => Intl.message(
     'Story crop could not be applied.',
     name: 'homeStoryEditorCropError',
     desc: 'Error shown when story crop rendering fails',
   );
 
-  String get noStickers => Intl.message(
+  String get homeStoryEditorNoStickers => Intl.message(
     'No account stickers available.',
     name: 'homeStoryEditorNoStickers',
     desc: 'Message shown when no account/global sticker packs are available',
   );
 
-  String get stickerError => Intl.message(
+  String get homeStoryEditorStickerError => Intl.message(
     'That sticker could not be added.',
     name: 'homeStoryEditorStickerError',
     desc: 'Error shown when a story sticker cannot be resolved',
   );
 
-  String get noMentionContacts => Intl.message(
+  String get homeStoryEditorNoMentionContacts => Intl.message(
     'No DM contacts available.',
     name: 'homeStoryEditorNoMentionContacts',
     desc:
@@ -390,7 +390,7 @@ class _HomeStoryEditorState extends State<HomeStoryEditor> {
                             height: 18,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : Text(done),
+                        : Text(homeStoryEditorDone),
                   ),
                 ],
               ),
@@ -557,7 +557,7 @@ class _HomeStoryEditorState extends State<HomeStoryEditor> {
                     children: [
                       if (!_draft.isTextOnly) ...[
                         _ToolbarButton(
-                          tooltip: fillCanvas,
+                          tooltip: homeStoryEditorFillCanvas,
                           icon: Icons.fullscreen,
                           selected:
                               _draft.imageFitMode == StoryImageFitMode.cover,
@@ -566,7 +566,7 @@ class _HomeStoryEditorState extends State<HomeStoryEditor> {
                               : () => _setImageFitMode(StoryImageFitMode.cover),
                         ),
                         _ToolbarButton(
-                          tooltip: fitWholePhoto,
+                          tooltip: homeStoryEditorFitWholePhoto,
                           icon: Icons.fit_screen,
                           selected:
                               _draft.imageFitMode == StoryImageFitMode.contain,
@@ -577,7 +577,7 @@ class _HomeStoryEditorState extends State<HomeStoryEditor> {
                         ),
                       ],
                       _ToolbarButton(
-                        tooltip: backgroundColor,
+                        tooltip: homeStoryEditorBackgroundColor,
                         icon: Icons.palette_outlined,
                         selected:
                             _draft.backgroundMode ==
@@ -588,7 +588,7 @@ class _HomeStoryEditorState extends State<HomeStoryEditor> {
                       const SizedBox(width: 8),
                       if (!_draft.isTextOnly) ...[
                         _ToolbarButton(
-                          tooltip: filter,
+                          tooltip: homeStoryEditorFilter,
                           icon: Icons.filter_b_and_w_outlined,
                           selected:
                               storyFilterIsActive(
@@ -599,35 +599,35 @@ class _HomeStoryEditorState extends State<HomeStoryEditor> {
                           onPressed: _busy ? null : _toggleFilterControls,
                         ),
                         _ToolbarButton(
-                          tooltip: crop,
+                          tooltip: homeStoryEditorCrop,
                           icon: Icons.crop,
                           onPressed: _busy ? null : _cropPhoto,
                         ),
                       ],
                       _ToolbarButton(
-                        tooltip: text,
+                        tooltip: homeStoryEditorText,
                         icon: Icons.text_fields,
                         onPressed: _busy ? null : _addTextOverlay,
                       ),
                       _ToolbarButton(
-                        tooltip: mention,
+                        tooltip: homeStoryEditorMention,
                         icon: Icons.alternate_email,
                         onPressed: _busy ? null : _addMentionOverlay,
                       ),
                       _ToolbarButton(
-                        tooltip: emoji,
+                        tooltip: homeStoryEditorEmoji,
                         icon: Icons.emoji_emotions_outlined,
                         onPressed: _busy ? null : _addEmojiOverlay,
                       ),
                       _ToolbarButton(
-                        tooltip: sticker,
+                        tooltip: homeStoryEditorSticker,
                         icon: Icons.sticky_note_2_outlined,
                         onPressed: _busy ? null : _addStickerOverlay,
                       ),
                       if (selected != null) ...[
                         const SizedBox(width: 8),
                         _ToolbarButton(
-                          tooltip: delete,
+                          tooltip: homeStoryEditorDelete,
                           icon: Icons.delete_outline,
                           foregroundColor: Theme.of(context).colorScheme.error,
                           onPressed: _busy
@@ -653,12 +653,12 @@ class _HomeStoryEditorState extends State<HomeStoryEditor> {
         mainAxisSize: MainAxisSize.min,
         children: [
           _ToolbarButton(
-            tooltip: previousOverlay,
+            tooltip: homeStoryEditorPreviousOverlay,
             icon: Icons.skip_previous,
             onPressed: _busy ? null : () => _selectAdjacentOverlay(-1),
           ),
           _ToolbarButton(
-            tooltip: nextOverlay,
+            tooltip: homeStoryEditorNextOverlay,
             icon: Icons.skip_next,
             onPressed: _busy ? null : () => _selectAdjacentOverlay(1),
           ),
@@ -698,7 +698,7 @@ class _HomeStoryEditorState extends State<HomeStoryEditor> {
                   children: [
                     IconButton(
                       key: const ValueKey('story-filter-previous'),
-                      tooltip: previousFilter,
+                      tooltip: homeStoryEditorPreviousFilter,
                       color: Colors.white,
                       visualDensity: VisualDensity.compact,
                       onPressed: () => _cycleFilterPreset(-1),
@@ -718,7 +718,7 @@ class _HomeStoryEditorState extends State<HomeStoryEditor> {
                     ),
                     IconButton(
                       key: const ValueKey('story-filter-next'),
-                      tooltip: nextFilter,
+                      tooltip: homeStoryEditorNextFilter,
                       color: Colors.white,
                       visualDensity: VisualDensity.compact,
                       onPressed: () => _cycleFilterPreset(1),
@@ -782,7 +782,7 @@ class _HomeStoryEditorState extends State<HomeStoryEditor> {
                   Row(
                     children: [
                       Text(
-                        filterIntensity,
+                        homeStoryEditorFilterIntensity,
                         style: Theme.of(
                           context,
                         ).textTheme.labelMedium?.copyWith(color: Colors.white),
@@ -821,31 +821,31 @@ class _HomeStoryEditorState extends State<HomeStoryEditor> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             _ToolbarButton(
-              tooltip: editSelectedText,
+              tooltip: homeStoryEditorEditSelectedText,
               icon: Icons.edit,
               onPressed: _busy ? null : () => _editTextOverlay(overlay),
             ),
             const SizedBox(width: 4),
             _ToolbarButton(
-              tooltip: decreaseTextSize,
+              tooltip: homeStoryEditorDecreaseTextSize,
               icon: Icons.text_decrease,
               onPressed: _busy ? null : () => _changeTextSize(overlay, -12),
             ),
             _ToolbarButton(
-              tooltip: increaseTextSize,
+              tooltip: homeStoryEditorIncreaseTextSize,
               icon: Icons.text_increase,
               onPressed: _busy ? null : () => _changeTextSize(overlay, 12),
             ),
             const SizedBox(width: 4),
             _ToolbarButton(
-              tooltip: rotateTextLeft,
+              tooltip: homeStoryEditorRotateTextLeft,
               icon: Icons.rotate_90_degrees_ccw,
               onPressed: _busy
                   ? null
                   : () => _rotateText(overlay, -math.pi / 12),
             ),
             _ToolbarButton(
-              tooltip: rotateTextRight,
+              tooltip: homeStoryEditorRotateTextRight,
               icon: Icons.rotate_90_degrees_cw,
               onPressed: _busy
                   ? null
@@ -855,7 +855,7 @@ class _HomeStoryEditorState extends State<HomeStoryEditor> {
             ..._buildSelectedOverlayMoveButtons(overlay),
             const SizedBox(width: 4),
             _ToolbarButton(
-              tooltip: boldText,
+              tooltip: homeStoryEditorBoldText,
               icon: Icons.format_bold,
               selected: overlay.isBold,
               onPressed: _busy
@@ -865,7 +865,7 @@ class _HomeStoryEditorState extends State<HomeStoryEditor> {
                     ),
             ),
             _ToolbarButton(
-              tooltip: italicText,
+              tooltip: homeStoryEditorItalicText,
               icon: Icons.format_italic,
               selected: overlay.isItalic,
               onPressed: _busy
@@ -875,7 +875,7 @@ class _HomeStoryEditorState extends State<HomeStoryEditor> {
                     ),
             ),
             _ToolbarButton(
-              tooltip: textBackgroundColor,
+              tooltip: homeStoryEditorTextBackgroundColor,
               icon: Icons.format_color_fill,
               selected: overlay.backgroundColor != null,
               onPressed: _busy ? null : () => _pickTextBackgroundColor(overlay),
@@ -894,25 +894,25 @@ class _HomeStoryEditorState extends State<HomeStoryEditor> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             _ToolbarButton(
-              tooltip: decreaseOverlaySize,
+              tooltip: homeStoryEditorDecreaseOverlaySize,
               icon: Icons.text_decrease,
               onPressed: _busy ? null : () => _changeOverlaySize(overlay, -24),
             ),
             _ToolbarButton(
-              tooltip: increaseOverlaySize,
+              tooltip: homeStoryEditorIncreaseOverlaySize,
               icon: Icons.text_increase,
               onPressed: _busy ? null : () => _changeOverlaySize(overlay, 24),
             ),
             const SizedBox(width: 4),
             _ToolbarButton(
-              tooltip: rotateOverlayLeft,
+              tooltip: homeStoryEditorRotateOverlayLeft,
               icon: Icons.rotate_90_degrees_ccw,
               onPressed: _busy
                   ? null
                   : () => _rotateOverlay(overlay, -math.pi / 12),
             ),
             _ToolbarButton(
-              tooltip: rotateOverlayRight,
+              tooltip: homeStoryEditorRotateOverlayRight,
               icon: Icons.rotate_90_degrees_cw,
               onPressed: _busy
                   ? null
@@ -929,7 +929,7 @@ class _HomeStoryEditorState extends State<HomeStoryEditor> {
   List<Widget> _buildSelectedOverlayMoveButtons(StoryOverlay overlay) {
     return [
       _ToolbarButton(
-        tooltip: moveOverlayLeft,
+        tooltip: homeStoryEditorMoveOverlayLeft,
         icon: Icons.keyboard_arrow_left,
         onPressed: _busy
             ? null
@@ -939,7 +939,7 @@ class _HomeStoryEditorState extends State<HomeStoryEditor> {
               ),
       ),
       _ToolbarButton(
-        tooltip: moveOverlayUp,
+        tooltip: homeStoryEditorMoveOverlayUp,
         icon: Icons.keyboard_arrow_up,
         onPressed: _busy
             ? null
@@ -949,7 +949,7 @@ class _HomeStoryEditorState extends State<HomeStoryEditor> {
               ),
       ),
       _ToolbarButton(
-        tooltip: moveOverlayDown,
+        tooltip: homeStoryEditorMoveOverlayDown,
         icon: Icons.keyboard_arrow_down,
         onPressed: _busy
             ? null
@@ -959,7 +959,7 @@ class _HomeStoryEditorState extends State<HomeStoryEditor> {
               ),
       ),
       _ToolbarButton(
-        tooltip: moveOverlayRight,
+        tooltip: homeStoryEditorMoveOverlayRight,
         icon: Icons.keyboard_arrow_right,
         onPressed: _busy
             ? null
@@ -1077,7 +1077,7 @@ class _HomeStoryEditorState extends State<HomeStoryEditor> {
       }
       setState(() {
         _saving = false;
-        _error = renderError;
+        _error = homeStoryEditorRenderError;
       });
     }
   }
@@ -1115,7 +1115,7 @@ class _HomeStoryEditorState extends State<HomeStoryEditor> {
     } catch (_) {
       if (mounted) {
         setState(() {
-          _error = cropError;
+          _error = homeStoryEditorCropError;
         });
       }
     } finally {
@@ -1159,7 +1159,7 @@ class _HomeStoryEditorState extends State<HomeStoryEditor> {
     } catch (_) {
       if (mounted) {
         setState(() {
-          _error = cropError;
+          _error = homeStoryEditorCropError;
         });
       }
     } finally {
@@ -1268,45 +1268,66 @@ class _HomeStoryEditorState extends State<HomeStoryEditor> {
     _cycleFilterPreset(direction);
   }
 
-  String _filterLabel(StoryFilterPreset preset) {
-    return switch (preset) {
-      StoryFilterPreset.original => Intl.message(
-        'Original',
-        name: 'homeStoryEditorFilterOriginal',
-        desc: 'Label for the original story photo filter',
-      ),
-      StoryFilterPreset.mono => Intl.message(
-        'Mono',
-        name: 'homeStoryEditorFilterMono',
-        desc: 'Label for the monochrome story photo filter',
-      ),
-      StoryFilterPreset.sepia => Intl.message(
-        'Sepia',
-        name: 'homeStoryEditorFilterSepia',
-        desc: 'Label for the sepia story photo filter',
-      ),
-      StoryFilterPreset.warm => Intl.message(
-        'Warm',
-        name: 'homeStoryEditorFilterWarm',
-        desc: 'Label for the warm story photo filter',
-      ),
-      StoryFilterPreset.cool => Intl.message(
-        'Cool',
-        name: 'homeStoryEditorFilterCool',
-        desc: 'Label for the cool story photo filter',
-      ),
-      StoryFilterPreset.fade => Intl.message(
-        'Fade',
-        name: 'homeStoryEditorFilterFade',
-        desc: 'Label for the faded story photo filter',
-      ),
-      StoryFilterPreset.contrast => Intl.message(
-        'Contrast',
-        name: 'homeStoryEditorFilterContrast',
-        desc: 'Label for the contrast story photo filter',
-      ),
-    };
-  }
+  // EACH FILTER NAME DECLARES ITS OWN PARAMETERLESS MEMBER, and `_filterLabel`
+  // below holds no `Intl.message` at all. That split is load bearing:
+  // `intl_translation` keys a message off its declaring member, so it takes at
+  // most one message per member and refuses any message declared inside a
+  // member that takes parameters. Folding these back into the switch
+  // un-extracts all seven silently - no error, no analyzer complaint and no
+  // failing test. Adding `args: [preset]` is not the fix either: none of these
+  // messages uses `preset`, so declaring it as a placeholder would be a lie.
+
+  String get homeStoryEditorFilterOriginal => Intl.message(
+    'Original',
+    name: 'homeStoryEditorFilterOriginal',
+    desc: 'Label for the original story photo filter',
+  );
+
+  String get homeStoryEditorFilterMono => Intl.message(
+    'Mono',
+    name: 'homeStoryEditorFilterMono',
+    desc: 'Label for the monochrome story photo filter',
+  );
+
+  String get homeStoryEditorFilterSepia => Intl.message(
+    'Sepia',
+    name: 'homeStoryEditorFilterSepia',
+    desc: 'Label for the sepia story photo filter',
+  );
+
+  String get homeStoryEditorFilterWarm => Intl.message(
+    'Warm',
+    name: 'homeStoryEditorFilterWarm',
+    desc: 'Label for the warm story photo filter',
+  );
+
+  String get homeStoryEditorFilterCool => Intl.message(
+    'Cool',
+    name: 'homeStoryEditorFilterCool',
+    desc: 'Label for the cool story photo filter',
+  );
+
+  String get homeStoryEditorFilterFade => Intl.message(
+    'Fade',
+    name: 'homeStoryEditorFilterFade',
+    desc: 'Label for the faded story photo filter',
+  );
+
+  String get homeStoryEditorFilterContrast => Intl.message(
+    'Contrast',
+    name: 'homeStoryEditorFilterContrast',
+    desc: 'Label for the contrast story photo filter',
+  );
+
+  String _filterLabel(StoryFilterPreset preset) => switch (preset) {
+    StoryFilterPreset.original => homeStoryEditorFilterOriginal,
+    StoryFilterPreset.mono => homeStoryEditorFilterMono,
+    StoryFilterPreset.sepia => homeStoryEditorFilterSepia,
+    StoryFilterPreset.warm => homeStoryEditorFilterWarm,
+    StoryFilterPreset.cool => homeStoryEditorFilterCool,
+    StoryFilterPreset.fade => homeStoryEditorFilterFade,
+    StoryFilterPreset.contrast => homeStoryEditorFilterContrast,
+  };
 
   Future<void> _setBackground(_StoryBackgroundChoice choice) async {
     if (_draft.backgroundMode == choice.mode &&
@@ -1347,7 +1368,7 @@ class _HomeStoryEditorState extends State<HomeStoryEditor> {
     } catch (_) {
       if (mounted) {
         setState(() {
-          _error = cropError;
+          _error = homeStoryEditorCropError;
         });
       }
     } finally {
@@ -1473,7 +1494,7 @@ class _HomeStoryEditorState extends State<HomeStoryEditor> {
   Future<void> _addMentionOverlay() async {
     final contacts = _mentionContacts;
     if (contacts.isEmpty) {
-      setState(() => _error = noMentionContacts);
+      setState(() => _error = homeStoryEditorNoMentionContacts);
       return;
     }
 
@@ -1484,7 +1505,7 @@ class _HomeStoryEditorState extends State<HomeStoryEditor> {
       showDragHandle: true,
       builder: (context) => _StoryMentionPickerSheet(
         contacts: contacts,
-        emptyLabel: noMentionContacts,
+        emptyLabel: homeStoryEditorNoMentionContacts,
       ),
     );
     if (!mounted || contact == null) {
@@ -1529,7 +1550,7 @@ class _HomeStoryEditorState extends State<HomeStoryEditor> {
   Future<void> _addStickerOverlay() async {
     final packs = _accountStickerPacks();
     if (packs.isEmpty) {
-      setState(() => _error = noStickers);
+      setState(() => _error = homeStoryEditorNoStickers);
       return;
     }
 
@@ -1557,7 +1578,7 @@ class _HomeStoryEditorState extends State<HomeStoryEditor> {
 
     final image = emoticon.image;
     if (image == null) {
-      setState(() => _error = stickerError);
+      setState(() => _error = homeStoryEditorStickerError);
       return;
     }
 
@@ -1995,31 +2016,31 @@ class _StoryTextDialogState extends State<_StoryTextDialog> {
   late bool _isBold;
   late bool _isItalic;
 
-  String get title => Intl.message(
+  String get homeStoryEditorTextDialogTitle => Intl.message(
     'Story Text',
     name: 'homeStoryEditorTextDialogTitle',
     desc: 'Title for editing story text',
   );
 
-  String get add => Intl.message(
+  String get homeStoryEditorTextDialogAdd => Intl.message(
     'Add',
     name: 'homeStoryEditorTextDialogAdd',
     desc: 'Button text for adding story text',
   );
 
-  String get cancel => Intl.message(
+  String get homeStoryEditorTextDialogCancel => Intl.message(
     'Cancel',
     name: 'homeStoryEditorTextDialogCancel',
     desc: 'Button text for canceling story text editing',
   );
 
-  String get bold => Intl.message(
+  String get homeStoryEditorTextDialogBold => Intl.message(
     'Bold',
     name: 'homeStoryEditorTextDialogBold',
     desc: 'Tooltip for the story text bold button',
   );
 
-  String get italic => Intl.message(
+  String get homeStoryEditorTextDialogItalic => Intl.message(
     'Italic',
     name: 'homeStoryEditorTextDialogItalic',
     desc: 'Tooltip for the story text italic button',
@@ -2043,7 +2064,7 @@ class _StoryTextDialogState extends State<_StoryTextDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(title),
+      title: Text(homeStoryEditorTextDialogTitle),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -2071,14 +2092,14 @@ class _StoryTextDialogState extends State<_StoryTextDialog> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               IconButton.filledTonal(
-                tooltip: bold,
+                tooltip: homeStoryEditorTextDialogBold,
                 isSelected: _isBold,
                 onPressed: () => setState(() => _isBold = !_isBold),
                 icon: const Icon(Icons.format_bold),
               ),
               const SizedBox(width: 8),
               IconButton.filledTonal(
-                tooltip: italic,
+                tooltip: homeStoryEditorTextDialogItalic,
                 isSelected: _isItalic,
                 onPressed: () => setState(() => _isItalic = !_isItalic),
                 icon: const Icon(Icons.format_italic),
@@ -2090,13 +2111,13 @@ class _StoryTextDialogState extends State<_StoryTextDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: Text(cancel),
+          child: Text(homeStoryEditorTextDialogCancel),
         ),
         FilledButton(
           onPressed: () => Navigator.of(
             context,
           ).pop(_StoryTextEdit(_controller.text, _color, _isBold, _isItalic)),
-          child: Text(add),
+          child: Text(homeStoryEditorTextDialogAdd),
         ),
       ],
     );
@@ -2160,13 +2181,13 @@ class _StoryBackgroundSheet extends StatelessWidget {
   final Color selectedGradientColor;
   final StoryCanvasBackgroundMode selectedMode;
 
-  String get solidColors => Intl.message(
+  String get homeStoryEditorSolidBackgrounds => Intl.message(
     'Solid',
     name: 'homeStoryEditorSolidBackgrounds',
     desc: 'Label for solid story background color choices',
   );
 
-  String get gradients => Intl.message(
+  String get homeStoryEditorGradientBackgrounds => Intl.message(
     'Gradient',
     name: 'homeStoryEditorGradientBackgrounds',
     desc: 'Label for gradient story background choices',
@@ -2181,7 +2202,10 @@ class _StoryBackgroundSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(solidColors, style: Theme.of(context).textTheme.labelLarge),
+            Text(
+              homeStoryEditorSolidBackgrounds,
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
             const SizedBox(height: 10),
             Wrap(
               alignment: WrapAlignment.center,
@@ -2207,7 +2231,10 @@ class _StoryBackgroundSheet extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 18),
-            Text(gradients, style: Theme.of(context).textTheme.labelLarge),
+            Text(
+              homeStoryEditorGradientBackgrounds,
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
             const SizedBox(height: 10),
             Wrap(
               alignment: WrapAlignment.center,
@@ -2290,7 +2317,7 @@ class _StoryColorSheet extends StatelessWidget {
   final Color? selectedColor;
   final bool includeNone;
 
-  String get noFill => Intl.message(
+  String get homeStoryEditorNoTextFill => Intl.message(
     'No fill',
     name: 'homeStoryEditorNoTextFill',
     desc: 'Tooltip for removing selected story text background fill',
@@ -2309,7 +2336,7 @@ class _StoryColorSheet extends StatelessWidget {
             if (includeNone)
               IconButton.filledTonal(
                 key: const ValueKey('story-color-none'),
-                tooltip: noFill,
+                tooltip: homeStoryEditorNoTextFill,
                 isSelected: selectedColor == null,
                 onPressed: () =>
                     Navigator.of(context).pop(const _StoryColorChoice(null)),
@@ -2363,7 +2390,7 @@ class _StoryEmojiSheet extends StatelessWidget {
     '\u{1F31F}',
   ];
 
-  String get moreEmoji => Intl.message(
+  String get homeStoryEditorMoreEmoji => Intl.message(
     'More emoji',
     name: 'homeStoryEditorMoreEmoji',
     desc: 'Tooltip for opening the full story emoji picker',
@@ -2415,7 +2442,7 @@ class _StoryEmojiSheet extends StatelessWidget {
           itemBuilder: (context, index) {
             if (index == choices.length) {
               return IconButton(
-                tooltip: moreEmoji,
+                tooltip: homeStoryEditorMoreEmoji,
                 onPressed: () => _openFullEmojiPicker(context),
                 icon: const Icon(Icons.add),
               );

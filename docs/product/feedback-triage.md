@@ -152,10 +152,10 @@ When rejecting a request, write a short reason that a user can understand:
 privacy risk, Matrix compatibility, product fit, maintenance cost, duplicate
 request, or replaced by an existing workflow.
 
-The website feedback form scope is tracked in
-`website-feedback-system.md`. The form should stay lightweight: title, user
-problem, requested behavior, platform/version when relevant, optional contact,
-and optional priority. Diagnostic logs and automatic screenshots belong in the
+The website feedback form's scope is tracked with the website project, not
+this repo. The form should stay lightweight: title, user problem, requested
+behavior, platform/version when relevant, optional contact, and optional
+priority. Diagnostic logs and automatic screenshots belong in the
 in-app bug-report flow, not feature request intake.
 
 ## User-Facing Known Issues

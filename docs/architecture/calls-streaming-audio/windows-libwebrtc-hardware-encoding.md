@@ -1,8 +1,7 @@
 # Windows Libwebrtc Hardware Encoding
 
 Status: Active native streaming architecture reference
-Owner: EXPERIMENTAL
-Last reviewed: 2026-06-16 by DOCUMENTATION
+Last reviewed: 2026-06-16
 
 This note tracks the native dependency work needed for smooth Windows gameplay
 streaming.
@@ -172,8 +171,8 @@ Current artifact:
 
 ## Pending Native Patch: Call Audio Ducking Opt-Out
 
-Added 2026-07-27 by AUDIO under a user-authorized cross-lane exception. Not yet
-built into an artifact, so the app-side toggle is inert until a rebuild ships.
+Added 2026-07-27. Not yet built into an artifact, so the app-side toggle is
+inert until a rebuild ships.
 
 The Windows ADM in this DLL is also what makes Inter Galactic calls turn down
 other applications' audio. The patch adds an
@@ -184,10 +183,8 @@ The change spans the WebRTC audio device module
 (`modules/audio_device/win/audio_device_core_win.{h,cc}`) and the libwebrtc
 wrapper (`BUILD.gn`, `include/rtc_intergalactic_audio_ducking.h`,
 `src/rtc_intergalactic_audio_ducking.cc`). The native sources live in private
-build checkouts and are not published; the exact revisions and the archived
-diff are tracked in private release coordination, and the source commit for
-whatever artifact actually shipped is recorded in the Current artifact list
-above.
+build checkouts and are not published; the source commit for whatever artifact
+actually shipped is recorded in the Current artifact list above.
 
 Rebuild requirements:
 

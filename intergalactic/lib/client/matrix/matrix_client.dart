@@ -4,6 +4,9 @@ import 'package:intergalactic/client/alert.dart';
 import 'package:intergalactic/client/auth.dart';
 import 'package:intergalactic/client/client_manager.dart';
 import 'package:intergalactic/client/components/component.dart';
+import 'package:intergalactic/client/components/voip/client_close_call_teardown.dart';
+import 'package:intergalactic/client/components/voip_room/voip_room_component.dart';
+import 'package:intergalactic/client/matrix/components/voip/matrix_voip_component.dart';
 import 'package:intergalactic/client/components/component_registry.dart';
 import 'package:intergalactic/client/components/direct_messages/direct_message_component.dart';
 import 'package:intergalactic/client/components/profile/profile_component.dart';
@@ -46,8 +49,11 @@ import 'package:matrix/encryption.dart';
 
 import '../../ui/atoms/code_block.dart';
 import 'matrix_room.dart';
+import 'push_rule_state_cache.dart';
 import 'matrix_space.dart';
 import 'package:vodozemac/vodozemac.dart' as vod;
+import 'package:intergalactic/client/matrix/vodozemac_single_flight.dart';
+
 import 'vodozemac_init.dart';
 
 class MatrixPasswordResetStatus {
@@ -153,6 +159,38 @@ class MatrixClient extends Client {
 
   matrix.Client get matrixClient => _matrixClient;
 
+  /// Whether this client runs the persistent sync loop at all. False for the
+  /// Android bubble and the headless notification service, which is why
+  /// [resumeSyncAfterDatabaseRelease] cannot simply set `backgroundSync` true.
+  bool _persistentSyncEnabled = false;
+
+  /// B5. Stops the sync loop and waits for the transaction it holds.
+  ///
+  /// The SDK wraps sync processing in one database transaction held in a field
+  /// for the whole of a large sync, so a release attempted mid-sync is refused.
+  /// `abortSync` waits for that transaction before returning, which is the
+  /// "let the in-flight transaction finish" step of the release trigger, and it
+  /// must run BEFORE the wrapper's quiescence is polled - otherwise the next
+  /// sync starts a new transaction and the poll never sees quiet.
+  Future<void> suspendSyncForDatabaseRelease() async {
+    if (_isClosed) {
+      return;
+    }
+    await _matrixClient.abortSync();
+  }
+
+  /// B5. Restarts the sync loop once every released database is established.
+  ///
+  /// Not before: sync against a released wrapper throws a `StateError` on its
+  /// first query, loudly and by design. The trigger calls this only after
+  /// `reestablish()` reported `established` for every database it released.
+  void resumeSyncAfterDatabaseRelease() {
+    if (_isClosed || !_persistentSyncEnabled) {
+      return;
+    }
+    _matrixClient.backgroundSync = true;
+  }
+
   /// Raw homeserver access token for this session. Exposed only for
   /// developer/debug tooling (e.g. the developer settings token viewer);
   /// never surface this in ordinary UI or logs.
@@ -206,13 +244,19 @@ class MatrixClient extends Client {
       suppressAutomaticRepair: isBubble,
       onPersistentRequestableSessionFailure:
           _repairPersistentRequestableRoomKeyDelivery,
+      onRequestableRoomKeyReceived: _retryDecryptAfterRequestableRoomKey,
     )..start();
 
     self = ErrorProfile();
 
-    _matrixSyncSubscription = _matrixClient.onSync.stream.listen(
-      onMatrixClientSync,
-    );
+    _matrixSyncSubscription = _matrixClient.onSync.stream.listen((update) {
+      runZoned(
+        () => onMatrixClientSync(update),
+        zoneValues: {
+          Log.matrixNetworkOperationZoneKey: Log.matrixSyncDispatchOperation,
+        },
+      );
+    });
     componentsInternal = ComponentRegistry.getMatrixComponents(this);
   }
 
@@ -290,10 +334,9 @@ class MatrixClient extends Client {
   );
 
   static String get matrixClientVodozemacMissingMessage => Intl.message(
-    "vodozemac is not installed or was not found. End to End Encryption will not be available until this is resolved",
+    "Encryption could not be initialized for this session. End-to-end encrypted messages will not be available until this is resolved.",
     name: "matrixClientVodozemacMissingMessage",
-    desc:
-        "Text that explains to the user that vodozemac dependency is not found",
+    desc: "Warning shown after Matrix encryption initialization attempts fail",
   );
 
   static String get matrixClientEncryptionWarningTitle => Intl.message(
@@ -604,6 +647,21 @@ class MatrixClient extends Client {
   static final ValueNotifier<String?> encryptionStartupProgress =
       ValueNotifier<String?>(null);
 
+  /// Encryption readiness, for surfaces that act DIRECTLY on encryption.
+  ///
+  /// The progress string above is for a person watching startup; it is copy,
+  /// it is cleared on every exit path, and nothing can decide anything from
+  /// it. This is the state a caller can read: `pending` until vodozemac
+  /// initializes, `unavailable` once the bounded retry budget is exhausted.
+  /// Both are fail-closed - a surface that acts on encryption must not offer
+  /// itself as operable in either.
+  ///
+  /// It does not weaken the restore ordering. Clients are still not created
+  /// until initialization returns; this only makes the state legible to
+  /// everything that used to have to assume it.
+  static final ValueNotifier<EncryptionAvailability> encryptionAvailability =
+      ValueNotifier<EncryptionAvailability>(EncryptionAvailability.pending);
+
   static Future<void> _checkSystem(ClientManager clientManager) async {
     // A cold web WASM download of vodozemac can take several seconds on a slow
     // connection, so a single 5s attempt used to time out and leave encryption
@@ -626,6 +684,7 @@ class MatrixClient extends Client {
             await initVodozemacForPlatform().timeout(attemptTimeout);
           }
           if (vod.isInitialized()) {
+            encryptionAvailability.value = EncryptionAvailability.ready;
             return;
           }
           throw Exception("Vodozemac failed to initialize!");
@@ -645,6 +704,11 @@ class MatrixClient extends Client {
             content:
                 "Failed to initialize vodozemac after $maxAttempts attempts",
           );
+          // The budget is spent. Say so in state as well as in an alert: an
+          // alert is dismissible and unreadable by code, and the surfaces
+          // that act on encryption need to fail closed for the rest of this
+          // session rather than look operable.
+          encryptionAvailability.value = EncryptionAvailability.unavailable;
           clientManager.alertManager.addAlert(
             Alert(
               AlertType.warning,
@@ -674,6 +738,7 @@ class MatrixClient extends Client {
     bool isBackgroundService = false,
   }) async {
     final disablePersistentSync = isBackgroundService || isBubble;
+    _persistentSyncEnabled = !disablePersistentSync;
     if (_matrixSdkInitialized) {
       if (disablePersistentSync) {
         _matrixClient.backgroundSync = false;
@@ -708,13 +773,18 @@ class MatrixClient extends Client {
           _matrixClient.backgroundSync = false;
         }
 
-        await _matrixClient.init(
-          waitForFirstSync: !loadingFromCache,
-          waitUntilLoadCompletedLoaded: true,
-          onInitStateChanged: (state) {
-            if (state == matrix.InitState.migratingDatabase) {
-              Log.w("Matrix Database is migrating");
-            }
+        await runZoned(
+          () => _matrixClient.init(
+            waitForFirstSync: !loadingFromCache,
+            waitUntilLoadCompletedLoaded: true,
+            onInitStateChanged: (state) {
+              if (state == matrix.InitState.migratingDatabase) {
+                Log.w("Matrix Database is migrating");
+              }
+            },
+          ),
+          zoneValues: {
+            Log.matrixNetworkOperationZoneKey: Log.matrixSdkLifecycleOperation,
           },
         );
 
@@ -855,11 +925,34 @@ class MatrixClient extends Client {
     _handleComponentSync(update);
     _roomNotificationSnoozes.onSync(update);
     unawaited(_reconcileRoomNotificationSnoozes());
+    _invalidatePushRuleCaches(update);
 
     _onSync.add(null);
     _updateRoomslist();
     _updateSpacesList();
     _handleSpaceChildren(update);
+  }
+
+  /// Room and space wrappers cache their push-rule state on first read, and
+  /// before BUG-319 only a local `setPushRule` on that same instance cleared
+  /// it. A rule changed on another device, or through a different wrapper for
+  /// the same id, was therefore invisible until a restart rebuilt the
+  /// instance. `globalPushRules` is derived from the `m.push_rules` account
+  /// data, so that event arriving is exactly when the caches are stale.
+  @visibleForTesting
+  void invalidatePushRuleCaches(matrix.SyncUpdate update) =>
+      _invalidatePushRuleCaches(update);
+
+  void _invalidatePushRuleCaches(matrix.SyncUpdate update) {
+    if (!syncCarriesPushRules(update)) {
+      return;
+    }
+
+    for (final holder in [...rooms, ...spaces]) {
+      if (holder is PushRuleCacheHolder) {
+        holder.invalidatePushRuleCache();
+      }
+    }
   }
 
   MatrixRoomNotificationSnoozes get roomNotificationSnoozes =>
@@ -1524,6 +1617,13 @@ class MatrixClient extends Client {
       return;
     }
 
+    await retryDecryptAllRooms(loadMissingTimelines: false);
+  }
+
+  Future<void> _retryDecryptAfterRequestableRoomKey() async {
+    if (_isClosed) {
+      return;
+    }
     await retryDecryptAllRooms(loadMissingTimelines: false);
   }
 
@@ -2239,8 +2339,47 @@ class MatrixClient extends Client {
     return room;
   }
 
+  /// Every call-ending step [close] runs before anything else it tears down.
+  ///
+  /// The direct calls, plus the call component of every room that has one.
+  /// Room close deliberately skips that component so a call can outlive the
+  /// room view for picture-in-picture and backgrounding - which is correct for
+  /// the room and exactly why client close must reach it here: nothing else
+  /// ever will, and it is the only owner of a room's LiveKit call and of any
+  /// join still in flight. Disposing it ends the call, and makes a join that
+  /// lands later end the session it produced.
+  ///
+  /// Static and separate from [close] because a MatrixClient cannot be built in
+  /// a unit test, and which sessions close reaches is the part worth pinning.
+  @visibleForTesting
+  static List<Future<void> Function()> callTeardownsForClose({
+    required MatrixVoipComponent? directCalls,
+    required Iterable<Room> rooms,
+  }) {
+    return [
+      if (directCalls != null) directCalls.hangUpCalls,
+      for (final room in rooms)
+        if (room.getComponent<VoipRoomComponent>()
+            case final DisposableComponent voipRoom)
+          voipRoom.dispose,
+    ];
+  }
+
   @override
   Future<void> close() async {
+    // Calls first, while the client can still send their hang-ups and clear
+    // their memberships - before the flag, the subscriptions and the SDK
+    // client they depend on go. One bound covers all of them together, so a
+    // client with several calls waits no longer than a client with one.
+    await hangUpBeforeClientClose(
+      callTeardownsForClose(
+        directCalls: getComponent<MatrixVoipComponent>(),
+        rooms: rooms.toList(growable: false),
+      ),
+      context: 'client close',
+      bound: clientCloseHangUpBound,
+    );
+
     _isClosed = true;
     await _roomNotificationSnoozes.dispose();
     _matrixSdkInitialized = false;
@@ -2891,3 +3030,14 @@ class _DummyRegistrationAuth extends matrix.AuthenticationData {
   _DummyRegistrationAuth({String? session})
     : super(type: _dummyAuthType, session: session);
 }
+
+/// Whether a sync carries the account-data event that push rules are derived
+/// from.
+///
+/// `Client.globalPushRules` reads `m.push_rules` out of global account data, so
+/// this event arriving is exactly the moment every cached room and space
+/// push-rule state may be wrong. Gating on it keeps a normal sync from
+/// re-reading the rule list for every room and space.
+@visibleForTesting
+bool syncCarriesPushRules(matrix.SyncUpdate update) =>
+    update.accountData?.any((event) => event.type == 'm.push_rules') ?? false;

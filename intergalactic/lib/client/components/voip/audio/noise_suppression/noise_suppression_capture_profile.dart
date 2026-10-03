@@ -146,22 +146,11 @@ class NoiseSuppressionCaptureProfile {
       tapOrderScenario: NoiseSuppressionTapOrderScenario.manual,
       echoCancellation: true,
       noiseSuppression: !_useNativeSuppression,
-      // AGC on, 2026-08-20. It had been off since the RNNoise tuning passes,
-      // where it was a deliberate baseline control so suppression A/Bs were not
-      // confounded by an adapting gain - a lab setting that became the
-      // production default and left nothing in the chain able to make a quiet
-      // talker louder.
-      //
-      // Measured across three machines: the raw microphone of a participant
-      // nobody reports as quiet sits at -23.9 dBFS active speech, while the two
-      // who do sit at -37.6 and -40.8. Nothing downstream corrects that - the
-      // native processor costs about 1.5 dB and the output limiter never
-      // engages. AGC runs before that processor (verified in
-      // audio_processing_impl.cc), which is fine precisely because the
-      // processor costs so little. It lifts the quiet and leaves the healthy
-      // alone: the -23.9 dBFS participant is already at target.
-      //
-      // Evidence: docs/audio/sender-side-stage-order.md
+      // AGC on since 2026-08-20. It had been off because an RNNoise-era lab
+      // control became the production default, leaving no stage able to make a
+      // quiet talker louder - every other stage only attenuates or clamps. Two
+      // participants arrived 14-17 dB below a healthy -23.9 dBFS.
+      // Evidence and stage order: docs/audio/sender-side-stage-order.md
       autoGainControl: true,
       highPassFilter: false,
       typingNoiseDetection: true,

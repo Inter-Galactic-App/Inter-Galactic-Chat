@@ -117,31 +117,31 @@ class _HomeStoryViewerDialogState extends State<_HomeStoryViewerDialog> {
   String? _reacting;
   String? _error;
 
-  String get deleteStory => Intl.message(
+  String get homeStoryViewerDeleteStory => Intl.message(
     'Delete story',
     name: 'homeStoryViewerDeleteStory',
     desc: 'Tooltip for deleting an owned story',
   );
 
-  String get deleteError => Intl.message(
+  String get homeStoryViewerDeleteError => Intl.message(
     'Story could not be deleted.',
     name: 'homeStoryViewerDeleteError',
     desc: 'Error shown when deleting a story from the viewer fails',
   );
 
-  String get reactionError => Intl.message(
+  String get homeStoryViewerReactionError => Intl.message(
     'Reaction could not be sent.',
     name: 'homeStoryViewerReactionError',
     desc: 'Error shown when reacting to a story fails',
   );
 
-  String get showAllMentions => Intl.message(
+  String get homeStoryViewerShowAllMentions => Intl.message(
     'Show all mentions',
     name: 'homeStoryViewerShowAllMentions',
     desc: 'Tooltip for opening the story mention details sheet',
   );
 
-  String get mentionedPeople => Intl.message(
+  String get homeStoryViewerMentionedPeople => Intl.message(
     'Mentioned people',
     name: 'homeStoryViewerMentionedPeople',
     desc: 'Title for the story mention details sheet',
@@ -274,7 +274,7 @@ class _HomeStoryViewerDialogState extends State<_HomeStoryViewerDialog> {
                         ),
                       if (story.isOwn)
                         IconButton(
-                          tooltip: deleteStory,
+                          tooltip: homeStoryViewerDeleteStory,
                           onPressed: _deleting ? null : _deleteCurrent,
                           icon: _deleting
                               ? const SizedBox(
@@ -352,13 +352,13 @@ class _HomeStoryViewerDialogState extends State<_HomeStoryViewerDialog> {
             for (final mention in visibleMentions)
               _StoryMentionChip(
                 label: mention.label,
-                tooltip: showAllMentions,
+                tooltip: homeStoryViewerShowAllMentions,
                 onPressed: () => _showMentionSheet(story),
               ),
             if (hiddenCount > 0)
               _StoryMentionChip(
                 label: '+$hiddenCount',
-                tooltip: showAllMentions,
+                tooltip: homeStoryViewerShowAllMentions,
                 onPressed: () => _showMentionSheet(story),
               ),
           ],
@@ -635,8 +635,10 @@ class _HomeStoryViewerDialogState extends State<_HomeStoryViewerDialog> {
         context: context,
         showDragHandle: true,
         backgroundColor: Theme.of(context).colorScheme.surface,
-        builder: (context) =>
-            _StoryMentionSheet(title: mentionedPeople, mentions: mentions),
+        builder: (context) => _StoryMentionSheet(
+          title: homeStoryViewerMentionedPeople,
+          mentions: mentions,
+        ),
       );
     } finally {
       _mentionSheetOpen = false;
@@ -862,7 +864,7 @@ class _HomeStoryViewerDialogState extends State<_HomeStoryViewerDialog> {
         return;
       }
       setState(() {
-        _error = reactionError;
+        _error = homeStoryViewerReactionError;
         _startedAt = DateTime.now();
       });
     } finally {
@@ -909,7 +911,7 @@ class _HomeStoryViewerDialogState extends State<_HomeStoryViewerDialog> {
         return;
       }
       setState(() {
-        _error = deleteError;
+        _error = homeStoryViewerDeleteError;
         _startedAt = DateTime.now();
       });
     } finally {
@@ -1121,8 +1123,8 @@ class _StoryMentionChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
+    return tiamat.Tooltip(
+      text: tooltip,
       child: Material(
         color: Colors.transparent,
         child: InkWell(

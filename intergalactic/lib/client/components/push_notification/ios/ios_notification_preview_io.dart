@@ -25,6 +25,7 @@ void _reportPreviewFailure(String stage) {
 
 const _previewDirectoryName = 'intergalactic-notification-previews';
 const _previewMaximumAge = Duration(hours: 24);
+const _previewLoadTimeout = Duration(seconds: 10);
 
 Future<String?> prepareIosNotificationPreview(
   ImageProvider imageProvider,
@@ -37,7 +38,13 @@ Future<String?> prepareIosNotificationPreview(
     await directory.create(recursive: true);
     await _purgeExpiredPreviewFiles(directory);
 
-    final image = await ImageUtils.imageProviderToImage(imageProvider);
+    // A load that fails or stalls degrades to the text-only notification
+    // through the catch below; without the timeout it used to hang the
+    // notification forever.
+    final image = await ImageUtils.imageProviderToImage(
+      imageProvider,
+      timeout: _previewLoadTimeout,
+    );
     final Uint8List? bytes;
     try {
       final imageData = await image.toByteData(format: ImageByteFormat.png);

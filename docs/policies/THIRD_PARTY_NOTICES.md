@@ -14,9 +14,9 @@ are not discovered by the Flutter package mechanism.
 
 | Platform | Registered native notice scope |
 | --- | --- |
-| Windows | `libmpv-2.dll` and its LGPL-2.1, LGPL-3.0, and GPL-3.0 documents. |
+| Windows | `libmpv-2.dll` and its LGPL-2.1, LGPL-3.0, and GPL-3.0 documents; DeepFilterNet libDF Rust-crate notice for `df.dll`. |
 | iOS | The bundled media framework components and the applicable complete licence texts. |
-| Android | Native media components, CameraX including the libyuv image-processing limb, DataStore, SQLite, Dart JNI payloads, KISS FFT, and the version-specific WebRTC-SDK notice packet. |
+| Android | Native media components, CameraX including the libyuv image-processing limb, DataStore, SQLite, Dart JNI payloads, KISS FFT, the version-specific WebRTC-SDK notice packet, and the DeepFilterNet libDF Rust-crate notice. |
 | macOS | No media-set notice is registered. No macOS artifact has been distributed. |
 | All supported platforms | The vodozemac Rust crate-tree notice and its applicable licence texts. |
 
@@ -26,7 +26,7 @@ also uses this route for the current package.
 
 ## Release scope
 
-The last distributed public binaries are `0.8.0+993`. The release evidence
+The last distributed public binaries are `0.8.1+1004`. The release evidence
 inventory includes earlier `0.7.4+985` material where a notice or source route
 continues to apply to recipients of that release. A later build remains a
 candidate until its package contents and notice attachments are verified.

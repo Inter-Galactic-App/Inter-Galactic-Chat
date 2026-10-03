@@ -126,6 +126,11 @@ class MainActivity: FlutterFragmentActivity() {
     /// incoming one, which is the supported handover, so the assertion cannot
     /// fire. This covers every route that can start a second MainActivity -
     /// notifications, shortcuts, deep links - not just sharing.
+    ///
+    /// The cache is process-local, but [engine] is the authority while this
+    /// process is alive. Always restore that engine to the Flutter cache before
+    /// returning its id. This covers both a fresh cold process (which creates an
+    /// engine) and a stale cache entry after an activity lifecycle transition.
     override fun getCachedEngineId(): String {
         provideEngine(this)
         return ENGINE_ID
@@ -290,7 +295,14 @@ class MainActivity: FlutterFragmentActivity() {
         var engine: FlutterEngine? = null
 
         fun provideEngine(context: Context): FlutterEngine {
-            engine?.let { return it }
+            engine?.let { existing ->
+                // FlutterEngineCache is process-local and may have been cleared
+                // while this retained engine still exists. The embedding resolves
+                // ENGINE_ID after getCachedEngineId() returns, so repopulate it on
+                // every handoff rather than returning a stale id.
+                FlutterEngineCache.getInstance().put(ENGINE_ID, existing)
+                return existing
+            }
             // The application context, not the activity. This engine deliberately
             // outlives every activity, so holding an Activity here would leak it
             // for the life of the process. Plugins still receive the current

@@ -265,15 +265,15 @@ class EmoticonEditorDesktop extends StatelessWidget {
               width: 150,
               child: tiamat.Button.secondary(
                 text: controller.sourceImageData == null
-                    ? EmoticonCreatorStrings.promptSelectPhoto
-                    : EmoticonCreatorStrings.promptChangePhoto,
+                    ? EmoticonCreatorStrings.promptEmoticonCreatorSelectPhoto
+                    : EmoticonCreatorStrings.promptEmoticonCreatorChangePhoto,
                 onTap: controller.loading ? null : onPickSourceImage,
               ),
             ),
             SizedBox(
               width: 110,
               child: tiamat.Button.secondary(
-                text: EmoticonCreatorStrings.promptCropPhoto,
+                text: EmoticonCreatorStrings.promptEmoticonCreatorCropPhoto,
                 onTap:
                     controller.sourceImageData == null ||
                         controller.loading ||
@@ -333,7 +333,7 @@ class EmoticonEditorDesktop extends StatelessWidget {
                   height: 40,
                   child: tiamat.Button(
                     key: const ValueKey('emoticon-desktop-editor-done'),
-                    text: EmoticonCreatorStrings.promptDone,
+                    text: EmoticonCreatorStrings.promptEmoticonEditorDone,
                     onTap: controller.loading ? null : onDone,
                   ),
                 ),

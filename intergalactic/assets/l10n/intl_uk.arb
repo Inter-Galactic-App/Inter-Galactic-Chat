@@ -1,4 +1,10 @@
 {
+  "notificationAttachmentSentImage": "Надіслано зображення",
+  "notificationAttachmentSentVideo": "Надіслано відео",
+  "notificationAttachmentSentAudio": "Надіслано голосове повідомлення",
+  "notificationAttachmentSentFile": "Надіслано файл",
+  "notificationAttachmentSharedLocation": "Надіслано місцезнаходження",
+  "notificationAttachmentSentSticker": "Надіслано наліпку",
   "labelCurrentAccountsHeader": "Поточний обліковий запис",
   "@labelCurrentAccountsHeader": {
     "description": "Label for header of accounts list",

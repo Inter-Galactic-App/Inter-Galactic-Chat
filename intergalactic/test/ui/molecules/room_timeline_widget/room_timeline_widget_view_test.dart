@@ -12,6 +12,7 @@ import 'package:intergalactic/client/components/profile/profile_component.dart';
 import 'package:intergalactic/client/components/room_component.dart';
 import 'package:intergalactic/client/member.dart';
 import 'package:intergalactic/client/permissions.dart';
+import 'package:intergalactic/client/room.dart';
 import 'package:intergalactic/client/timeline_events/timeline_event.dart';
 import 'package:intergalactic/client/timeline_events/timeline_event_message.dart';
 import 'package:intergalactic/main.dart' as globals;
@@ -374,6 +375,121 @@ void main() {
     await tester.pump();
 
     expect(find.byType(CircularProgressIndicator), findsNothing);
+  });
+
+  testWidgets(
+    'releases superseded event-context timelines without replacing the room timeline',
+    (tester) async {
+      final room = _JumpTrackingRoom(
+        identifier: '!room:example.org',
+        client: _FakeClient(),
+      );
+      final initialTimeline = _FakeTimeline(room: room);
+      initialTimeline.events = [_jumpEvent(r'$initial')];
+      final viewKey = GlobalKey<RoomTimelineWidgetViewState>();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              height: 500,
+              child: RoomTimelineWidgetView(
+                key: viewKey,
+                timeline: initialTimeline,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      for (final eventId in [r'$first', r'$second', r'$third']) {
+        viewKey.currentState!.jumpToEvent(eventId);
+        await tester.pump();
+      }
+
+      expect(room.eventContextTimelines, hasLength(3));
+      expect(initialTimeline.closeCount, 0);
+      expect(room.eventContextTimelines[0].closeCount, 1);
+      expect(room.eventContextTimelines[1].closeCount, 1);
+      expect(room.eventContextTimelines[2].closeCount, 0);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+
+      expect(room.eventContextTimelines[2].closeCount, 1);
+    },
+  );
+
+  testWidgets('snap to bottom releases the owned event-context timeline', (
+    tester,
+  ) async {
+    final room = _JumpTrackingRoom(
+      identifier: '!room:example.org',
+      client: _FakeClient(),
+    );
+    final roomTimeline = _FakeTimeline(room: room);
+    roomTimeline.events = [_jumpEvent(r'$initial')];
+    final viewKey = GlobalKey<RoomTimelineWidgetViewState>();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            height: 500,
+            child: RoomTimelineWidgetView(key: viewKey, timeline: roomTimeline),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    viewKey.currentState!.jumpToEvent(r'$older');
+    await tester.pump();
+    expect(room.eventContextTimelines, hasLength(1));
+    expect(room.eventContextTimelines.single.closeCount, 0);
+
+    viewKey.currentState!.animateAndSnapToBottom();
+    await tester.pump();
+
+    expect(viewKey.currentState!.timeline, same(roomTimeline));
+    expect(room.eventContextTimelines.single.closeCount, 1);
+    expect(roomTimeline.closeCount, 0);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    expect(room.eventContextTimelines.single.closeCount, 1);
+  });
+
+  testWidgets('failed event-context lookup clears the loading overlay', (
+    tester,
+  ) async {
+    final room = _FailingJumpRoom(
+      identifier: '!room:example.org',
+      client: _FakeClient(),
+    );
+    final timeline = _FakeTimeline(room: room);
+    timeline.events = [_jumpEvent(r'$initial')];
+    final viewKey = GlobalKey<RoomTimelineWidgetViewState>();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            height: 500,
+            child: RoomTimelineWidgetView(key: viewKey, timeline: timeline),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    viewKey.currentState!.jumpToEvent(r'$missing');
+    await tester.pump();
+
+    expect(viewKey.currentState!.loading, isFalse);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(timeline.closeCount, 0);
   });
 
   testWidgets(
@@ -992,6 +1108,31 @@ class _FakeRoom implements Room {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
+class _JumpTrackingRoom extends _FakeRoom {
+  _JumpTrackingRoom({required super.identifier, required super.client});
+
+  final eventContextTimelines = <_FakeTimeline>[];
+
+  @override
+  Future<RoomTimelineLease> getTimelineForEventContext(
+    String contextEventId,
+  ) async {
+    final timeline = _FakeTimeline(room: this);
+    timeline.events = [_jumpEvent(contextEventId)];
+    eventContextTimelines.add(timeline);
+    return RoomTimelineLease.owned(timeline);
+  }
+}
+
+class _FailingJumpRoom extends _FakeRoom {
+  _FailingJumpRoom({required super.identifier, required super.client});
+
+  @override
+  Future<RoomTimelineLease> getTimelineForEventContext(String eventId) async {
+    throw StateError('context unavailable');
+  }
+}
+
 class _FakePermissions extends Permissions {}
 
 class _FakeTimeline extends Timeline {
@@ -1002,6 +1143,7 @@ class _FakeTimeline extends Timeline {
   }
 
   int loadMoreHistoryCount = 0;
+  int closeCount = 0;
   final Completer<void>? loadMoreHistoryCompleter;
 
   @override
@@ -1020,7 +1162,9 @@ class _FakeTimeline extends Timeline {
   Stream<void> get onLoadingStatusChanged => const Stream<void>.empty();
 
   @override
-  Future<void> close() async {}
+  Future<void> close() async {
+    closeCount++;
+  }
 
   @override
   bool canDeleteEvent(TimelineEvent event) => false;
@@ -1046,6 +1190,13 @@ class _FakeTimeline extends Timeline {
   @override
   void markAsRead(TimelineEvent event) {}
 }
+
+_FakeImageMessageEvent _jumpEvent(String eventId) => _FakeImageMessageEvent(
+  eventId: eventId,
+  senderId: '@alice:example.org',
+  originServerTs: DateTime.utc(2026, 9, 23),
+  attachmentName: 'timeline.png',
+);
 
 class _FakeMember implements Member {
   const _FakeMember(this.identifier);

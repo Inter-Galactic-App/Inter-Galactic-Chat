@@ -20,6 +20,12 @@ $markdownPaths = @(
   # is an unmodified verbatim upstream notice packet; it is deliberately not
   # scanned because its legal text must remain byte-identical.
   'docs/release/evidence/license-sources/PACKAGED-LICENCE-TEXT-PROVENANCE.md',
+  'docs/release/evidence/license-sources/libwebrtc-windows/0.8.2+1008.md',
+  'docs/release/evidence/license-sources/dart-vodozemac-ios-patch/SOURCE.md',
+  'docs/release/evidence/corresponding-source-holding/HOLDING.json',
+  'docs/release/evidence/license-sources/apple/APPLE-CORRESPONDING-SOURCE.md',
+  'docs/release/evidence/license-sources/libmpv/THIRD_PARTY_NOTICES.libmpv.md',
+  'docs/release/evidence/published-source-surface/SOURCE-CORRESPONDENCE-0.8.1+1004.md',
   'docs/release/evidence/license-sources/android-native-payloads/AAR-ORIGINS-0.8.1+1003.md',
   'docs/release/evidence/license-sources/android-native-payloads/CAMERAX-IMAGE-PROCESSING-LIBYUV-1.6.0.md',
   'docs/release/evidence/license-sources/android-native-payloads/CAMERAX-SURFACE-UTIL-1.6.0.md',

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intergalactic/client/client.dart';
 import 'package:intergalactic/client/client_manager.dart';
 import 'package:intergalactic/client/favorite_room_categories.dart';
+import 'package:intergalactic/client/favorite_rooms.dart';
 import 'package:intergalactic/client/space_room_categories.dart';
 import 'package:intergalactic/main.dart';
 import 'package:intergalactic/ui/navigation/adaptive_dialog.dart';
@@ -11,6 +12,7 @@ import 'package:intergalactic/ui/pages/settings/categories/app/setting_row.dart'
 import 'package:intergalactic/ui/pages/settings/categories/category_settings_header.dart';
 import 'package:intergalactic/ui/pages/settings/settings_status_components.dart';
 import 'package:tiamat/tiamat.dart' as tiamat;
+import 'package:uuid/uuid.dart';
 
 class FavoritesCategoriesSettingsPage extends StatefulWidget {
   const FavoritesCategoriesSettingsPage({
@@ -28,42 +30,34 @@ class FavoritesCategoriesSettingsPage extends StatefulWidget {
 class _FavoritesCategoriesSettingsPageState
     extends State<FavoritesCategoriesSettingsPage> {
   SpaceRoomCategoryState _state = SpaceRoomCategoryState.empty;
+  Client? _selectedClient;
   late final List<StreamSubscription> _subscriptions;
   bool _loaded = false;
   bool _saving = false;
 
-  List<Room> get _favoriteRooms {
-    final favoriteIds = preferences.getFavoriteRoomIds();
-    final order = <String, int>{
-      for (var i = 0; i < favoriteIds.length; i++) favoriteIds[i]: i,
-    };
-
-    final rooms = widget.clientManager.rooms.where((room) {
-      return preferences.isRoomFavorite(
-        room.favoriteStorageId,
-        legacyRoomId: room.localId,
-      );
-    }).toList();
-
-    int sortOrder(Room room) {
-      final stableOrder = order[room.favoriteStorageId];
-      final legacyOrder = order[room.localId];
-      if (stableOrder == null) return legacyOrder ?? favoriteIds.length;
-      if (legacyOrder == null) return stableOrder;
-      return stableOrder < legacyOrder ? stableOrder : legacyOrder;
+  List<Client> get _favoriteClients {
+    final clients = <Client>[];
+    for (final room in widget.clientManager.rooms) {
+      if (favoriteRoomStore.isFavorite(room) &&
+          !clients.contains(room.client)) {
+        clients.add(room.client);
+      }
     }
-
-    rooms.sort((a, b) => sortOrder(a).compareTo(sortOrder(b)));
-    return rooms;
+    return clients;
   }
+
+  List<Room> get _favoriteRooms => favoriteRoomStore.sortFavorites(
+    widget.clientManager.rooms.where(
+      (room) =>
+          room.client == _selectedClient && favoriteRoomStore.isFavorite(room),
+    ),
+  );
 
   @override
   void initState() {
     super.initState();
     _subscriptions = [
-      spaceRoomCategoryStore.onChanged
-          .where((event) => event.spaceLocalId == favoriteRoomCategoriesLocalId)
-          .listen(_onCategoryStateChanged),
+      favoriteRoomCategoryStore.onChanged.listen(_onCategoryStateChanged),
       preferences.onSettingChanged.listen((_) => _loadState()),
       widget.clientManager.onRoomAdded.listen((_) => _loadState()),
       widget.clientManager.onRoomRemoved.listen((_) => _loadState()),
@@ -81,13 +75,33 @@ class _FavoritesCategoriesSettingsPageState
   }
 
   Future<void> _loadState() async {
+    final clients = _favoriteClients;
+    if (_selectedClient == null || !clients.contains(_selectedClient)) {
+      final nextClient = clients.isEmpty ? null : clients.first;
+      if (nextClient != _selectedClient) {
+        _selectedClient = nextClient;
+        _state = SpaceRoomCategoryState.empty;
+        _loaded = false;
+      }
+    }
+    final client = _selectedClient;
+    if (client == null) {
+      if (mounted) {
+        setState(() {
+          _state = SpaceRoomCategoryState.empty;
+          _loaded = true;
+        });
+      }
+      return;
+    }
     final favoriteRoomIds = _favoriteRooms
         .map((room) => room.favoriteStorageId)
         .toList(growable: false);
-    final state = await loadFavoriteRoomCategoryState(
+    final state = await favoriteRoomCategoryStore.load(
+      client: client,
       favoriteRoomIds: favoriteRoomIds,
     );
-    if (!mounted) {
+    if (!mounted || client != _selectedClient) {
       return;
     }
 
@@ -99,8 +113,8 @@ class _FavoritesCategoriesSettingsPageState
     });
   }
 
-  void _onCategoryStateChanged(SpaceRoomCategoryChanged event) {
-    if (!mounted) {
+  void _onCategoryStateChanged(FavoriteRoomCategoryChanged event) {
+    if (!mounted || event.client != _selectedClient) {
       return;
     }
 
@@ -127,13 +141,13 @@ class _FavoritesCategoriesSettingsPageState
           title: 'Favorite Room Categories',
           children: [
             SettingsControlRow(
-              title: 'Local favorite groups',
+              title: 'Account-wide favorite groups',
               description:
-                  'Organize favorite rooms from every signed-in account and homeserver in one local Favorites view. These categories do not change Matrix spaces or room membership.',
+                  'Categories sync through Matrix account data for this account. Each signed-in account keeps its own separate groups.',
               trailing: ElevatedButton.icon(
                 icon: const Icon(Icons.create_new_folder_outlined),
                 label: const Text('Add category'),
-                onPressed: _saving ? null : _createCategory,
+                onPressed: _saving || !_loaded ? null : _createCategory,
               ),
               child: !_loaded
                   ? const SettingsStatePanel(
@@ -146,6 +160,31 @@ class _FavoritesCategoriesSettingsPageState
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        if (_favoriteClients.length > 1) ...[
+                          DropdownButton<Client>(
+                            isExpanded: true,
+                            value: _selectedClient,
+                            items: [
+                              for (final client in _favoriteClients)
+                                DropdownMenuItem(
+                                  value: client,
+                                  child: Text(_clientLabel(client)),
+                                ),
+                            ],
+                            onChanged: _saving
+                                ? null
+                                : (client) {
+                                    if (client == null) return;
+                                    setState(() {
+                                      _selectedClient = client;
+                                      _state = SpaceRoomCategoryState.empty;
+                                      _loaded = false;
+                                    });
+                                    unawaited(_loadState());
+                                  },
+                          ),
+                          const SizedBox(height: 12),
+                        ],
                         if (rooms.isEmpty)
                           SettingsStatePanel(
                             icon: Icons.star_border_rounded,
@@ -159,14 +198,16 @@ class _FavoritesCategoriesSettingsPageState
                             icon: Icons.create_new_folder_outlined,
                             title: 'No categories yet',
                             description:
-                                'Add a category to group favorite rooms across your signed-in accounts.',
+                                'Add a category for this Matrix account.',
                             padding: EdgeInsets.zero,
                             action: ElevatedButton.icon(
                               icon: const Icon(
                                 Icons.create_new_folder_outlined,
                               ),
                               label: const Text('Add category'),
-                              onPressed: _saving ? null : _createCategory,
+                              onPressed: _saving || !_loaded
+                                  ? null
+                                  : _createCategory,
                             ),
                           )
                         else ...[
@@ -316,6 +357,11 @@ class _FavoritesCategoriesSettingsPageState
     return '$identifier - ${room.favoriteStorageId}';
   }
 
+  String _clientLabel(Client client) {
+    final self = client.self;
+    return self?.identifier ?? client.identifier;
+  }
+
   SpaceRoomCategoryDefinition? _categoryForRoom(String roomId) {
     for (final category in _state.categories) {
       if (category.roomIds.contains(roomId)) {
@@ -327,13 +373,15 @@ class _FavoritesCategoriesSettingsPageState
   }
 
   Future<void> _createCategory() async {
+    if (!_loaded) return;
+    final client = _selectedClient;
     final name = await AdaptiveDialog.textPrompt(
       context,
       title: 'Add Category',
       hintText: 'Category name',
       submitText: 'Add',
     );
-    if (!mounted || name == null) {
+    if (!mounted || !_loaded || client != _selectedClient || name == null) {
       return;
     }
 
@@ -343,9 +391,16 @@ class _FavoritesCategoriesSettingsPageState
     }
 
     await _runSaving(
-      () => spaceRoomCategoryStore.createCategory(
-        favoriteRoomCategoriesLocalId,
-        trimmedName,
+      () => _saveState(
+        _state.copyWith(
+          categories: [
+            ..._state.categories,
+            SpaceRoomCategoryDefinition(
+              id: const Uuid().v4(),
+              name: normalizeSpaceRoomCategoryName(trimmedName),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -364,10 +419,18 @@ class _FavoritesCategoriesSettingsPageState
     final trimmedName = name.trim();
 
     await _runSaving(
-      () => spaceRoomCategoryStore.renameCategory(
-        favoriteRoomCategoriesLocalId,
-        category.id,
-        trimmedName,
+      () => _saveState(
+        _state.copyWith(
+          categories: [
+            for (final value in _state.categories)
+              if (value.id == category.id)
+                value.copyWith(
+                  name: normalizeSpaceRoomCategoryName(trimmedName),
+                )
+              else
+                value,
+          ],
+        ),
       ),
     );
   }
@@ -385,20 +448,27 @@ class _FavoritesCategoriesSettingsPageState
     }
 
     await _runSaving(
-      () => spaceRoomCategoryStore.deleteCategory(
-        favoriteRoomCategoriesLocalId,
-        category.id,
+      () => _saveState(
+        _state.copyWith(
+          categories: [
+            for (final value in _state.categories)
+              if (value.id != category.id) value,
+          ],
+        ),
       ),
     );
   }
 
   Future<void> _moveCategory(SpaceRoomCategoryDefinition category, int index) {
+    final categories = List<SpaceRoomCategoryDefinition>.from(
+      _state.categories,
+    );
+    final oldIndex = categories.indexWhere((value) => value.id == category.id);
+    if (oldIndex < 0) return Future.value();
+    final moved = categories.removeAt(oldIndex);
+    categories.insert(index.clamp(0, categories.length).toInt(), moved);
     return _runSaving(
-      () => spaceRoomCategoryStore.moveCategory(
-        favoriteRoomCategoriesLocalId,
-        category.id,
-        index,
-      ),
+      () => _saveState(_state.copyWith(categories: categories)),
     );
   }
 
@@ -406,36 +476,91 @@ class _FavoritesCategoriesSettingsPageState
     SpaceRoomCategoryDefinition category,
     bool collapsed,
   ) {
-    return _runSaving(
-      () => spaceRoomCategoryStore.setCategoryCollapsed(
-        favoriteRoomCategoriesLocalId,
-        category.id,
-        collapsed,
-      ),
-    );
+    return _runSaving(() async {
+      final client = _selectedClient;
+      if (client == null) return;
+      final state = _state.copyWith(
+        categories: [
+          for (final value in _state.categories)
+            if (value.id == category.id)
+              value.copyWith(collapsed: collapsed)
+            else
+              value,
+        ],
+      );
+      await favoriteRoomCategoryStore.saveLocalView(
+        client: client,
+        state: state,
+      );
+    });
   }
 
   Future<void> _assignRoomToCategory(String roomId, String categoryId) {
     return _runSaving(
-      () => spaceRoomCategoryStore.assignRoomToCategory(
-        favoriteRoomCategoriesLocalId,
-        roomId,
-        categoryId,
+      () => _saveState(
+        _state.copyWith(
+          categories: [
+            for (final category in _state.categories)
+              if (category.id == categoryId)
+                category.copyWith(
+                  roomIds: [
+                    ...category.roomIds.where((id) => id != roomId),
+                    roomId,
+                  ],
+                  roomOrderIds: category.roomOrderIds.isEmpty
+                      ? const []
+                      : [
+                          ...category.roomOrderIds.where((id) => id != roomId),
+                          roomId,
+                        ],
+                )
+              else
+                category.copyWith(
+                  roomIds: [
+                    for (final id in category.roomIds)
+                      if (id != roomId) id,
+                  ],
+                  roomOrderIds: [
+                    for (final id in category.roomOrderIds)
+                      if (id != roomId) id,
+                  ],
+                ),
+          ],
+        ),
       ),
     );
   }
 
   Future<void> _unassignRoom(String roomId) {
     return _runSaving(
-      () => spaceRoomCategoryStore.unassignRoom(
-        favoriteRoomCategoriesLocalId,
-        roomId,
+      () => _saveState(
+        _state.copyWith(
+          categories: [
+            for (final category in _state.categories)
+              category.copyWith(
+                roomIds: [
+                  for (final id in category.roomIds)
+                    if (id != roomId) id,
+                ],
+                roomOrderIds: [
+                  for (final id in category.roomOrderIds)
+                    if (id != roomId) id,
+                ],
+              ),
+          ],
+        ),
       ),
     );
   }
 
+  Future<void> _saveState(SpaceRoomCategoryState state) async {
+    final client = _selectedClient;
+    if (client == null || !_loaded) return;
+    await favoriteRoomCategoryStore.save(client: client, state: state);
+  }
+
   Future<void> _runSaving(Future<dynamic> Function() action) async {
-    if (_saving) {
+    if (_saving || !_loaded) {
       return;
     }
 

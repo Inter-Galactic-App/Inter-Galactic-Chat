@@ -1,10 +1,7 @@
 # Calls And Stories Motion Audit
 
-Status: docs-only DESIGN audit
-Owner: DESIGN
+Status: docs-only audit
 Date: 2026-06-24
-Backlog item: `docs/design/UX_UI_POLISH_BACKLOG.md` P20
-Related audit: `docs/design/MOTION_AND_MICROINTERACTION_AUDIT.md`
 
 ## Purpose
 
@@ -41,14 +38,14 @@ No app behavior changed in this pass.
 
 ## Safe Future Candidates
 
-| ID | Candidate | Scope | Reduced-motion behavior | Ownership gate |
-| --- | --- | --- | --- | --- |
-| CS01 | Story viewer route consistency | Keep the full-screen viewer entrance short and non-spatial, aligned with shared modal motion tokens. | Fade-only or instant. | DESIGN plus FEATURES review. |
-| CS02 | Story composer busy feedback | Standardize capture/upload/export busy labels and stable action widths without changing camera/upload behavior. | Static labels and disabled states. | FEATURES review. |
-| CS03 | Story draft strip state | Use shared preparing/uploading/failed/sent language for drafts after the media-send QA caveats close. | Instant icon/label swap. | FEATURES and QA. |
-| CS04 | Call controls visibility | Normalize fade duration and focus behavior for call controls only, leaving render surfaces untouched. | Controls appear/disappear instantly. | EXPERIMENTAL/DEBUG review. |
-| CS05 | Hidden stream reveal affordance | Clarify hidden-video state with static icon/text and accessible action labels. | Static only. | EXPERIMENTAL/DEBUG review. |
-| CS06 | Fullscreen media route | Align fullscreen stream/story route duration with shared modal tokens. | Fade-only or instant. | EXPERIMENTAL/FEATURES review. |
+| ID | Candidate | Scope | Reduced-motion behavior |
+| --- | --- | --- | --- |
+| CS01 | Story viewer route consistency | Keep the full-screen viewer entrance short and non-spatial, aligned with shared modal motion tokens. | Fade-only or instant. |
+| CS02 | Story composer busy feedback | Standardize capture/upload/export busy labels and stable action widths without changing camera/upload behavior. | Static labels and disabled states. |
+| CS03 | Story draft strip state | Use shared preparing/uploading/failed/sent language for drafts after the media-send QA caveats close. | Instant icon/label swap. |
+| CS04 | Call controls visibility | Normalize fade duration and focus behavior for call controls only, leaving render surfaces untouched. | Controls appear/disappear instantly. |
+| CS05 | Hidden stream reveal affordance | Clarify hidden-video state with static icon/text and accessible action labels. | Static only. |
+| CS06 | Fullscreen media route | Align fullscreen stream/story route duration with shared modal tokens. | Fade-only or instant. |
 
 ## Deferred Or Excluded
 
@@ -80,9 +77,9 @@ No app behavior changed in this pass.
 Treat P20 as complete for design audit purposes and keep implementation
 deferred until a narrow owner-cleared task selects one candidate above.
 
-## EXPERIMENTAL Implementation Update - 2026-06-24
+## Implementation Update - 2026-06-24
 
-EXPERIMENTAL addressed the calls-owned subset of this audit without changing
+Pass addressed the calls-owned subset of this audit without changing
 LiveKit media, renderer texture, stream subscription, PiP, popout, or detached
 window behavior.
 
@@ -97,12 +94,11 @@ window behavior.
 - CS06: fullscreen stream routes now use shared modal fade timing and honor
   reduced-motion contexts with an instant transition.
 
-Story-side CS01/CS02/CS03 and the story half of CS06 remain deferred to
-DESIGN/FEATURES ownership.
+Story-side CS01/CS02/CS03 and the story half of CS06 remain deferred.
 
-## FEATURES Implementation Update - 2026-06-24
+## Implementation Update - 2026-06-24
 
-FEATURES addressed the story-side subset of this audit without changing story
+Pass addressed the story-side subset of this audit without changing story
 Matrix events, upload sequencing, media readiness timers, camera capture,
 trim/export, desktop recording, or notification behavior.
 

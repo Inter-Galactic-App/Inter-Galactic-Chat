@@ -1,8 +1,6 @@
 # Streaming Pipeline
 
-Owner: DOCUMENTATION for structure; runtime owners by subsystem
-Last reviewed: 2026-08-06 by DOCUMENTATION for structure and source routing;
-runtime decisions remain with the listed subsystem owners
+Last reviewed: 2026-08-06
 
 ## Status
 
@@ -173,7 +171,7 @@ flowchart LR
   unavailable.
 - Windows gameplay capture can use the experimental D3D11 game-hook helper,
   shared textures, GPU scale/convert, and native NV12/WebRTC sender handoff.
-  This path is EXPERIMENTAL-owned and should stay separate from normal
+  This path is experimental and should stay separate from normal
   WGC/window-GDI compatibility work.
 - The external receiver probe is a diagnostic runtime. It is authoritative for
   receiver freshness only when it is external or otherwise explicitly

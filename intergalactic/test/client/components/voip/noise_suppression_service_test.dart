@@ -784,6 +784,7 @@ void main() {
         'deepFilterNetLastLocalSnr': 12.25,
         'deepFilterNetSpeechProtectedFrames': 3,
         'deepFilterNetLastSpeechProtectWetMix': 0.58,
+        'deepFilterNetSpeechProtectHysteresisEnabled': true,
         'deepFilterNetAttenuationLimitDb': 60,
         'deepFilterNetPostFilterBeta': 0.02,
         'deepFilterNetTransientSuppressionEnabled': true,
@@ -865,6 +866,7 @@ void main() {
       expect(status.deepFilterNetLastLocalSnr, 12.25);
       expect(status.deepFilterNetSpeechProtectedFrames, 3);
       expect(status.deepFilterNetLastSpeechProtectWetMix, 0.58);
+      expect(status.deepFilterNetSpeechProtectHysteresisEnabled, isTrue);
       expect(status.deepFilterNetAttenuationLimitDb, 60);
       expect(status.deepFilterNetPostFilterBeta, 0.02);
       expect(status.deepFilterNetTransientSuppressionEnabled, isTrue);
@@ -927,6 +929,13 @@ void main() {
       expect(status.transientSensitivity, 0.65);
       expect(status.fastCloseEnabled, isTrue);
       expect(status.reason, 'ready');
+    });
+
+    test('older native status keeps the loud-speech guard stable mode off', () {
+      final status = NoiseSuppressionNativeStatus.fromJson(<String, dynamic>{
+        'supported': true,
+      });
+      expect(status.deepFilterNetSpeechProtectHysteresisEnabled, isFalse);
     });
 
     test(

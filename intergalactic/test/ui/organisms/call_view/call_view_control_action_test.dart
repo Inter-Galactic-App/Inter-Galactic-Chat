@@ -1,7 +1,38 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intergalactic/client/components/voip/voip_stream.dart';
 import 'package:intergalactic/ui/organisms/call_view/call_view.dart';
 
 void main() {
+  test('mobile double-tap is limited to a live local camera tile', () {
+    bool allowed({
+      bool mobilePlatform = true,
+      bool mobileLayout = true,
+      bool localTile = true,
+      VoipStreamType streamType = VoipStreamType.video,
+      bool videoHidden = false,
+      bool cameraEnabled = true,
+      bool livekitSession = true,
+    }) => shouldFlipLocalCameraOnDoubleTap(
+      mobilePlatform: mobilePlatform,
+      mobileLayout: mobileLayout,
+      localTile: localTile,
+      streamType: streamType,
+      videoHidden: videoHidden,
+      cameraEnabled: cameraEnabled,
+      livekitSession: livekitSession,
+    );
+
+    expect(allowed(), isTrue);
+    expect(allowed(mobilePlatform: false), isFalse);
+    expect(allowed(mobileLayout: false), isFalse);
+    expect(allowed(localTile: false), isFalse);
+    expect(allowed(streamType: VoipStreamType.screenshare), isFalse);
+    expect(allowed(streamType: VoipStreamType.audio), isFalse);
+    expect(allowed(videoHidden: true), isFalse);
+    expect(allowed(cameraEnabled: false), isFalse);
+    expect(allowed(livekitSession: false), isFalse);
+  });
+
   test('call control actions still run through the recovery wrapper', () async {
     var ran = false;
 

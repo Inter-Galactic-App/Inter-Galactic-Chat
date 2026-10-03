@@ -43,6 +43,22 @@ needs a `MatrixRoom`: it reuses an existing client room wrapper when one is
 already registered, creates a temporary wrapper only when needed, and closes
 only the wrapper it owns during widget update/dispose.
 
+## Matrix Room Version Migrations
+
+Matrix room versions cannot be changed in place. `POST /rooms/{roomId}/upgrade`
+creates a replacement room with a new room ID, transfers only server-selected
+state, sends an `m.room.tombstone` in the predecessor, and may prevent further
+sends in that predecessor. Timeline history and membership events are not
+transferred by the protocol.
+
+Do not expose the raw upgrade endpoint as a routine Room Admin control. A safe
+client migration flow must be explicit about successor creation, retain access
+to the predecessor timeline, preflight and report per-member invitations,
+navigate to the successor, and recover from partial failures. It must not claim
+that the same room ID or historic events are upgraded. Until that runtime flow
+exists, Room Admin may show the current room version but must not trigger a
+live migration.
+
 ## Members Tab
 
 The room Members tab is a Matrix room settings surface for changing member

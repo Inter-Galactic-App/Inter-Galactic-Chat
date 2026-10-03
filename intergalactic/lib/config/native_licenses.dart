@@ -85,6 +85,13 @@ class NativeLicenses {
       LicenseRegistry.addLicense(_androidEntries);
     }
 
+    // DeepFilterNet's `df` runtime is separately delivered on Windows and
+    // Android. Its Rust tree is not covered by the vodozemac tree below and
+    // cannot be discovered from Flutter package metadata.
+    if (PlatformUtils.isWindows || PlatformUtils.isAndroid) {
+      LicenseRegistry.addLicense(_libdfRustEntries);
+    }
+
     // Unconditional, and deliberately outside the platform chain above. The
     // Rust encryption tree is the one native component this app links on
     // *every* platform, macOS included - it is not part of the media bundle
@@ -121,6 +128,10 @@ class NativeLicenses {
   /// The cross-platform Rust entries, for the same reason as the others.
   @visibleForTesting
   static Stream<LicenseEntry> rustEntriesForTest() => _rustEntries();
+
+  /// The Windows/Android DeepFilterNet libDF Rust entries.
+  @visibleForTesting
+  static Stream<LicenseEntry> libdfRustEntriesForTest() => _libdfRustEntries();
 }
 
 /// Windows ships one third-party native media component: `libmpv-2.dll`, which
@@ -290,8 +301,11 @@ Stream<LicenseEntry> _appleEntries() async* {
 /// OTHER_LDFLAGS = -force_load ${BUILT_PRODUCTS_DIR}/libvodozemac_bindings_dart.a
 /// ```
 ///
-/// So the whole Rust dependency tree is merged into the single `Runner` Mach-O.
-/// On Android and Windows the same tree arrives as
+/// The Rust dependency tree is merged into `Runner`; the iOS notification
+/// extension also force-loads the archive when built against the pinned
+/// patched 0.5.0 wrapper for its backup-decrypt ABI. Both Mach-O files then
+/// carry the tree, with no separate Rust framework in the bundle. On Android
+/// and Windows the same tree arrives as
 /// `libvodozemac_bindings_dart.so` / `.dll`.
 ///
 /// Either way **no generated notice surface can see it**, because every one of
@@ -341,11 +355,43 @@ The Matrix end-to-end encryption in this app is vodozemac, written in Rust.
 It is not a library the app loads at runtime. The Rust code and everything it
 depends on are compiled into a static archive and merged into the application
 binary itself, which is why they appear under one heading here rather than as
-separate entries: on Apple builds they have no file of their own to be listed.
+separate entries. On iOS builds with the pinned patched wrapper, both Runner
+and the notification extension contain the statically linked tree; there is
+no separate Rust framework file in the bundle. The modified wrapper source
+and build instructions are identified in the application's iOS patch source
+record for dart-vodozemac 0.5.0.
 
 The entry that follows names all 59 crates with the exact version compiled in,
 together with the Rust standard library, and reproduces the full text of every
 licence each of them ships.
+""";
+
+/// The Rust crate closures compiled into DeepFilterNet's native C API runtime.
+///
+/// `df.dll` is delivered on Windows and `libdf.so` is delivered on Android.
+/// They have a distinct 109-package closure from vodozemac, so sharing the
+/// latter's notice would give recipients a plausible but incorrect roster.
+Stream<LicenseEntry> _libdfRustEntries() async* {
+  const String libdf =
+      'DeepFilterNet libDF Rust crates (Windows df.dll and Android libdf.so)';
+
+  yield const LicenseEntryWithLineBreaks(<String>[libdf], _libdfRustNotice);
+  final String text = await rootBundle.loadString(
+    'assets/licenses/deepfilternet-libdf-rust-crates-NOTICE.txt',
+  );
+  yield LicenseEntryWithLineBreaks(const <String>[libdf], text);
+}
+
+const String _libdfRustNotice = """
+The DeepFilterNet native C API runtime is written in Rust and is distributed as
+df.dll on Windows and libdf.so on Android. It has its own feature-specific Rust
+dependency closure, separate from the app's vodozemac Rust components.
+
+The entry that follows names all 109 selected package/version pairs, together
+with the Rust standard library used to build the delivered runtime, and
+reproduces every captured licence text. Two MIT declarations are expressly
+identified as canonical SPDX MIT mappings because their exact package sources
+contain no licence file.
 """;
 
 /// The single `libmpv.so` the APK ships per ABI, which statically carries 10
@@ -566,7 +612,7 @@ build of WebRTC. Its two patched source trees are public:
 
   https://github.com/Inter-Galactic-App/libwebrtc
     branch intergalactic/windows-hardware-h264
-    commit cdd3c9a98e93f911a67489ecaa3968b730baf8a4
+commit c8619a6d98d49939b6affe642a037d9f5a6ed9d5
 
 Unlike the other components on this page, these are NOT served from
 https://app.ourgalaxy.space/source/ — they are whole git repositories rather

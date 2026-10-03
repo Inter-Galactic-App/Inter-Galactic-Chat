@@ -252,6 +252,16 @@ class TextUtils {
         .toList();
   }
 
+  /// [text] with every URL [_urlRegex] matches removed.
+  ///
+  /// Deliberately the same regex `findUrls` uses, applied to PLAIN text only.
+  /// A caller deciding "is this message just a link" must not compare a link
+  /// derived from the HTML formatted body against the plaintext body - HTML
+  /// entity-encodes `&` as `&amp;`, `_urlRegex` does not include `;`, so a
+  /// query string with an `&` truncates there when read from HTML, and the
+  /// truncated form is never a substring of the plaintext original.
+  static String stripUrls(String text) => text.replaceAll(_urlRegex, '');
+
   static List<InlineSpan> formatMatches(
     Iterable<RegExpMatch> matches,
     String text, {
@@ -433,8 +443,8 @@ class TextUtils {
   }
 
   static Uint8List parseHexString(String hexString) => Uint8List.fromList(
-        (RegExp(r'.{1,2}').allMatches(hexString).toList()).map<int>((byte) {
-          return int.parse(byte.group(0)!, radix: 16);
-        }).toList(),
-      );
+    (RegExp(r'.{1,2}').allMatches(hexString).toList()).map<int>((byte) {
+      return int.parse(byte.group(0)!, radix: 16);
+    }).toList(),
+  );
 }

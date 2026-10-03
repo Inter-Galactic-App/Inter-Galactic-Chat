@@ -93,7 +93,7 @@ table row.
 ## Candidate: In-App Bug Reporting
 
 **Status:** investigating
-**Owner:** COMMUNITY / DEBUG / S&C / OPERATIONS, depending on final scope
+**Owner:**
 **Related docs:** `feedback-triage.md`, `bug-report-template.md`,
 `known-issues.md`
 

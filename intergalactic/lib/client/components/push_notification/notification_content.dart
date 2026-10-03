@@ -30,33 +30,49 @@ class NotificationAttachmentPresentation {
   /// `NotificationModifierHideContent` is: this becomes the notification body,
   /// the ticker and the MessagingStyle text, and it was the only notification
   /// text that stayed English in every locale.
+  /// One message per member below, rather than five inside this switch.
+  ///
+  /// `intl_translation` keys a message off the member that declares it, so five
+  /// `Intl.message` calls in one getter can match at most one `name:` - it
+  /// skipped all five, and these strings stayed English in every locale. The
+  /// switch now only chooses between members.
   String get typeLabel => switch (type) {
-    NotificationAttachmentType.image => Intl.message(
-      'Sent an image',
-      name: 'notificationAttachmentSentImage',
-      desc: 'Notification body for a message whose content is an image.',
-    ),
-    NotificationAttachmentType.video => Intl.message(
-      'Sent a video',
-      name: 'notificationAttachmentSentVideo',
-      desc: 'Notification body for a message whose content is a video.',
-    ),
-    NotificationAttachmentType.file => Intl.message(
-      'Sent a file',
-      name: 'notificationAttachmentSentFile',
-      desc: 'Notification body for a message whose content is a file.',
-    ),
-    NotificationAttachmentType.gif => Intl.message(
-      'Sent a GIF',
-      name: 'notificationAttachmentSentGif',
-      desc: 'Notification body for a message whose content is an animated GIF.',
-    ),
-    NotificationAttachmentType.sticker => Intl.message(
-      'Sent a sticker',
-      name: 'notificationAttachmentSentSticker',
-      desc: 'Notification body for a message whose content is a sticker.',
-    ),
+    NotificationAttachmentType.image => notificationAttachmentSentImage,
+    NotificationAttachmentType.video => notificationAttachmentSentVideo,
+    NotificationAttachmentType.file => notificationAttachmentSentFile,
+    NotificationAttachmentType.gif => notificationAttachmentSentGif,
+    NotificationAttachmentType.sticker => notificationAttachmentSentSticker,
   };
+
+  String get notificationAttachmentSentImage => Intl.message(
+    'Sent an image',
+    name: 'notificationAttachmentSentImage',
+    desc: 'Notification body for a message whose content is an image.',
+  );
+
+  String get notificationAttachmentSentVideo => Intl.message(
+    'Sent a video',
+    name: 'notificationAttachmentSentVideo',
+    desc: 'Notification body for a message whose content is a video.',
+  );
+
+  String get notificationAttachmentSentFile => Intl.message(
+    'Sent a file',
+    name: 'notificationAttachmentSentFile',
+    desc: 'Notification body for a message whose content is a file.',
+  );
+
+  String get notificationAttachmentSentGif => Intl.message(
+    'Sent a GIF',
+    name: 'notificationAttachmentSentGif',
+    desc: 'Notification body for a message whose content is an animated GIF.',
+  );
+
+  String get notificationAttachmentSentSticker => Intl.message(
+    'Sent a sticker',
+    name: 'notificationAttachmentSentSticker',
+    desc: 'Notification body for a message whose content is a sticker.',
+  );
 
   String get displayText =>
       caption == null ? typeLabel : '$typeLabel\n$caption';

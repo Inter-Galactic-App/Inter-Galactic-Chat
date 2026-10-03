@@ -1,4 +1,10 @@
 {
+  "notificationAttachmentSentImage": "یک تصویر ارسال کرد",
+  "notificationAttachmentSentVideo": "یک ویدیو ارسال کرد",
+  "notificationAttachmentSentAudio": "یک پیام صوتی ارسال کرد",
+  "notificationAttachmentSentFile": "یک فایل ارسال کرد",
+  "notificationAttachmentSharedLocation": "یک موقعیت مکانی به اشتراک گذاشت",
+  "notificationAttachmentSentSticker": "یک برچسب ارسال کرد",
   "messagePlaceholderUserCreatedRoom": "{user} اتاق را ایجاد کرد!",
   "@messagePlaceholderUserCreatedRoom": {
     "description": "Message body for when a user created the room",

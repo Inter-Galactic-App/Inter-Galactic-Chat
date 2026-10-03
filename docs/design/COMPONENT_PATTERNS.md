@@ -1,7 +1,6 @@
 # Component Patterns
 
 Status: active design reference
-Owner: DESIGN
 Last updated: 2026-06-29
 
 ## Purpose
@@ -139,6 +138,12 @@ focus traversal inside the dialog, and honor platform/app reduced-motion
 signals. Do not add local dialog animations or unlabeled barriers for standard
 confirmation, picker, text-prompt, image, recovery, invite, or settings flows.
 
+Destructive or irreversible writes must use
+`AdaptiveDialog.confirmation(..., dangerous: true)` before calling the
+underlying action. State the irreversible consequence in the prompt, use an
+action-specific confirmation label, and invoke the write only when the result
+is `true`.
+
 Floating media, detached-window, and custom room/list surfaces need their own
 Flutter boundary primitives when they use ink, tooltip, menu, or overlay
 controls. Add a local transparent `Material` before custom `InkWell`/tooltip
@@ -184,7 +189,7 @@ instant reduced-motion fallback, and large counts keep the existing compact
 | --- | --- | --- |
 | Space summary room row | `intergalactic/lib/ui/atoms/room_panel.dart` | Room rows in wide selected-space and virtual-space summary panes, including last-message preview. |
 | Space sidebar room row | `intergalactic/lib/ui/atoms/room_text_button.dart` | Compact room rows inside sidebars and narrow selected-space panels. |
-| Space reorder affordance | `ReorderableListView` plus save/undo actions in `space_summary_view.dart` | Drag/drop room ordering where the surface presents a selected-space room list. |
+| Space reorder affordance | `ReorderableListView` plus save/undo actions in `space_summary_view.dart` | Drag/drop room ordering where the surface presents a selected-space room list. Mobile long press belongs to `ReorderableDelayedDragStartListener`; do not wrap that row in a competing long-press context menu. |
 | Virtual Favorites space | `intergalactic/lib/ui/molecules/favorite_rooms_list.dart` | Favorites behaves as a local virtual selected space, reusing the same wide/sidebar row primitives, local categories, and local-only icon/banner presentation preferences. |
 | Favorites settings | `intergalactic/lib/ui/pages/settings/favorites_settings_page.dart` | Contextual Favorites settings surface with Appearance and Categories tabs, opened from the Favorites virtual-space gear rather than App Appearance. |
 

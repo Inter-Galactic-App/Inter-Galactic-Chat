@@ -1,7 +1,6 @@
 # Stream Diagnostic Contract
 
 Status: Active architecture contract
-Owner: EXPERIMENTAL
 Last updated: 2026-06-21
 
 This contract defines the canonical field surface for Inter Galactic stream
@@ -290,7 +289,7 @@ hot path by default. Sender-side proof should remain bounded to proof frames or
 explicit low-rate diagnostics. Distinct visual-frame cadence should be measured
 by a receiver-side/tool-side recording when possible because that sees the
 post-encode/post-send output. Server/SFU-side recording may be useful later,
-but it is a separate SERVER/LiveKit/storage/consent design branch, not part of
+but it is a separate server/LiveKit/storage/consent design branch, not part of
 the DX11 sender hot-path diagnostic contract.
 
 The current receiver/tool-side marker source is

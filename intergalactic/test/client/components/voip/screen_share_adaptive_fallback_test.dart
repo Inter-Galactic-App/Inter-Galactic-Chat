@@ -11,8 +11,8 @@ void main() {
       final start = DateTime(2026);
       ScreenShareAdaptiveFallbackDecision decision =
           const ScreenShareAdaptiveFallbackDecision(
-        profile: ScreenShareProfileConfig.highQuality,
-      );
+            profile: ScreenShareProfileConfig.highQuality,
+          );
 
       for (var seconds = 0; seconds <= 8; seconds += 2) {
         decision = controller.evaluate(
@@ -86,8 +86,8 @@ void main() {
       final start = DateTime(2026);
       ScreenShareAdaptiveFallbackDecision decision =
           const ScreenShareAdaptiveFallbackDecision(
-        profile: ScreenShareProfileConfig.smooth,
-      );
+            profile: ScreenShareProfileConfig.smooth,
+          );
 
       for (var seconds = 0; seconds <= 8; seconds += 2) {
         decision = controller.evaluate(
@@ -141,8 +141,8 @@ void main() {
 
       ScreenShareAdaptiveFallbackDecision decision =
           const ScreenShareAdaptiveFallbackDecision(
-        profile: ScreenShareProfileConfig.smooth,
-      );
+            profile: ScreenShareProfileConfig.smooth,
+          );
       for (var seconds = 10; seconds <= 22; seconds += 2) {
         decision = controller.evaluate(
           requestedProfile: ScreenShareProfileConfig.smooth,
@@ -172,107 +172,111 @@ void main() {
       expect(controller.reason, contains('resolution limit not applied'));
     });
 
-    test('clears resolution-not-applied reason after encoded size recovers',
-        () {
-      final controller = ScreenShareAdaptiveFallbackController();
-      final start = DateTime(2026);
+    test(
+      'clears resolution-not-applied reason after encoded size recovers',
+      () {
+        final controller = ScreenShareAdaptiveFallbackController();
+        final start = DateTime(2026);
 
-      for (var seconds = 0; seconds <= 8; seconds += 2) {
-        controller.evaluate(
+        for (var seconds = 0; seconds <= 8; seconds += 2) {
+          controller.evaluate(
+            requestedProfile: ScreenShareProfileConfig.smooth,
+            snapshot: _snapshot(
+              now: start.add(Duration(seconds: seconds)),
+              requestedWidth: 1280,
+              requestedHeight: 720,
+              encodedWidth: 1280,
+              encodedHeight: 720,
+              fps: 12,
+              requestedFps: 30,
+              bitrateBps: 900000,
+              targetBitrateBps: 1800000,
+              averageEncodeTimeMs: 90,
+            ),
+            now: start.add(Duration(seconds: seconds)),
+          );
+        }
+
+        final blocked = controller.evaluate(
           requestedProfile: ScreenShareProfileConfig.smooth,
           snapshot: _snapshot(
-            now: start.add(Duration(seconds: seconds)),
-            requestedWidth: 1280,
-            requestedHeight: 720,
+            now: start.add(const Duration(seconds: 10)),
+            requestedWidth: 960,
+            requestedHeight: 540,
             encodedWidth: 1280,
             encodedHeight: 720,
             fps: 12,
             requestedFps: 30,
             bitrateBps: 900000,
-            targetBitrateBps: 1800000,
+            targetBitrateBps: 1200000,
             averageEncodeTimeMs: 90,
           ),
-          now: start.add(Duration(seconds: seconds)),
-        );
-      }
-
-      final blocked = controller.evaluate(
-        requestedProfile: ScreenShareProfileConfig.smooth,
-        snapshot: _snapshot(
           now: start.add(const Duration(seconds: 10)),
-          requestedWidth: 960,
-          requestedHeight: 540,
-          encodedWidth: 1280,
-          encodedHeight: 720,
-          fps: 12,
-          requestedFps: 30,
-          bitrateBps: 900000,
-          targetBitrateBps: 1200000,
-          averageEncodeTimeMs: 90,
-        ),
-        now: start.add(const Duration(seconds: 10)),
-      );
-      final recovered = controller.evaluate(
-        requestedProfile: ScreenShareProfileConfig.smooth,
-        snapshot: _snapshot(
-          now: start.add(const Duration(seconds: 12)),
-          requestedWidth: 960,
-          requestedHeight: 540,
-          encodedWidth: 960,
-          encodedHeight: 540,
-          fps: 30,
-          requestedFps: 30,
-          bitrateBps: 1200000,
-          targetBitrateBps: 1200000,
-        ),
-        now: start.add(const Duration(seconds: 12)),
-      );
-
-      expect(blocked.reason, contains('resolution limit not applied'));
-      expect(blocked.profile.mainLayer.width, 960);
-      expect(recovered.changed, isFalse);
-      expect(recovered.profile.mainLayer.width, 960);
-      expect(recovered.reason, isNull);
-      expect(controller.reason, isNull);
-    });
-
-    test('does not downshift hardware stream on clean bandwidth estimate only',
-        () {
-      final controller = ScreenShareAdaptiveFallbackController();
-      final start = DateTime(2026);
-      final requestedProfile =
-          ScreenShareProfileConfig.highQuality.withHardwareEncodingPreference();
-      ScreenShareAdaptiveFallbackDecision decision =
-          ScreenShareAdaptiveFallbackDecision(profile: requestedProfile);
-
-      for (var seconds = 0; seconds <= 20; seconds += 2) {
-        decision = controller.evaluate(
-          requestedProfile: requestedProfile,
-          snapshot: _snapshot(
-            now: start.add(Duration(seconds: seconds)),
-            fps: 16,
-            bitrateBps: 2400000,
-            targetBitrateBps: 18000000,
-            limitation: 'bandwidth',
-            availableOutgoingBitrateBps: 7000000,
-            hardwareEncodeActive: true,
-            encoderImplementation: 'MediaFoundationH264',
-          ),
-          now: start.add(Duration(seconds: seconds)),
         );
-      }
+        final recovered = controller.evaluate(
+          requestedProfile: ScreenShareProfileConfig.smooth,
+          snapshot: _snapshot(
+            now: start.add(const Duration(seconds: 12)),
+            requestedWidth: 960,
+            requestedHeight: 540,
+            encodedWidth: 960,
+            encodedHeight: 540,
+            fps: 30,
+            requestedFps: 30,
+            bitrateBps: 1200000,
+            targetBitrateBps: 1200000,
+          ),
+          now: start.add(const Duration(seconds: 12)),
+        );
 
-      expect(decision.changed, isFalse);
-      expect(decision.profile.profile, ScreenShareQualityProfile.highQuality);
-      expect(decision.profile.mainLayer.maxBitrateBps, 18000000);
-      expect(decision.reason, isNull);
-    });
+        expect(blocked.reason, contains('resolution limit not applied'));
+        expect(blocked.profile.mainLayer.width, 960);
+        expect(recovered.changed, isFalse);
+        expect(recovered.profile.mainLayer.width, 960);
+        expect(recovered.reason, isNull);
+        expect(controller.reason, isNull);
+      },
+    );
+
+    test(
+      'does not downshift hardware stream on clean bandwidth estimate only',
+      () {
+        final controller = ScreenShareAdaptiveFallbackController();
+        final start = DateTime(2026);
+        final requestedProfile = ScreenShareProfileConfig.highQuality
+            .withHardwareEncodingPreference();
+        ScreenShareAdaptiveFallbackDecision decision =
+            ScreenShareAdaptiveFallbackDecision(profile: requestedProfile);
+
+        for (var seconds = 0; seconds <= 20; seconds += 2) {
+          decision = controller.evaluate(
+            requestedProfile: requestedProfile,
+            snapshot: _snapshot(
+              now: start.add(Duration(seconds: seconds)),
+              fps: 16,
+              bitrateBps: 2400000,
+              targetBitrateBps: 18000000,
+              limitation: 'bandwidth',
+              availableOutgoingBitrateBps: 7000000,
+              hardwareEncodeActive: true,
+              encoderImplementation: 'MediaFoundationH264',
+            ),
+            now: start.add(Duration(seconds: seconds)),
+          );
+        }
+
+        expect(decision.changed, isFalse);
+        expect(decision.profile.profile, ScreenShareQualityProfile.highQuality);
+        expect(decision.profile.mainLayer.maxBitrateBps, 18000000);
+        expect(decision.reason, isNull);
+      },
+    );
 
     test('preset fallback preserves hardware-first encoding preference', () {
       final controller = ScreenShareAdaptiveFallbackController();
       final start = DateTime(2026);
-      final requestedProfile =
-          ScreenShareProfileConfig.highQuality.withHardwareEncodingPreference();
+      final requestedProfile = ScreenShareProfileConfig.highQuality
+          .withHardwareEncodingPreference();
       ScreenShareAdaptiveFallbackDecision decision =
           ScreenShareAdaptiveFallbackDecision(profile: requestedProfile);
 
@@ -302,8 +306,8 @@ void main() {
       final start = DateTime(2026);
       ScreenShareAdaptiveFallbackDecision decision =
           const ScreenShareAdaptiveFallbackDecision(
-        profile: ScreenShareProfileConfig.smooth,
-      );
+            profile: ScreenShareProfileConfig.smooth,
+          );
 
       for (var seconds = 0; seconds <= 8; seconds += 2) {
         decision = controller.evaluate(
@@ -325,43 +329,45 @@ void main() {
       expect(decision.profile.mainLayer.height, 540);
     });
 
-    test('ignores cpu limitation when healthy overload counters are present',
-        () {
-      final controller = ScreenShareAdaptiveFallbackController();
-      final start = DateTime(2026);
-      ScreenShareAdaptiveFallbackDecision decision =
-          const ScreenShareAdaptiveFallbackDecision(
-        profile: ScreenShareProfileConfig.smooth,
-      );
+    test(
+      'ignores cpu limitation when healthy overload counters are present',
+      () {
+        final controller = ScreenShareAdaptiveFallbackController();
+        final start = DateTime(2026);
+        ScreenShareAdaptiveFallbackDecision decision =
+            const ScreenShareAdaptiveFallbackDecision(
+              profile: ScreenShareProfileConfig.smooth,
+            );
 
-      for (var seconds = 0; seconds <= 12; seconds += 2) {
-        decision = controller.evaluate(
-          requestedProfile: ScreenShareProfileConfig.smooth,
-          snapshot: _snapshot(
+        for (var seconds = 0; seconds <= 12; seconds += 2) {
+          decision = controller.evaluate(
+            requestedProfile: ScreenShareProfileConfig.smooth,
+            snapshot: _snapshot(
+              now: start.add(Duration(seconds: seconds)),
+              fps: 30,
+              bitrateBps: 1800000,
+              targetBitrateBps: 1800000,
+              limitation: 'cpu',
+              averageEncodeTimeMs: 12,
+              framesDroppedBeforeEncode: 0,
+              framesDroppedByEncoder: 0,
+              averagePacketSendDelayMs: 20,
+            ),
             now: start.add(Duration(seconds: seconds)),
-            fps: 30,
-            bitrateBps: 1800000,
-            targetBitrateBps: 1800000,
-            limitation: 'cpu',
-            averageEncodeTimeMs: 12,
-            framesDroppedBeforeEncode: 0,
-            framesDroppedByEncoder: 0,
-            averagePacketSendDelayMs: 20,
-          ),
-          now: start.add(Duration(seconds: seconds)),
-        );
-      }
+          );
+        }
 
-      expect(decision.changed, isFalse);
-      expect(decision.profile.profile, ScreenShareQualityProfile.smooth);
-      expect(decision.reason, isNull);
-    });
+        expect(decision.changed, isFalse);
+        expect(decision.profile.profile, ScreenShareQualityProfile.smooth);
+        expect(decision.reason, isNull);
+      },
+    );
 
     test('degrades on cpu limitation with severe FPS collapse', () {
       final controller = ScreenShareAdaptiveFallbackController();
       final start = DateTime(2026);
-      final requestedProfile =
-          ScreenShareProfileConfig.smooth.withHardwareEncodingPreference();
+      final requestedProfile = ScreenShareProfileConfig.smooth
+          .withHardwareEncodingPreference();
       ScreenShareAdaptiveFallbackDecision decision =
           ScreenShareAdaptiveFallbackDecision(profile: requestedProfile);
 
@@ -395,8 +401,8 @@ void main() {
     test('does not degrade on healthy software encoder stats', () {
       final controller = ScreenShareAdaptiveFallbackController();
       final start = DateTime(2026);
-      final requestedProfile =
-          ScreenShareProfileConfig.smooth.withHardwareEncodingPreference();
+      final requestedProfile = ScreenShareProfileConfig.smooth
+          .withHardwareEncodingPreference();
       ScreenShareAdaptiveFallbackDecision decision =
           ScreenShareAdaptiveFallbackDecision(profile: requestedProfile);
 
@@ -426,8 +432,8 @@ void main() {
     test('ignores uncorroborated bandwidth estimate on software encoder', () {
       final controller = ScreenShareAdaptiveFallbackController();
       final start = DateTime(2026);
-      final requestedProfile =
-          ScreenShareProfileConfig.smooth.withHardwareEncodingPreference();
+      final requestedProfile = ScreenShareProfileConfig.smooth
+          .withHardwareEncodingPreference();
       ScreenShareAdaptiveFallbackDecision decision =
           ScreenShareAdaptiveFallbackDecision(profile: requestedProfile);
 
@@ -452,41 +458,43 @@ void main() {
       expect(decision.reason, isNull);
     });
 
-    test('ignores uncorroborated bandwidth limitation without sender symptoms',
-        () {
-      final controller = ScreenShareAdaptiveFallbackController();
-      final start = DateTime(2026);
-      ScreenShareAdaptiveFallbackDecision decision =
-          const ScreenShareAdaptiveFallbackDecision(
-        profile: ScreenShareProfileConfig.smooth,
-      );
+    test(
+      'ignores uncorroborated bandwidth limitation without sender symptoms',
+      () {
+        final controller = ScreenShareAdaptiveFallbackController();
+        final start = DateTime(2026);
+        ScreenShareAdaptiveFallbackDecision decision =
+            const ScreenShareAdaptiveFallbackDecision(
+              profile: ScreenShareProfileConfig.smooth,
+            );
 
-      for (var seconds = 0; seconds <= 8; seconds += 2) {
-        decision = controller.evaluate(
-          requestedProfile: ScreenShareProfileConfig.smooth,
-          snapshot: _snapshot(
+        for (var seconds = 0; seconds <= 8; seconds += 2) {
+          decision = controller.evaluate(
+            requestedProfile: ScreenShareProfileConfig.smooth,
+            snapshot: _snapshot(
+              now: start.add(Duration(seconds: seconds)),
+              fps: 30,
+              bitrateBps: 1800000,
+              targetBitrateBps: 1800000,
+              limitation: 'bandwidth',
+              availableOutgoingBitrateBps: 4000000,
+            ),
             now: start.add(Duration(seconds: seconds)),
-            fps: 30,
-            bitrateBps: 1800000,
-            targetBitrateBps: 1800000,
-            limitation: 'bandwidth',
-            availableOutgoingBitrateBps: 4000000,
-          ),
-          now: start.add(Duration(seconds: seconds)),
-        );
-      }
+          );
+        }
 
-      expect(decision.changed, isFalse);
-      expect(decision.reason, isNull);
-    });
+        expect(decision.changed, isFalse);
+        expect(decision.reason, isNull);
+      },
+    );
 
     test('enters CPU rescue after smooth reaches its lowest fallback', () {
       final controller = ScreenShareAdaptiveFallbackController();
       final start = DateTime(2026);
       ScreenShareAdaptiveFallbackDecision decision =
           const ScreenShareAdaptiveFallbackDecision(
-        profile: ScreenShareProfileConfig.smooth,
-      );
+            profile: ScreenShareProfileConfig.smooth,
+          );
 
       for (var seconds = 0; seconds <= 40; seconds += 2) {
         decision = controller.evaluate(
@@ -517,8 +525,8 @@ void main() {
       final start = DateTime(2026);
       ScreenShareAdaptiveFallbackDecision decision =
           const ScreenShareAdaptiveFallbackDecision(
-        profile: ScreenShareProfileConfig.smooth,
-      );
+            profile: ScreenShareProfileConfig.smooth,
+          );
 
       for (var seconds = 0; seconds <= 8; seconds += 2) {
         decision = controller.evaluate(
@@ -538,40 +546,42 @@ void main() {
       expect(decision.reason, isNull);
     });
 
-    test('does not treat startup bandwidth estimate alone as network proof',
-        () {
-      final controller = ScreenShareAdaptiveFallbackController();
-      final start = DateTime(2026);
-      ScreenShareAdaptiveFallbackDecision decision =
-          const ScreenShareAdaptiveFallbackDecision(
-        profile: ScreenShareProfileConfig.smooth,
-      );
+    test(
+      'does not treat startup bandwidth estimate alone as network proof',
+      () {
+        final controller = ScreenShareAdaptiveFallbackController();
+        final start = DateTime(2026);
+        ScreenShareAdaptiveFallbackDecision decision =
+            const ScreenShareAdaptiveFallbackDecision(
+              profile: ScreenShareProfileConfig.smooth,
+            );
 
-      for (var seconds = 0; seconds <= 8; seconds += 2) {
-        decision = controller.evaluate(
-          requestedProfile: ScreenShareProfileConfig.smooth,
-          snapshot: _snapshot(
+        for (var seconds = 0; seconds <= 8; seconds += 2) {
+          decision = controller.evaluate(
+            requestedProfile: ScreenShareProfileConfig.smooth,
+            snapshot: _snapshot(
+              now: start.add(Duration(seconds: seconds)),
+              fps: 30,
+              bitrateBps: null,
+              targetBitrateBps: 1800000,
+              limitation: 'bandwidth',
+              availableOutgoingBitrateBps: 300000,
+            ),
             now: start.add(Duration(seconds: seconds)),
-            fps: 30,
-            bitrateBps: null,
-            targetBitrateBps: 1800000,
-            limitation: 'bandwidth',
-            availableOutgoingBitrateBps: 300000,
-          ),
-          now: start.add(Duration(seconds: seconds)),
-        );
-      }
+          );
+        }
 
-      expect(decision.changed, isFalse);
-      expect(decision.profile.profile, ScreenShareQualityProfile.smooth);
-      expect(decision.reason, isNull);
-    });
+        expect(decision.changed, isFalse);
+        expect(decision.profile.profile, ScreenShareQualityProfile.smooth);
+        expect(decision.reason, isNull);
+      },
+    );
 
     test('keeps hardware preset on clean low-FPS sender stats', () {
       final controller = ScreenShareAdaptiveFallbackController();
       final start = DateTime(2026);
-      final requestedProfile =
-          ScreenShareProfileConfig.smooth.withHardwareEncodingPreference();
+      final requestedProfile = ScreenShareProfileConfig.smooth
+          .withHardwareEncodingPreference();
       ScreenShareAdaptiveFallbackDecision decision =
           ScreenShareAdaptiveFallbackDecision(profile: requestedProfile);
 
@@ -602,8 +612,8 @@ void main() {
     test('keeps hardware preset on clean low-FPS stats without limitation', () {
       final controller = ScreenShareAdaptiveFallbackController();
       final start = DateTime(2026);
-      final requestedProfile =
-          ScreenShareProfileConfig.highQuality.withHardwareEncodingPreference();
+      final requestedProfile = ScreenShareProfileConfig.highQuality
+          .withHardwareEncodingPreference();
       ScreenShareAdaptiveFallbackDecision decision =
           ScreenShareAdaptiveFallbackDecision(profile: requestedProfile);
 
@@ -634,8 +644,8 @@ void main() {
     test('degrades on sustained capture-stage FPS deficit', () {
       final controller = ScreenShareAdaptiveFallbackController();
       final start = DateTime(2026);
-      final requestedProfile =
-          ScreenShareProfileConfig.balanced.withHardwareEncodingPreference();
+      final requestedProfile = ScreenShareProfileConfig.balanced
+          .withHardwareEncodingPreference();
       ScreenShareAdaptiveFallbackDecision decision =
           ScreenShareAdaptiveFallbackDecision(profile: requestedProfile);
 
@@ -669,88 +679,254 @@ void main() {
       expect(decision.profile.profile, ScreenShareQualityProfile.smooth);
     });
 
-    test('does not shrink below smooth for capture-limited clean sender stats',
-        () {
+    test(
+      'does not shrink below smooth for capture-limited clean sender stats',
+      () {
+        final controller = ScreenShareAdaptiveFallbackController();
+        final start = DateTime(2026);
+        final requestedProfile = ScreenShareProfileConfig.smooth
+            .withHardwareEncodingPreference();
+        ScreenShareAdaptiveFallbackDecision decision =
+            ScreenShareAdaptiveFallbackDecision(profile: requestedProfile);
+
+        for (var seconds = 0; seconds <= 20; seconds += 2) {
+          decision = controller.evaluate(
+            requestedProfile: requestedProfile,
+            snapshot: _snapshot(
+              now: start.add(Duration(seconds: seconds)),
+              fps: 16,
+              captureFps: 16,
+              encodeFps: 16,
+              sendFps: 16,
+              requestedFps: 30,
+              bitrateBps: 1400000,
+              targetBitrateBps: 3000000,
+              availableOutgoingBitrateBps: 19000000,
+              averageEncodeTimeMs: 65,
+              packetLossPercent: 0,
+              packetsLost: 0,
+              nackCount: 0,
+              roundTripTimeMs: 3,
+              hardwareEncodeActive: true,
+              encoderImplementation: 'MediaFoundationH264',
+            ),
+            now: start.add(Duration(seconds: seconds)),
+          );
+        }
+
+        expect(decision.changed, isFalse);
+        expect(decision.reason, 'capture FPS below target');
+        expect(decision.profile.profile, ScreenShareQualityProfile.smooth);
+        expect(decision.profile.mainLayer.width, 1280);
+        expect(decision.profile.mainLayer.height, 720);
+        expect(decision.profile.mainLayer.maxFramerate, 36);
+        expect(decision.profile.mainLayer.targetFramerateForScoring, 30);
+        expect(decision.profile.mainLayer.maxBitrateBps, 3000000);
+        expect(decision.profile.mainLayer.minBitrateBps, 2500000);
+      },
+    );
+
+    test(
+      'does not treat capture-stage FPS deficit as clean when loss exists',
+      () {
+        final controller = ScreenShareAdaptiveFallbackController();
+        final start = DateTime(2026);
+        final requestedProfile = ScreenShareProfileConfig.balanced
+            .withHardwareEncodingPreference();
+        ScreenShareAdaptiveFallbackDecision decision =
+            ScreenShareAdaptiveFallbackDecision(profile: requestedProfile);
+
+        for (var seconds = 0; seconds <= 20; seconds += 2) {
+          decision = controller.evaluate(
+            requestedProfile: requestedProfile,
+            snapshot: _snapshot(
+              now: start.add(Duration(seconds: seconds)),
+              fps: 19,
+              captureFps: 20,
+              encodeFps: 19,
+              sendFps: 19,
+              requestedFps: 30,
+              bitrateBps: 8000000,
+              targetBitrateBps: 8000000,
+              packetLossPercent: 2,
+              packetsLost: 1,
+              nackCount: 1,
+              roundTripTimeMs: 3,
+              hardwareEncodeActive: true,
+              encoderImplementation: 'MediaFoundationH264',
+            ),
+            now: start.add(Duration(seconds: seconds)),
+          );
+        }
+
+        expect(decision.changed, isFalse);
+        expect(decision.profile.profile, ScreenShareQualityProfile.balanced);
+        expect(decision.reason, isNull);
+      },
+    );
+  });
+
+  // BUG-324: the step back up used to jump straight to the requested profile
+  // after 45 s quiet with no memory and no look at the uplink, which on a
+  // persistently poor uplink is a loop of profile changes - and on Windows
+  // every one republishes the share under a new sid.
+  group('ScreenShareAdaptiveFallbackController step up', () {
+    test('steps up one preset at a time instead of jumping to the request', () {
       final controller = ScreenShareAdaptiveFallbackController();
       final start = DateTime(2026);
-      final requestedProfile =
-          ScreenShareProfileConfig.smooth.withHardwareEncodingPreference();
-      ScreenShareAdaptiveFallbackDecision decision =
-          ScreenShareAdaptiveFallbackDecision(profile: requestedProfile);
+      final atSmooth = _degradeToSmooth(controller, start);
 
-      for (var seconds = 0; seconds <= 20; seconds += 2) {
-        decision = controller.evaluate(
-          requestedProfile: requestedProfile,
-          snapshot: _snapshot(
-            now: start.add(Duration(seconds: seconds)),
-            fps: 16,
-            captureFps: 16,
-            encodeFps: 16,
-            sendFps: 16,
-            requestedFps: 30,
-            bitrateBps: 1400000,
-            targetBitrateBps: 3000000,
-            availableOutgoingBitrateBps: 19000000,
-            averageEncodeTimeMs: 65,
-            packetLossPercent: 0,
-            packetsLost: 0,
-            nackCount: 0,
-            roundTripTimeMs: 3,
-            hardwareEncodeActive: true,
-            encoderImplementation: 'MediaFoundationH264',
-          ),
-          now: start.add(Duration(seconds: seconds)),
-        );
-      }
+      _quiet(controller, atSmooth.add(const Duration(seconds: 2)));
+      final firstStep = _quiet(
+        controller,
+        atSmooth.add(const Duration(seconds: 48)),
+      );
+      expect(firstStep.changed, isTrue);
+      expect(firstStep.profile.profile, ScreenShareQualityProfile.balanced);
 
-      expect(decision.changed, isFalse);
-      expect(decision.reason, 'capture FPS below target');
-      expect(decision.profile.profile, ScreenShareQualityProfile.smooth);
-      expect(decision.profile.mainLayer.width, 1280);
-      expect(decision.profile.mainLayer.height, 720);
-      expect(decision.profile.mainLayer.maxFramerate, 36);
-      expect(decision.profile.mainLayer.targetFramerateForScoring, 30);
-      expect(decision.profile.mainLayer.maxBitrateBps, 3000000);
-      expect(decision.profile.mainLayer.minBitrateBps, 2500000);
+      final secondStep = _quiet(
+        controller,
+        atSmooth.add(const Duration(seconds: 94)),
+      );
+      expect(secondStep.changed, isTrue);
+      expect(secondStep.profile.profile, ScreenShareQualityProfile.highQuality);
     });
 
-    test('does not treat capture-stage FPS deficit as clean when loss exists',
-        () {
+    test('a step up that fails inside its window doubles the next hold, and '
+        'one that survives resets it', () {
       final controller = ScreenShareAdaptiveFallbackController();
       final start = DateTime(2026);
-      final requestedProfile =
-          ScreenShareProfileConfig.balanced.withHardwareEncodingPreference();
-      ScreenShareAdaptiveFallbackDecision decision =
-          ScreenShareAdaptiveFallbackDecision(profile: requestedProfile);
+      final atSmooth = _degradeToSmooth(controller, start);
+      _quiet(controller, atSmooth.add(const Duration(seconds: 2)));
+      final stepUp = _quiet(
+        controller,
+        atSmooth.add(const Duration(seconds: 48)),
+      );
+      expect(stepUp.profile.profile, ScreenShareQualityProfile.balanced);
+      final upgradedAt = atSmooth.add(const Duration(seconds: 48));
 
-      for (var seconds = 0; seconds <= 20; seconds += 2) {
-        decision = controller.evaluate(
-          requestedProfile: requestedProfile,
-          snapshot: _snapshot(
-            now: start.add(Duration(seconds: seconds)),
-            fps: 19,
-            captureFps: 20,
-            encodeFps: 19,
-            sendFps: 19,
-            requestedFps: 30,
-            bitrateBps: 8000000,
-            targetBitrateBps: 8000000,
-            packetLossPercent: 2,
-            packetsLost: 1,
-            nackCount: 1,
-            roundTripTimeMs: 3,
-            hardwareEncodeActive: true,
-            encoderImplementation: 'MediaFoundationH264',
-          ),
-          now: start.add(Duration(seconds: seconds)),
-        );
+      // Trouble 2 s after the step up: back to Smooth 8 s later.
+      ScreenShareAdaptiveFallbackDecision? failed;
+      for (var seconds = 2; seconds <= 10; seconds += 2) {
+        failed = _bad(controller, upgradedAt.add(Duration(seconds: seconds)));
       }
+      expect(failed!.changed, isTrue);
+      expect(failed.profile.profile, ScreenShareQualityProfile.smooth);
+      expect(failed.reason, contains('upgrade held 90s'));
+      expect(controller.upgradeHold, const Duration(seconds: 90));
 
-      expect(decision.changed, isFalse);
-      expect(decision.profile.profile, ScreenShareQualityProfile.balanced);
-      expect(decision.reason, isNull);
+      final failedAt = upgradedAt.add(const Duration(seconds: 10));
+      _quiet(controller, failedAt.add(const Duration(seconds: 2)));
+      final tooEarly = _quiet(
+        controller,
+        failedAt.add(const Duration(seconds: 48)),
+      );
+      expect(tooEarly.changed, isFalse);
+      expect(tooEarly.profile.profile, ScreenShareQualityProfile.smooth);
+      final afterHold = _quiet(
+        controller,
+        failedAt.add(const Duration(seconds: 93)),
+      );
+      expect(afterHold.changed, isTrue);
+      expect(afterHold.profile.profile, ScreenShareQualityProfile.balanced);
+
+      // Quiet for longer than the failure window: hold back to base, and the
+      // next step lands on High Quality.
+      final survived = _quiet(
+        controller,
+        failedAt.add(const Duration(seconds: 93 + 61)),
+      );
+      expect(controller.upgradeHold, const Duration(seconds: 45));
+      expect(survived.changed, isTrue);
+      expect(survived.profile.profile, ScreenShareQualityProfile.highQuality);
+    });
+
+    test('holds the step up while the uplink estimate cannot carry the next '
+        'profile', () {
+      final controller = ScreenShareAdaptiveFallbackController();
+      final start = DateTime(2026);
+      final atSmooth = _degradeToSmooth(controller, start);
+
+      _quiet(
+        controller,
+        atSmooth.add(const Duration(seconds: 2)),
+        availableOutgoingBitrateBps: 1500000,
+      );
+      final held = _quiet(
+        controller,
+        atSmooth.add(const Duration(seconds: 48)),
+        availableOutgoingBitrateBps: 1500000,
+      );
+      expect(held.changed, isFalse);
+      expect(held.profile.profile, ScreenShareQualityProfile.smooth);
+      expect(held.reason, contains('uplink estimate 1.5Mbps'));
+      expect(held.reason, contains('Balanced'));
+
+      // The estimate rises: the step up goes on the next evaluation, without
+      // restarting the quiet clock.
+      final released = _quiet(
+        controller,
+        atSmooth.add(const Duration(seconds: 50)),
+        availableOutgoingBitrateBps: 5000000,
+      );
+      expect(released.changed, isTrue);
+      expect(released.profile.profile, ScreenShareQualityProfile.balanced);
     });
   });
+}
+
+/// Corroborated bandwidth trouble on a High Quality request.
+ScreenShareAdaptiveFallbackDecision _bad(
+  ScreenShareAdaptiveFallbackController controller,
+  DateTime now,
+) {
+  return controller.evaluate(
+    requestedProfile: ScreenShareProfileConfig.highQuality,
+    snapshot: _snapshot(
+      now: now,
+      fps: 18,
+      bitrateBps: 2000000,
+      targetBitrateBps: 6000000,
+      limitation: 'bandwidth',
+      availableOutgoingBitrateBps: 1200000,
+      packetLossPercent: 3,
+      packetsLost: 12,
+    ),
+    now: now,
+  );
+}
+
+/// A clean sender on a High Quality request.
+ScreenShareAdaptiveFallbackDecision _quiet(
+  ScreenShareAdaptiveFallbackController controller,
+  DateTime now, {
+  int? availableOutgoingBitrateBps,
+}) {
+  return controller.evaluate(
+    requestedProfile: ScreenShareProfileConfig.highQuality,
+    snapshot: _snapshot(
+      now: now,
+      fps: 30,
+      bitrateBps: 1500000,
+      targetBitrateBps: 1800000,
+      availableOutgoingBitrateBps: availableOutgoingBitrateBps,
+    ),
+    now: now,
+  );
+}
+
+/// Drives a High Quality request down to Smooth: Balanced at +8 s, Smooth at
+/// +16 s. Returns the time of the Smooth decision.
+DateTime _degradeToSmooth(
+  ScreenShareAdaptiveFallbackController controller,
+  DateTime start,
+) {
+  ScreenShareAdaptiveFallbackDecision? decision;
+  for (var seconds = 0; seconds <= 16; seconds += 2) {
+    decision = _bad(controller, start.add(Duration(seconds: seconds)));
+  }
+  expect(decision!.profile.profile, ScreenShareQualityProfile.smooth);
+  return start.add(const Duration(seconds: 16));
 }
 
 VoipCallDiagnosticsSnapshot _snapshot({

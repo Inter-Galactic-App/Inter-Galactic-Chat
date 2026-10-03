@@ -1,7 +1,6 @@
 # Bug Reporting Flow
 
 Status: implemented
-Owner: DEBUG / Help & diagnostics
 Last updated: 2026-07-23
 
 ## Guided Diagnostic Interview (2026-07-23)

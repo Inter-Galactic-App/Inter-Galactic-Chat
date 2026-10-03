@@ -1,7 +1,6 @@
 # Accessibility Focus And Hover Audit
 
 Status: active audit and QA smoke checklist
-Owner: DESIGN
 Last updated: 2026-06-23
 Source backlog item: P19 in the workspace UX/UI polish backlog
 
@@ -37,17 +36,17 @@ guide the next full QA smoke and later owner-scoped fixes.
 
 ## Findings
 
-| ID | Surface | Finding | QA smoke requirement | Follow-up owner |
-| --- | --- | --- | --- | --- |
-| A11Y-01 | Settings state panels | Shared `SettingsStatePanel` gives Discover a consistent inline recovery pattern, but older settings pages still mix plain error text, snackbars, and modal errors. | Tab through panels and confirm retry/refresh actions are reachable, focus remains predictable, and mobile action wrapping does not hide the button. | DESIGN for pattern migration, feature owner for behavior-specific errors |
-| A11Y-02 | Settings account header | The shared settings account selector moved account scope out of individual tabs. The header now needs routine keyboard and screen-reader smoke because it is a high-value clickable control. | Open settings with multiple accounts, use keyboard to reach the account header, change accounts, and confirm the selected account is announced and applied. | DESIGN / FEATURES only if account-scope behavior changes |
-| A11Y-03 | Discover result cards | Discover uses shared chips and state panels, but result cards include dense metadata, running actions, and inline outcomes that can crowd on mobile. | Keyboard through search, filters, result cards, Join/Request buttons, load more, and retry. On mobile, confirm actions remain visible without relying on hover. | DESIGN / QA |
-| A11Y-04 | Room creation chooser | The chooser now has clearer copy and layout, but it is a modal decision point with selectable rows/cards and a primary `Next` action. | Tab through existing room, each room type, back/next/cancel. Confirm selected state is not color-only and mobile tap targets are large enough. | DESIGN |
-| A11Y-05 | Space categories | Category headers visually use text and tapered rules; expand/collapse motion is reduced-motion aware. The key accessibility risk is whether the header exposes a usable button-like target and expanded/collapsed state. | Use keyboard and mobile touch to collapse/expand categories with several rooms. Confirm no hidden child row can receive focus while collapsed. | DESIGN, FEATURES if category state behavior changes |
-| A11Y-06 | Timeline hover actions | Desktop timeline and media surfaces still use hover/context affordances in several places. Mobile focused-media actions exist, but failed-send retry/cancel must remain reachable without hover. | Smoke normal message actions, focused image/video actions, failed media retry/cancel, and context menus by mouse, keyboard, and mobile long press. | DESIGN after FEATURES/QA clears media behavior |
-| A11Y-07 | Snooze compact buttons | Snooze controls already use compact visible labels with fuller semantics labels. This should be treated as the pattern for dense controls. | Confirm `30 m` style visible labels do not clip and screen-reader labels still announce the full duration. | DESIGN |
-| A11Y-08 | Settings search target highlight | Search opens matching settings surfaces, but row-level highlight/scroll remains backlog P07 rather than part of this audit. | During smoke, note any search result that opens a long tab without making the matching row obvious. | DESIGN / FEATURES for a later anchor contract |
-| A11Y-09 | Calls and stories | Calls, PiP, story video, and platform permission flows are high-risk and were intentionally deferred from this broad audit. | Do not treat this pass as call/story accessibility clearance. | IOS / EXPERIMENTAL / FEATURES / DESIGN later |
+| ID | Surface | Finding | QA smoke requirement |
+| --- | --- | --- | --- |
+| A11Y-01 | Settings state panels | Shared `SettingsStatePanel` gives Discover a consistent inline recovery pattern, but older settings pages still mix plain error text, snackbars, and modal errors. | Tab through panels and confirm retry/refresh actions are reachable, focus remains predictable, and mobile action wrapping does not hide the button. |
+| A11Y-02 | Settings account header | The shared settings account selector moved account scope out of individual tabs. The header now needs routine keyboard and screen-reader smoke because it is a high-value clickable control. | Open settings with multiple accounts, use keyboard to reach the account header, change accounts, and confirm the selected account is announced and applied. |
+| A11Y-03 | Discover result cards | Discover uses shared chips and state panels, but result cards include dense metadata, running actions, and inline outcomes that can crowd on mobile. | Keyboard through search, filters, result cards, Join/Request buttons, load more, and retry. On mobile, confirm actions remain visible without relying on hover. |
+| A11Y-04 | Room creation chooser | The chooser now has clearer copy and layout, but it is a modal decision point with selectable rows/cards and a primary `Next` action. | Tab through existing room, each room type, back/next/cancel. Confirm selected state is not color-only and mobile tap targets are large enough. |
+| A11Y-05 | Space categories | Category headers visually use text and tapered rules; expand/collapse motion is reduced-motion aware. The key accessibility risk is whether the header exposes a usable button-like target and expanded/collapsed state. | Use keyboard and mobile touch to collapse/expand categories with several rooms. Confirm no hidden child row can receive focus while collapsed. |
+| A11Y-06 | Timeline hover actions | Desktop timeline and media surfaces still use hover/context affordances in several places. Mobile focused-media actions exist, but failed-send retry/cancel must remain reachable without hover. | Smoke normal message actions, focused image/video actions, failed media retry/cancel, and context menus by mouse, keyboard, and mobile long press. |
+| A11Y-07 | Snooze compact buttons | Snooze controls already use compact visible labels with fuller semantics labels. This should be treated as the pattern for dense controls. | Confirm `30 m` style visible labels do not clip and screen-reader labels still announce the full duration. |
+| A11Y-08 | Settings search target highlight | Search opens matching settings surfaces, but row-level highlight/scroll remains backlog P07 rather than part of this audit. | During smoke, note any search result that opens a long tab without making the matching row obvious. |
+| A11Y-09 | Calls and stories | Calls, PiP, story video, and platform permission flows are high-risk and were intentionally deferred from this broad audit. | Do not treat this pass as call/story accessibility clearance. |
 
 ## QA Smoke Pass Criteria
 

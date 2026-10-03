@@ -73,6 +73,9 @@ class WindowManager {
   HWND native_window = nullptr;
 
   int last_state = STATE_NORMAL;
+  // Suppress the transient restored-size event during a fullscreen exit that
+  // will end maximized. The final SIZE_MAXIMIZED is still delivered.
+  bool restoring_maximized_from_fullscreen = false;
 
   bool has_shadow_ = false;
   bool is_always_on_bottom_ = false;
@@ -615,12 +618,22 @@ void WindowManager::SetFullScreen(const flutter::EncodableMap& args) {
                      SWP_NOMOVE | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
     }
   } else {  // Restore from fullscreen
+    restoring_maximized_from_fullscreen = g_maximized_before_fullscreen;
     // if (!g_maximized_before_fullscreen)
     //   Restore();
     ::SetWindowLongPtr(
         mainWindow, GWL_STYLE,
         g_style_before_fullscreen | (WS_THICKFRAME | WS_MAXIMIZEBOX));
-    if (::IsZoomed(mainWindow)) {
+    if (g_maximized_before_fullscreen) {
+      // Reapplying the restored frame while the window is still zoomed leaves
+      // Windows with the fullscreen monitor bounds as its maximized placement.
+      // A posted SC_MAXIMIZE is also too late: Dart can reapply the hidden
+      // title bar before that message runs. Force a synchronous state change
+      // so Windows recalculates the maximized work area with the restored
+      // style before SetFullScreen returns.
+      ::ShowWindow(mainWindow, SW_RESTORE);
+      ::ShowWindow(mainWindow, SW_MAXIMIZE);
+
       // Refresh the parent mainWindow.
       ::SetWindowPos(mainWindow, nullptr, 0, 0, 0, 0,
                      SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
@@ -632,8 +645,7 @@ void WindowManager::SetFullScreen(const flutter::EncodableMap& args) {
       ::SetWindowPos(flutter_view, nullptr, rect.left, rect.top,
                      rect.right - rect.left, rect.bottom - rect.top,
                      SWP_NOACTIVATE | SWP_NOZORDER);
-      if (g_maximized_before_fullscreen)
-        PostMessage(mainWindow, WM_SYSCOMMAND, SC_MAXIMIZE, 0);
+      restoring_maximized_from_fullscreen = false;
     } else {
       ::SetWindowPos(
           mainWindow, nullptr, g_frame_before_fullscreen.left,

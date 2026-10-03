@@ -1476,10 +1476,10 @@ function Install-WindowsVideoRendererLatestFramePatch {
 
   $source = [System.IO.File]::ReadAllText($target)
   $nl = if ($source.Contains("`r`n")) { "`r`n" } else { "`n" }
-  $rendererPatchMarker = "Inter Galactic: do not hold renderer frame mutex while converting"
+  $rendererPatchMarker = "Inter Galactic: retain pixel buffers through Flutter texture upload"
 
   if ($source.Contains($rendererPatchMarker)) {
-    Write-Host "Flutter WebRTC video renderer patch: latest-frame mutex behavior already applied."
+    Write-Host "Flutter WebRTC video renderer patch: pixel-buffer lifetime guard already applied."
     return $null
   }
 
@@ -1494,37 +1494,37 @@ const FlutterDesktopPixelBuffer* FlutterVideoRenderer::CopyPixelBuffer(
   (void)height;
 
   scoped_refptr<RTCVideoFrame> frame;
-  std::shared_ptr<FlutterDesktopPixelBuffer> pixel_buffer;
   {
     std::lock_guard<std::mutex> lock(mutex_);
     frame = frame_;
-    pixel_buffer = pixel_buffer_;
   }
 
-  if (!pixel_buffer.get() || !frame.get()) {
+  if (!frame.get() || frame->width() <= 0 || frame->height() <= 0) {
     return nullptr;
   }
 
-  if (pixel_buffer->width != frame->width() ||
-      pixel_buffer->height != frame->height()) {
-    size_t buffer_size =
-        (size_t(frame->width()) * size_t(frame->height())) * (32 >> 3);
-    rgb_buffer_.reset(new uint8_t[buffer_size],
-                      std::default_delete<uint8_t[]>());
-    pixel_buffer->width = frame->width();
-    pixel_buffer->height = frame->height();
-  }
-
-  // Inter Galactic: do not hold renderer frame mutex while converting.
-  // Native preview frames can arrive on a WebRTC source/broadcaster thread;
-  // holding this lock during I420->ABGR conversion lets Flutter texture pulls
-  // block the newest-frame handoff and makes the local stream tile stale.
-  frame->ConvertToARGB(RTCVideoFrame::Type::kABGR, rgb_buffer_.get(), 0,
-                       static_cast<int>(pixel_buffer->width),
-                       static_cast<int>(pixel_buffer->height));
-
-  pixel_buffer->buffer = rgb_buffer_.get();
-  return pixel_buffer.get();
+  // Inter Galactic: retain pixel buffers through Flutter texture upload.
+  // Flutter reads the returned pointer after this callback returns. A remote
+  // track can disappear meanwhile, so neither the renderer nor its reusable
+  // buffer may own the pixels handed to Flutter.
+  struct PixelBufferLease {
+    FlutterDesktopPixelBuffer pixel_buffer{};
+    std::unique_ptr<uint8_t[]> pixels;
+  };
+  auto lease = std::make_unique<PixelBufferLease>();
+  lease->pixel_buffer.width = frame->width();
+  lease->pixel_buffer.height = frame->height();
+  const size_t buffer_size = size_t(frame->width()) * size_t(frame->height()) * 4;
+  lease->pixels = std::make_unique<uint8_t[]>(buffer_size);
+  frame->ConvertToARGB(RTCVideoFrame::Type::kABGR, lease->pixels.get(), 0,
+                       static_cast<int>(lease->pixel_buffer.width),
+                       static_cast<int>(lease->pixel_buffer.height));
+  lease->pixel_buffer.buffer = lease->pixels.get();
+  lease->pixel_buffer.release_callback = [](void* context) {
+    delete static_cast<PixelBufferLease*>(context);
+  };
+  lease->pixel_buffer.release_context = lease.get();
+  return &lease.release()->pixel_buffer;
 }
 '@
     $copyPixelBuffer = $copyPixelBuffer -replace "\r?\n", $nl
@@ -1533,11 +1533,11 @@ const FlutterDesktopPixelBuffer* FlutterVideoRenderer::CopyPixelBuffer(
       -Source $source `
       -Pattern 'const FlutterDesktopPixelBuffer\* FlutterVideoRenderer::CopyPixelBuffer\([\s\S]*?\r?\n}\r?\n\r?\nvoid FlutterVideoRenderer::OnFrame' `
       -Replacement ($copyPixelBuffer + "${nl}${nl}void FlutterVideoRenderer::OnFrame") `
-      -Description "video renderer latest-frame mutex copy"
+      -Description "video renderer pixel-buffer lifetime copy"
 
     $utf8NoBom = New-Object System.Text.UTF8Encoding $false
     [System.IO.File]::WriteAllText($target, $source, $utf8NoBom)
-    Write-Host "Flutter WebRTC video renderer patch: installed latest-frame mutex copy."
+    Write-Host "Flutter WebRTC video renderer patch: installed pixel-buffer lifetime guard."
     return $backup
   } catch {
     $originalError = $_

@@ -12,7 +12,6 @@ import 'package:intergalactic/ui/molecules/timeline_events/timeline_event_menu.d
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:just_the_tooltip/just_the_tooltip.dart';
 import 'package:tiamat/atoms/context_menu.dart';
 import 'package:tiamat/atoms/tile.dart';
 
@@ -42,7 +41,6 @@ class TimelineOverlayState extends State<TimelineOverlay> {
   static const double iosJumpButtonComposerOverlap = 12;
 
   TimelineEventMenu? currentMenu;
-  JustTheController controller = JustTheController();
   PageStorageBucket storage = PageStorageBucket();
 
   TimelineEventMenuEntry? selectedEntry;
@@ -68,53 +66,66 @@ class TimelineOverlayState extends State<TimelineOverlay> {
         ? math.max(0.0, widget.bottomInset - iosJumpButtonComposerOverlap)
         : widget.bottomInset;
 
-    return Stack(
-      children: [
-        if (widget.showMessageMenu)
-          Positioned(
+    // The LayoutBuilder reports the timeline's own width. The hover menu is a
+    // follower anchored at the message's right edge that grows leftwards, and
+    // it lives inside the timeline's ClipRect - so in the call-room side rail
+    // (280-340 px) a menu built for a full-width chat was cut off at the
+    // panel's left edge. The right-click menu is unaffected because it is
+    // rendered in the root overlay.
+    return LayoutBuilder(
+      builder: (context, constraints) => Stack(
+        children: [
+          if (widget.showMessageMenu)
+            Positioned(
+              right: 0,
+              top: 0,
+              child: CompositedTransformFollower(
+                targetAnchor: Alignment.topRight,
+                followerAnchor: openDownwards == true
+                    ? Alignment.topRight
+                    : Alignment.bottomRight,
+                showWhenUnlinked: false,
+                offset: Offset(-20, openDownwards == true ? -50 : 0),
+                link: widget.link,
+                child: ExcludeSemantics(
+                  child: MouseRegion(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                      child: buildTooltipMenu(
+                        child: buildPrimaryMenu(
+                          context,
+                          maxWidth: constraints.maxWidth,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          AnimatedPositioned(
+            left: 0,
             right: 0,
-            top: 0,
-            child: CompositedTransformFollower(
-              targetAnchor: Alignment.topRight,
-              followerAnchor: openDownwards == true
-                  ? Alignment.topRight
-                  : Alignment.bottomRight,
-              showWhenUnlinked: false,
-              offset: Offset(-20, openDownwards == true ? -50 : 0),
-              link: widget.link,
-              child: ExcludeSemantics(
-                child: MouseRegion(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-                    child: buildTooltipMenu(child: buildPrimaryMenu(context)),
+            bottom: isAttatchedToBottom
+                ? hiddenJumpButtonBottom
+                : jumpButtonBottom,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOutCubic,
+            child: IgnorePointer(
+              ignoring: isAttatchedToBottom,
+              child: AnimatedOpacity(
+                opacity: isAttatchedToBottom ? 0 : 1,
+                duration: const Duration(milliseconds: 120),
+                child: Center(
+                  child: RoomTimelineOverlayButton(
+                    text: labelJumpToLatest,
+                    onTap: widget.jumpToLatest,
                   ),
                 ),
               ),
             ),
           ),
-        AnimatedPositioned(
-          left: 0,
-          right: 0,
-          bottom: isAttatchedToBottom
-              ? hiddenJumpButtonBottom
-              : jumpButtonBottom,
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeInOutCubic,
-          child: IgnorePointer(
-            ignoring: isAttatchedToBottom,
-            child: AnimatedOpacity(
-              opacity: isAttatchedToBottom ? 0 : 1,
-              duration: const Duration(milliseconds: 120),
-              child: Center(
-                child: RoomTimelineOverlayButton(
-                  text: labelJumpToLatest,
-                  onTap: widget.jumpToLatest,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -154,17 +165,65 @@ class TimelineOverlayState extends State<TimelineOverlay> {
     );
   }
 
-  Widget buildPrimaryMenu(BuildContext context) {
+  /// Width of one action button, quick reactions included.
+  static const double actionSize = 30;
+
+  /// Everything in the menu row that is not a quick reaction, in pixels:
+  /// the follower's outer padding (20 + 20), the row's inner padding (4 + 4),
+  /// the 1 px border on each side, and the default `VerticalDivider` width
+  /// after the add-reaction button.
+  static const double _menuOuterPadding = 40;
+  static const double _menuInnerPadding = 8;
+  static const double _menuBorder = 2;
+  static const double _dividerWidth = 16;
+
+  /// How many quick reactions fit beside the fixed actions in [maxWidth].
+  ///
+  /// The fixed actions - add reaction, the primary actions, and the options
+  /// button - always show; quick reactions are the only part that can give.
+  /// Clamped to `[0, quickReactionCount]`. An unbounded width - a
+  /// LayoutBuilder under a horizontally unconstrained parent reports
+  /// infinity - fits everything; `(infinity / size).floor()` throws.
+  static int quickReactionsThatFit({
+    required double maxWidth,
+    required int quickReactionCount,
+    required int primaryActionCount,
+    required bool hasAddReaction,
+  }) {
+    if (!maxWidth.isFinite) {
+      return quickReactionCount;
+    }
+    final fixed =
+        _menuOuterPadding +
+        _menuInnerPadding +
+        _menuBorder +
+        (hasAddReaction ? actionSize + _dividerWidth : 0) +
+        primaryActionCount * actionSize +
+        actionSize; // options
+    final room = maxWidth - fixed;
+    if (room <= 0) {
+      return 0;
+    }
+    return math.min((room / actionSize).floor(), quickReactionCount);
+  }
+
+  Widget buildPrimaryMenu(BuildContext context, {required double maxWidth}) {
     var reactions = currentMenu?.quickReactions;
     if (reactions != null) {
-      if (reactions.length > RecentEmoticonComponent.quickReactionCount) {
-        reactions = reactions.sublist(
-          0,
+      final fit = quickReactionsThatFit(
+        maxWidth: maxWidth,
+        quickReactionCount: math.min(
+          reactions.length,
           RecentEmoticonComponent.quickReactionCount,
-        );
+        ),
+        primaryActionCount: currentMenu?.primaryActions.length ?? 0,
+        hasAddReaction: currentMenu?.addReactionAction != null,
+      );
+      if (reactions.length > fit) {
+        reactions = reactions.sublist(0, fit);
       }
     }
-    const double size = 30;
+    const double size = actionSize;
 
     return MouseRegion(
       child: DecoratedBox(

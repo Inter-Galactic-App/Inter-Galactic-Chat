@@ -18,6 +18,7 @@ import 'package:intergalactic/ui/pages/settings/settings_account_scope.dart';
 import 'package:intergalactic/ui/pages/settings/settings_navigation.dart';
 import 'package:intergalactic/ui/pages/settings/space_settings_page.dart';
 import 'package:intl/intl.dart';
+import 'package:tiamat/tiamat.dart' as tiamat;
 
 @visibleForTesting
 Color soundboardPreviewPackSurface(ColorScheme scheme) =>
@@ -602,8 +603,8 @@ class _SoundboardPackPreview extends StatelessWidget {
                     ),
                   ),
                 ),
-                Tooltip(
-                  message: enabled
+                tiamat.Tooltip(
+                  text: enabled
                       ? 'Remove pack from favorites'
                       : 'Add pack to favorites',
                   child: IconButton(

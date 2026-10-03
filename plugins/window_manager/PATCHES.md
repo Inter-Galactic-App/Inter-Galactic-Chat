@@ -43,11 +43,29 @@ getter now falls back to `NSApplication.shared.mainWindow` / `keyWindow` /
 real window is registered (a throwaway fallback window is never key).
 
 Discovered during the WebRTC 1.5.2 macOS spike
-(`docs/agent-control/ios/webrtc-1.5.2-phase0a-ios-handoff-2026-07-11.md`);
+(`webrtc-1.5.2` maintainer migration notes);
 pre-existing and unrelated to that migration.
+
+## 4. Recompute maximized Windows bounds when leaving fullscreen
+
+`windows/window_manager.cpp` (`SetFullScreen`) and
+`windows/window_manager_plugin.cpp` (`WM_SIZE` state handling).
+
+Upstream restores a fullscreen window's frame while it is still zoomed, then
+posts another `SC_MAXIMIZE`. For a window that was already maximized before
+fullscreen, the posted message can run after the app reapplies its hidden title
+bar and leave the maximized frame above the monitor work area. The vendored
+plugin now performs a synchronous restore/maximize transition after restoring
+the native style so Windows recalculates the work area before the method call
+returns. The corresponding `WM_SIZE` transition also recognizes a maximized
+fullscreen exit and clears the fullscreen event state.
+The intermediate `SIZE_RESTORED` notification from `SW_RESTORE` is suppressed
+while the originally maximized window is being restored. Only the final
+`SIZE_MAXIMIZED` emits `leave-full-screen`, so Dart never sees a transient
+normal state to persist.
 
 ## Upgrading
 
-Re-vendor the new upstream version and re-apply all three patches (or drop them
+Re-vendor the new upstream version and re-apply all four patches (or drop them
 if upstream fixes multi-window delegate scoping, the version check, and the
-macOS nil-unwrap).
+macOS nil-unwrap, and the maximized fullscreen restore ordering).

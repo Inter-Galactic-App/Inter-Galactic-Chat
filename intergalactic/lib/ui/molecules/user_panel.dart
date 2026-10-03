@@ -540,8 +540,13 @@ class ClientConnectionStatusBadge extends StatelessWidget {
         return switch (snapshot.data?.status) {
           ClientConnectionStatus.connecting => Semantics(
             label: 'Account connecting',
-            child: material.Tooltip(
-              message: 'Connecting',
+            // excludeFromSemantics: the enclosing Semantics already
+            // labels this dot ('Account connecting'), and the house
+            // tooltip announces by default - without this a reader says it
+            // twice, which is the D7 trap SpaceIcon hit.
+            child: tiamat.Tooltip(
+              text: 'Connecting',
+              excludeFromSemantics: true,
               child: SizedBox(
                 width: 12,
                 height: 12,
@@ -551,8 +556,13 @@ class ClientConnectionStatusBadge extends StatelessWidget {
           ),
           ClientConnectionStatus.disconnected => Semantics(
             label: 'Account disconnected',
-            child: material.Tooltip(
-              message: 'Disconnected',
+            // excludeFromSemantics: the enclosing Semantics already
+            // labels this dot ('Account disconnected'), and the house
+            // tooltip announces by default - without this a reader says it
+            // twice, which is the D7 trap SpaceIcon hit.
+            child: tiamat.Tooltip(
+              text: 'Disconnected',
+              excludeFromSemantics: true,
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.error,

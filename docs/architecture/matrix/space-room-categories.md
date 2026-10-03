@@ -1,7 +1,6 @@
 # Space Room Categories
 
 Date: 2026-06-10
-Owner: FEATURES
 
 ## Scope
 
@@ -96,6 +95,8 @@ so duplicate names remain distinguishable.
 This feature writes a Matrix-visible custom state event, but that event is
 Inter Galactic metadata only. It must not be used as a substitute for Matrix
 space child state, permissions, membership, or canonical room ordering.
+The event type and content-versioning convention is documented in
+[Custom Matrix Event Identifiers](custom-event-identifiers.md).
 
 Category membership and category order are managed from Space Settings.
 Canonical Matrix room order remains the Matrix space-child order. Category

@@ -1,7 +1,6 @@
 # Layout And Spacing
 
 Status: active design reference
-Owner: DESIGN
 Last updated: 2026-05-13
 
 ## Layout Principles

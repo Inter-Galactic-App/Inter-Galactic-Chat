@@ -178,7 +178,7 @@ class EmoticonEditorMobile extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: tiamat.Text.labelEmphasised(
-              EmoticonCreatorStrings.titleCutoutEditor,
+              EmoticonCreatorStrings.titleEmoticonCutoutEditor,
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -188,7 +188,7 @@ class EmoticonEditorMobile extends StatelessWidget {
             height: 40,
             child: tiamat.Button(
               key: const ValueKey('emoticon-editor-done'),
-              text: EmoticonCreatorStrings.promptDone,
+              text: EmoticonCreatorStrings.promptEmoticonEditorDone,
               onTap: () => _close(context, commit: true),
             ),
           ),

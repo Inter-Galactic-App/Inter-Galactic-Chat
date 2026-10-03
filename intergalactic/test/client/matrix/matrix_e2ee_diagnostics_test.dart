@@ -4,32 +4,193 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:intergalactic/client/matrix/matrix_e2ee_diagnostics.dart';
 
 void main() {
-  group('MatrixPersistentRequestableSessionRepairDispatcher', () {
-    test('coalesces concurrent dispatches and permits a later retry', () async {
-      final callbackStarted = Completer<void>();
-      final releaseCallback = Completer<void>();
-      var callbackCount = 0;
-      final dispatcher = MatrixPersistentRequestableSessionRepairDispatcher(
-        isDisposed: () => false,
-        callback: () async {
-          callbackCount++;
-          callbackStarted.complete();
-          await releaseCallback.future;
-        },
+  group('MatrixE2eeBackupProbeScope', () {
+    test('bounds probes to two candidates and aggregates outcomes', () async {
+      final scope = MatrixE2eeBackupProbeScope(
+        enabled: true,
+        budget: const Duration(seconds: 5),
       );
+      var probeCount = 0;
 
-      final first = dispatcher.dispatch(suppressAutomaticRepair: false);
-      await callbackStarted.future;
-      final second = dispatcher.dispatch(suppressAutomaticRepair: false);
+      await scope.record((_) async {
+        probeCount++;
+        return MatrixE2eeBackupProbeOutcome.inBackup;
+      });
+      await scope.record((_) async {
+        probeCount++;
+        return MatrixE2eeBackupProbeOutcome.notInBackup;
+      });
+      await scope.record((_) async {
+        probeCount++;
+        return MatrixE2eeBackupProbeOutcome.inBackup;
+      });
 
-      expect(identical(first, second), isTrue);
-      expect(callbackCount, 1);
-
-      releaseCallback.complete();
-      await first;
-      await dispatcher.dispatch(suppressAutomaticRepair: false);
-      expect(callbackCount, 2);
+      final summary = await scope.finish();
+      expect(probeCount, 2);
+      expect(summary.candidates, 3);
+      expect(summary.inBackup, 1);
+      expect(summary.notInBackup, 1);
+      expect(summary.versionUnusable, 0);
+      expect(summary.skippedBudget, 1);
     });
+
+    test(
+      'skips a candidate when less than one probe timeout remains',
+      () async {
+        var now = DateTime.utc(2026, 9, 12, 13);
+        final scope = MatrixE2eeBackupProbeScope(
+          enabled: true,
+          budget: const Duration(milliseconds: 749),
+          now: () => now,
+        );
+
+        var probeCount = 0;
+        await scope.record((_) async {
+          probeCount++;
+          return MatrixE2eeBackupProbeOutcome.inBackup;
+        });
+
+        now = now.add(const Duration(milliseconds: 749));
+        final summary = await scope.finish();
+        expect(probeCount, 0);
+        expect(summary.candidates, 1);
+        expect(summary.skippedBudget, 1);
+      },
+    );
+
+    test('does nothing outside developer mode', () async {
+      final scope = MatrixE2eeBackupProbeScope(
+        enabled: false,
+        budget: const Duration(seconds: 5),
+      );
+      var probeCount = 0;
+
+      await scope.record((_) async {
+        probeCount++;
+        return MatrixE2eeBackupProbeOutcome.inBackup;
+      });
+
+      final summary = await scope.finish();
+      expect(probeCount, 0);
+      expect(summary.candidates, 0);
+      expect(summary.inBackup, 0);
+      expect(summary.skippedBudget, 0);
+    });
+
+    test(
+      'rejects an unrelated client decrypt failure from a route-matched wake aggregate',
+      () async {
+        final scope = MatrixE2eeBackupProbeScope(
+          enabled: true,
+          budget: const Duration(seconds: 5),
+          routeClientId: 'routed-client',
+          routeRoomId: '!routed:example.org',
+          routeEventId: r'$routed',
+        );
+        var probeCount = 0;
+
+        await scope.recordForRoute(
+          clientId: 'unrelated-client',
+          roomId: '!routed:example.org',
+          eventId: r'$routed',
+          probe: (_) async {
+            probeCount++;
+            return MatrixE2eeBackupProbeOutcome.inBackup;
+          },
+        );
+
+        var summary = await scope.finish();
+        expect(probeCount, 0);
+        expect(summary.candidates, 0);
+        expect(summary.inBackup, 0);
+
+        // The exact routed event still records normally; the isolation above
+        // is not a blanket probe disablement.
+        final matchedScope = MatrixE2eeBackupProbeScope(
+          enabled: true,
+          budget: const Duration(seconds: 5),
+          routeClientId: 'routed-client',
+          routeRoomId: '!routed:example.org',
+          routeEventId: r'$routed',
+        );
+        await matchedScope.recordForRoute(
+          clientId: 'routed-client',
+          roomId: '!routed:example.org',
+          eventId: r'$routed',
+          probe: (_) async {
+            probeCount++;
+            return MatrixE2eeBackupProbeOutcome.inBackup;
+          },
+        );
+        summary = await matchedScope.finish();
+        expect(probeCount, 1);
+        expect(summary.candidates, 1);
+        expect(summary.inBackup, 1);
+      },
+    );
+  });
+
+  group('MatrixPersistentRequestableSessionRepairDispatcher', () {
+    test(
+      'queues one follow-up when dispatch overlaps an active retry',
+      () async {
+        final callbackStarted = Completer<void>();
+        final releaseCallback = Completer<void>();
+        var callbackCount = 0;
+        final dispatcher = MatrixPersistentRequestableSessionRepairDispatcher(
+          isDisposed: () => false,
+          callback: () async {
+            callbackCount++;
+            if (!callbackStarted.isCompleted) {
+              callbackStarted.complete();
+            }
+            await releaseCallback.future;
+          },
+        );
+
+        final first = dispatcher.dispatch(suppressAutomaticRepair: false);
+        await callbackStarted.future;
+        final second = dispatcher.dispatch(suppressAutomaticRepair: false);
+
+        expect(identical(first, second), isTrue);
+        expect(callbackCount, 1);
+
+        releaseCallback.complete();
+        await first;
+        await Future<void>.delayed(Duration.zero);
+        expect(callbackCount, 2);
+      },
+    );
+
+    test(
+      'a suppressed dispatch overlapping an active retry queues no follow-up',
+      () async {
+        // The trailing rerun always dispatches unsuppressed. That is only
+        // safe while a suppressed call returns before it can request one.
+        final callbackStarted = Completer<void>();
+        final releaseCallback = Completer<void>();
+        var callbackCount = 0;
+        final dispatcher = MatrixPersistentRequestableSessionRepairDispatcher(
+          isDisposed: () => false,
+          callback: () async {
+            callbackCount++;
+            if (!callbackStarted.isCompleted) {
+              callbackStarted.complete();
+            }
+            await releaseCallback.future;
+          },
+        );
+
+        final first = dispatcher.dispatch(suppressAutomaticRepair: false);
+        await callbackStarted.future;
+        final suppressed = dispatcher.dispatch(suppressAutomaticRepair: true);
+
+        releaseCallback.complete();
+        await Future.wait(<Future<void>>[first, suppressed]);
+        await Future<void>.delayed(Duration.zero);
+        expect(callbackCount, 1);
+      },
+    );
 
     test(
       'does not dispatch when suppressed, disposed, or callback-free',
@@ -249,6 +410,43 @@ void main() {
       isNull,
     );
   });
+
+  test(
+    'late matching room keys resolve and dispatch retry before stale',
+    () async {
+      final tracker = MatrixMissingRoomSessionStalenessTracker(
+        hash: (value) => value?.toString() ?? 'none',
+      );
+
+      tracker.recordMissing(
+        source: 'timeline',
+        roomId: '!room:example',
+        senderId: '@alice:example',
+        sessionId: 'SESSION',
+        senderKey: 'SENDER_KEY',
+      );
+
+      var retryCount = 0;
+      final coordinator = MatrixLateRoomKeyRetryCoordinator(
+        tracker: tracker,
+        dispatcher: MatrixPersistentRequestableSessionRepairDispatcher(
+          isDisposed: () => false,
+          callback: () async => retryCount++,
+        ),
+        suppressAutomaticRepair: false,
+      );
+
+      final resolved = coordinator.recordRoomKeyReceived(
+        roomId: '!room:example',
+        sessionId: 'SESSION',
+      );
+
+      expect(resolved, isNotNull);
+      expect(resolved!.observations, 1);
+      await Future<void>.delayed(Duration.zero);
+      expect(retryCount, 1);
+    },
+  );
 
   test('missing sessions without a room and session never become stale', () {
     final tracker = MatrixMissingRoomSessionStalenessTracker(

@@ -1,8 +1,7 @@
 # Windows ShareSession
 
 Status: Active architecture reference
-Owner: EXPERIMENTAL for shared-content media; AUDIO for microphone suppression
-Last reviewed: 2026-06-16 by DOCUMENTATION
+Last reviewed: 2026-06-16
 
 ## Purpose
 

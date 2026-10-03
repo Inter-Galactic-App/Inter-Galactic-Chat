@@ -17,6 +17,35 @@
 
 namespace ig = intergalactic_noise_suppression;
 
+namespace intergalactic_noise_suppression {
+struct HushGainRecoveryTestAccess {
+  static bool Run() {
+    auto state = std::make_shared<ProcessorSharedState>();
+    RnnoiseCaptureProcessor processor(state);
+    for (int frame = 0; frame < 6; ++frame) {
+      std::vector<float> quiet(480, 0.02f);
+      processor.ApplyDeepFilterNetHushGainRecovery(
+          0.12, 0.14, 0.02, 0.02, &quiet);
+    }
+    const float previous_gain = processor.deepfilternet_hush_recovery_gain_;
+    if (previous_gain <= 1.2f) {
+      return false;
+    }
+
+    std::vector<float> loud(480, 0.7f);
+    processor.ApplyDeepFilterNetHushGainRecovery(
+        0.75, 0.78, 0.7, 0.7, &loud);
+    const float peak_safe_gain = 0.78f / 0.7f;
+    for (float sample : loud) {
+      if (!std::isfinite(sample) || sample > 0.7f * peak_safe_gain + 1e-5f) {
+        return false;
+      }
+    }
+    return processor.deepfilternet_hush_recovery_gain_ == 1.0f;
+  }
+};
+}  // namespace intergalactic_noise_suppression
+
 namespace {
 
 constexpr int kWavFormatPcm = 1;
@@ -1000,6 +1029,13 @@ int ModeToNative(const std::string& mode, bool* enabled) {
 }  // namespace
 
 int main(int argc, char** argv) {
+  if (argc == 2 && std::strcmp(argv[1], "--test-hush-gain-quiet-to-loud") == 0) {
+    if (!ig::HushGainRecoveryTestAccess::Run()) {
+      std::cerr << "Hush recovery exceeded the loud frame peak-safe gain\n";
+      return 1;
+    }
+    return 0;
+  }
   ReplayOptions options;
   if (!ParseArgs(argc, argv, &options)) {
     PrintUsage();
@@ -1073,8 +1109,40 @@ int main(int argc, char** argv) {
     ig::PrewarmDeepFilterNetRuntimes(shared_state.get(),
                                      true,
                                      options.deepfilternet_hush);
+    // Printed unconditionally so a control can assert on readiness itself
+    // rather than inferring it from the exit code.
+    std::cout << "prewarm deepfilternet ready="
+              << (shared_state->prewarmed_deepfilternet_ready.load() ? "true"
+                                                                     : "false")
+              << " reason="
+              << ig::DeepFilterNetRuntimeReasonToString(
+                     shared_state->prewarmed_deepfilternet_reason.load())
+              << "\n";
+    if (options.deepfilternet_hush) {
+      std::cout << "prewarm hush ready="
+                << (shared_state->prewarmed_hush_ready.load() ? "true"
+                                                              : "false")
+                << " reason="
+                << ig::DeepFilterNetRuntimeReasonToString(
+                       shared_state->prewarmed_hush_reason.load())
+                << "\n";
+    }
     if (!shared_state->prewarmed_deepfilternet_ready.load()) {
-      std::cerr << "DeepFilterNet prewarm did not produce a runtime\n";
+      std::cerr << "DeepFilterNet prewarm did not produce a usable runtime. "
+                   "reason="
+                << ig::DeepFilterNetRuntimeReasonToString(
+                       shared_state->prewarmed_deepfilternet_reason.load())
+                << ". Check that df.dll and its model archive resolve.\n";
+      return 69;
+    }
+    if (options.deepfilternet_hush &&
+        !shared_state->prewarmed_hush_ready.load()) {
+      std::cerr << "Hush was requested but its prewarm produced no usable "
+                   "runtime. reason="
+                << ig::DeepFilterNetRuntimeReasonToString(
+                       shared_state->prewarmed_hush_reason.load())
+                << ". Re-run without --deepfilternet-hush or stage the Hush "
+                   "archive.\n";
       return 69;
     }
   }
@@ -1116,22 +1184,21 @@ int main(int argc, char** argv) {
   }
   shared_state->diagnostic_capture->Stop();
 
-  // Assert on frames actually PROCESSED, because the prewarm check above cannot
-  // detect a failed model load.
+  // Assert on frames actually PROCESSED, as defence in depth behind the
+  // readiness check above.
   //
-  // PrewarmDeepFilterNetRuntimes publishes whatever load_runtime returns, and
-  // load_runtime returns its make_unique result unconditionally - it does not
-  // check EnsureInitialized(). So prewarmed_deepfilternet_ready means "an object
-  // exists", not "a model loaded", and it goes true even when df.dll resolved
-  // nothing. The `return 69` guard above is therefore unreachable for the
-  // failure it names: the replay ran with a non-ready runtime, every frame took
-  // the bypass branch, and the tool exited 0. A broken native setup looked like
-  // a passing replay, which silently removed the regression coverage this tool
-  // exists to provide.
+  // History, because this comment used to say the opposite: readiness once
+  // meant only that a runtime OBJECT existed, since load_runtime returned its
+  // make_unique result without checking EnsureInitialized(). The `return 69`
+  // guard above was then unreachable for the failure it names - a replay with a
+  // dead model bypassed every frame and exited 0, so a broken native setup read
+  // as a passing replay. Fixed at the source since: a prewarm publishes a slot
+  // only when initialization, frame length and the warm-up inference all
+  // succeed, and records the native reason when it does not.
   //
-  // Checked here rather than fixed at the source on purpose: making `ready`
-  // mean "usable" changes runtime adoption and retry behaviour in the live
-  // audio path, and no CI job compiles this plugin. That is filed separately.
+  // This check stays because it asserts something different. Readiness is about
+  // the load; this is about adoption actually reaching the model, which the
+  // try_lock hand-off could still miss.
   if (native_mode == ig::kRnnoisePipelineModeDeepFilterNet) {
     const int processed_frames =
         shared_state->deepfilternet_frames_processed.load();

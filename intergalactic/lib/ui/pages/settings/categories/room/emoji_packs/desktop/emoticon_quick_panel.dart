@@ -206,8 +206,10 @@ class _EmoticonCreatorDesktopState extends State<EmoticonCreatorDesktop> {
                               child: EmoticonImagePickTile(
                                 image: controller.image,
                                 tooltip: hasSource
-                                    ? EmoticonCreatorStrings.promptChangePhoto
-                                    : EmoticonCreatorStrings.promptSelectPhoto,
+                                    ? EmoticonCreatorStrings
+                                          .promptEmoticonCreatorChangePhoto
+                                    : EmoticonCreatorStrings
+                                          .promptEmoticonCreatorSelectPhoto,
                                 onTap: () => unawaited(_pickSourceImage()),
                               ),
                             ),
@@ -258,7 +260,8 @@ class _EmoticonCreatorDesktopState extends State<EmoticonCreatorDesktop> {
                               height: 42,
                               child: tiamat.Button.secondary(
                                 key: const ValueKey('emoticon-quick-crop'),
-                                text: EmoticonCreatorStrings.promptCropPhoto,
+                                text: EmoticonCreatorStrings
+                                    .promptEmoticonCreatorCropPhoto,
                                 onTap:
                                     !hasSource ||
                                         controller.loading ||
@@ -278,7 +281,7 @@ class _EmoticonCreatorDesktopState extends State<EmoticonCreatorDesktop> {
                             // and photo actions, so it must open even before
                             // a source photo is chosen.
                             text:
-                                '${EmoticonCreatorStrings.promptAdvancedEdit} — cutout & brush',
+                                '${EmoticonCreatorStrings.promptEmoticonCreatorAdvancedEdit} — cutout & brush',
                             onTap: _openEditor,
                           ),
                         ),

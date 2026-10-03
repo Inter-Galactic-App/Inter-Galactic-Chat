@@ -20,13 +20,13 @@ class SettingsCategoryFavorites implements SettingsCategory {
     desc: 'Label for the overall Favorites settings category',
   );
 
-  String get labelFavoritesAppearance => Intl.message(
+  String get labelFavoritesSettingsAppearance => Intl.message(
     'Appearance',
     name: 'labelFavoritesSettingsAppearance',
     desc: 'Label for the Favorites appearance settings tab',
   );
 
-  String get labelFavoritesCategories => Intl.message(
+  String get labelFavoritesSettingsCategories => Intl.message(
     'Categories',
     name: 'labelFavoritesSettingsCategories',
     desc: 'Label for the Favorites categories settings tab',
@@ -39,7 +39,7 @@ class SettingsCategoryFavorites implements SettingsCategory {
   List<SettingsTab> get tabs => [
     SettingsTab(
       id: tabIdAppearance,
-      label: labelFavoritesAppearance,
+      label: labelFavoritesSettingsAppearance,
       icon: Icons.palette_outlined,
       searchKeywords: const [
         'favorites',
@@ -64,7 +64,7 @@ class SettingsCategoryFavorites implements SettingsCategory {
     ),
     SettingsTab(
       id: tabIdCategories,
-      label: labelFavoritesCategories,
+      label: labelFavoritesSettingsCategories,
       icon: Icons.folder_copy_outlined,
       searchKeywords: const [
         'favorites',

@@ -1,4 +1,10 @@
 {
+  "notificationAttachmentSentImage": "Odeslán obrázek",
+  "notificationAttachmentSentVideo": "Odesláno video",
+  "notificationAttachmentSentAudio": "Odeslána zvuková zpráva",
+  "notificationAttachmentSentFile": "Odeslán soubor",
+  "notificationAttachmentSharedLocation": "Sdíleno místo",
+  "notificationAttachmentSentSticker": "Odeslána samolepka",
     "labelRoomsList": "Místnosti",
     "@labelRoomsList": {
         "description": "Header label for the list of rooms",

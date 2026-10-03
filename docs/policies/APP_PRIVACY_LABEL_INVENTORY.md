@@ -1,34 +1,32 @@
 # App Privacy Label Inventory
 
-Publication status: App Store Connect answers were provided by the app owner on
-2026-06-14 from App Store Connect screenshots and reconciled with
-`PUBLIC_RELEASE_READINESS_TRACKER.md`. Recheck this inventory if the submitted
-archive or App Store answers change.
+Publication status: last verified against App Store Connect on 2026-06-14; the
+evidence for that verification is recorded under "Complete App Store privacy
+labels" in `PUBLIC_RELEASE_READINESS_TRACKER.md`. Recheck this inventory if the
+submitted archive or App Store answers change.
 
-Tracking: No tracking is declared in the recorded App Store Connect label set.
+Tracking: No tracking is declared in the App Store Connect label set.
 
-## App Store Connect Evidence - 2026-06-14
+## App Store Connect Label Set
 
-User-provided App Store Connect screenshots record the following labels:
+The submitted App Store Connect privacy labels declare:
 
-- Data Linked to You: Identifiers, User Content, Search History.
+- Data Linked to You: Identifiers, User Content, Search History, Audio Data.
 - Data Not Linked to You: Diagnostics, User Content.
 - Data types collected: User ID, Device ID, Emails or Text Messages, Photos or
   Videos, Audio Data, Other User Content, Customer Support, Search History,
   Crash Data, Performance Data, and Other Diagnostic Data.
 - Purpose shown for each visible type: App Functionality.
-- Linked fields shown: Emails or Text Messages, Photos or Videos, Other User
+- Linked fields: Emails or Text Messages, Photos or Videos, Other User
   Content, Audio Data, Search History, User ID, and Device ID.
-- Not-linked fields shown: Customer Support, Crash Data, Performance Data, and
+- Not-linked fields: Customer Support, Crash Data, Performance Data, and
   Other Diagnostic Data.
-- Additional Audio Data screenshot supplied on 2026-06-14 shows Audio Data is
-  used for App Functionality and linked to the user's identity.
 
-S&C interpretation: the screenshots match the current identifier, diagnostic,
-support, search, and user-content boundary if the contactless in-app app-bug
-reporter remains unlinked and diagnostics remain redacted before
-preview/upload. Audio Data is now aligned with the inventory's treatment of
-voice calls and voice messages as linked app-functionality data.
+This matches the current identifier, diagnostic, support, search, and
+user-content boundary as long as the contactless in-app bug reporter stays
+unlinked and diagnostics stay redacted before preview/upload. Audio Data is
+linked app-functionality data because it covers voice calls and voice
+messages.
 
 ## Likely Data Types
 

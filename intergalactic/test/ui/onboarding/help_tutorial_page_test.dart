@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intergalactic/client/client_manager.dart';
 import 'package:intergalactic/config/app_globals.dart' as globals;
+import 'package:intergalactic/main.dart' as app_globals;
 import 'package:intergalactic/ui/onboarding/demo_tutorial_content.dart';
 import 'package:intergalactic/ui/pages/settings/categories/help/help_tutorial_page.dart';
 import 'package:intergalactic/ui/pages/settings/categories/help/settings_category_help.dart';
@@ -12,6 +14,13 @@ void main() {
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
+    final previousClientManager = app_globals.clientManager;
+    final clientManager = ClientManager();
+    app_globals.clientManager = clientManager;
+    addTearDown(() {
+      app_globals.clientManager = previousClientManager;
+      return clientManager.close();
+    });
     await globals.preferences.init();
     // These cases assert the desktop tutorial surface. Pin the layout instead
     // of relying on BuildConfig's platform fallback: under `flutter test`
@@ -26,16 +35,14 @@ void main() {
     expect(tabs.any((tab) => tab.label == 'Tutorial'), isTrue);
   });
 
-  test('Help category hides Tutorial tab on mobile layout', () async {
+  test('Help category includes Tutorial tab on mobile layout', () async {
     await globals.preferences.layoutOverride.set('mobile');
     final tabs = SettingsCategoryHelp().tabs;
 
-    expect(tabs.any((tab) => tab.label == 'Tutorial'), isFalse);
+    expect(tabs.any((tab) => tab.label == 'Tutorial'), isTrue);
   });
 
-  testWidgets('Mobile tutorial page shows desktop-only restriction', (
-    tester,
-  ) async {
+  testWidgets('Mobile tutorial page offers replay', (tester) async {
     await globals.preferences.layoutOverride.set('mobile');
 
     await tester.pumpWidget(
@@ -48,13 +55,7 @@ void main() {
     );
 
     expect(find.text('Tutorial'), findsOneWidget);
-    expect(
-      find.text(
-        'The guided tutorial is desktop-only for now. Mobile builds hide replay until the mobile tutorial path is ready.',
-      ),
-      findsOneWidget,
-    );
-    expect(find.text('Replay tutorial'), findsNothing);
+    expect(find.text('Replay tutorial'), findsOneWidget);
   });
 
   testWidgets('Replay tutorial button opens onboarding', (tester) async {
@@ -72,6 +73,30 @@ void main() {
 
     expect(find.text('Welcome to Inter Galactic'), findsWidgets);
     expect(find.text('1 of ${demoTutorialSteps.length}'), findsOneWidget);
+  });
+
+  testWidgets('Mobile replay uses the mobile guided tour', (tester) async {
+    await globals.preferences.layoutOverride.set('mobile');
+    tester.view
+      ..physicalSize = const Size(390, 844)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData.light(
+          useMaterial3: true,
+        ).copyWith(extensions: [const ThemeSettings()]),
+        home: const Scaffold(body: HelpTutorialPage()),
+      ),
+    );
+
+    await tester.tap(find.text('Replay tutorial'));
+    await _pumpTutorialAnimation(tester);
+
+    expect(find.byKey(const ValueKey('mobile-tutorial-sheet')), findsOneWidget);
+    expect(find.text('Next'), findsNothing);
   });
 
   testWidgets('Developer placeholder button opens legacy onboarding', (

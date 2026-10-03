@@ -22,24 +22,28 @@ void main() {
     addTearDown(subscription.cancel);
 
     final category = await store.createCategory(
-      'client-a:!space:server',
+      LocalSpaceCategoryScope.forTesting('client-a:!space:server'),
       '  Raid   Rooms  ',
     );
     await store.assignRoomToCategory(
-      'client-a:!space:server',
+      LocalSpaceCategoryScope.forTesting('client-a:!space:server'),
       '!general:server',
       category.id,
     );
 
-    final state = await store.load('client-a:!space:server');
-    final otherState = await store.load('client-b:!space:server');
+    final state = await store.load(
+      LocalSpaceCategoryScope.forTesting('client-a:!space:server'),
+    );
+    final otherState = await store.load(
+      LocalSpaceCategoryScope.forTesting('client-b:!space:server'),
+    );
 
     expect(state.categories, hasLength(1));
     expect(state.categories.single.name, 'Raid Rooms');
     expect(state.categories.single.roomIds, ['!general:server']);
     expect(otherState.categories, isEmpty);
     expect(changes.map((change) => change.spaceLocalId).toSet(), {
-      'client-a:!space:server',
+      LocalSpaceCategoryScope.forTesting('client-a:!space:server'),
     });
   });
 
@@ -49,14 +53,18 @@ void main() {
     addTearDown(store.dispose);
 
     await store.save(
-      'client-a:!space:server',
+      LocalSpaceCategoryScope.forTesting('client-a:!space:server'),
       const SpaceRoomCategoryState(
         uncategorizedRoomOrderIds: ['!two:server', '!one:server'],
       ),
     );
 
-    final state = await store.load('client-a:!space:server');
-    final otherState = await store.load('client-b:!space:server');
+    final state = await store.load(
+      LocalSpaceCategoryScope.forTesting('client-a:!space:server'),
+    );
+    final otherState = await store.load(
+      LocalSpaceCategoryScope.forTesting('client-b:!space:server'),
+    );
 
     expect(state.categories, isEmpty);
     expect(state.uncategorizedCollapsed, isFalse);
@@ -139,7 +147,7 @@ void main() {
     await loadFavoriteRoomCategoryState(favoriteRoomIds: ['!first:server']);
 
     await spaceRoomCategoryStore.renameCategory(
-      favoriteRoomCategoriesLocalId,
+      LocalSpaceCategoryScope.favorites,
       favoriteRoomDefaultCategoryId,
       'Pinned Across Accounts',
     );
@@ -250,6 +258,97 @@ void main() {
     expect(parsed.uncategorizedRoomOrderIds, ['!two:server']);
   });
 
+  test('category sync keeps pending state until its write echo arrives', () {
+    const pending = SpaceRoomCategoryState(
+      categories: [SpaceRoomCategoryDefinition(id: 'alpha', name: 'Alpha')],
+    );
+    const staleRemote = SpaceRoomCategoryState(
+      categories: [SpaceRoomCategoryDefinition(id: 'legacy', name: 'Legacy')],
+    );
+
+    final stale = FavoriteRoomCategoryStore.resolveSyncedState(
+      pending: pending,
+      remote: staleRemote,
+    );
+    expect(stale.visible, pending);
+    expect(stale.settlePending, isFalse);
+
+    final echo = FavoriteRoomCategoryStore.resolveSyncedState(
+      pending: pending,
+      remote: pending,
+    );
+    expect(echo.visible, pending);
+    expect(echo.settlePending, isTrue);
+  });
+
+  test('category sync accepts a post-write remote edit', () {
+    const pending = SpaceRoomCategoryState(
+      categories: [SpaceRoomCategoryDefinition(id: 'local', name: 'Local')],
+    );
+    const baseline = SpaceRoomCategoryState(
+      categories: [SpaceRoomCategoryDefinition(id: 'old', name: 'Old')],
+    );
+    const remote = SpaceRoomCategoryState(
+      categories: [SpaceRoomCategoryDefinition(id: 'other', name: 'Other')],
+    );
+
+    final stale = FavoriteRoomCategoryStore.resolveSyncedState(
+      pending: pending,
+      remote: baseline,
+      baseline: baseline,
+      baselineKnown: true,
+    );
+    expect(stale.visible, pending);
+    expect(stale.settlePending, isFalse);
+
+    final edit = FavoriteRoomCategoryStore.resolveSyncedState(
+      pending: pending,
+      remote: remote,
+      baseline: baseline,
+      baselineKnown: true,
+    );
+    expect(edit.visible, remote);
+    expect(edit.settlePending, isTrue);
+  });
+
+  test('category sync settles a collapsed local view on the shared echo', () {
+    const pending = SpaceRoomCategoryState(
+      categories: [
+        SpaceRoomCategoryDefinition(
+          id: 'alpha',
+          name: 'Alpha',
+          roomIds: ['!one:server'],
+          roomOrderIds: ['!one:server'],
+          collapsed: true,
+        ),
+      ],
+    );
+    final remote = SpaceRoomCategoryState.fromMatrixStateContent(
+      pending.toMatrixStateContent(),
+    );
+
+    final resolution = FavoriteRoomCategoryStore.resolveSyncedState(
+      pending: pending,
+      remote: remote,
+    );
+
+    expect(resolution.settlePending, isTrue);
+    expect(resolution.visible.categories.single.collapsed, isFalse);
+  });
+
+  test('category sync accepts remote edits after no write is pending', () {
+    const remote = SpaceRoomCategoryState(
+      categories: [SpaceRoomCategoryDefinition(id: 'remote', name: 'Remote')],
+    );
+
+    final resolved = FavoriteRoomCategoryStore.resolveSyncedState(
+      pending: null,
+      remote: remote,
+    );
+    expect(resolved.visible, remote);
+    expect(resolved.settlePending, isFalse);
+  });
+
   test('local viewer collapse state merges into shared definitions', () {
     const sharedState = SpaceRoomCategoryState(
       categories: [
@@ -292,13 +391,29 @@ void main() {
     );
     addTearDown(store.dispose);
 
-    final alpha = await store.createCategory('client:!space', 'Alpha');
-    final beta = await store.createCategory('client:!space', 'Beta');
+    final alpha = await store.createCategory(
+      LocalSpaceCategoryScope.forTesting('client:!space'),
+      'Alpha',
+    );
+    final beta = await store.createCategory(
+      LocalSpaceCategoryScope.forTesting('client:!space'),
+      'Beta',
+    );
 
-    await store.assignRoomToCategory('client:!space', '!room:server', alpha.id);
-    await store.assignRoomToCategory('client:!space', '!room:server', beta.id);
+    await store.assignRoomToCategory(
+      LocalSpaceCategoryScope.forTesting('client:!space'),
+      '!room:server',
+      alpha.id,
+    );
+    await store.assignRoomToCategory(
+      LocalSpaceCategoryScope.forTesting('client:!space'),
+      '!room:server',
+      beta.id,
+    );
 
-    final state = await store.load('client:!space');
+    final state = await store.load(
+      LocalSpaceCategoryScope.forTesting('client:!space'),
+    );
 
     expect(state.categories[0].roomIds, isEmpty);
     expect(state.categories[1].roomIds, ['!room:server']);

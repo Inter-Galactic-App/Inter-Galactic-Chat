@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "toolchain": {
+    "flutter_version": "3.41.1",
+    "flutter_revision": "582a0e7c5581dc0ca5f7bfd8662bb8db6f59d536",
+    "dart_version": "3.11.0",
+    "xcode": "Xcode 26.5\nBuild version 17F42",
+    "rustc": "rustc 1.94.1 (e408947bf 2026-03-25)",
+    "cargo": "cargo 1.94.1 (29ea6fb6a 2026-03-24)",
+    "cocoapods": "1.16.2"
+  },
+  "defines": {
+    "ENABLE_GOOGLE_SERVICES": "false",
+    "ENABLE_NATIVE_DETACHED_CALL_WINDOWS": "true",
+    "GIF_API_BASE_URL": "https://api.ourgalaxy.space/klipy",
+    "INTERGALACTIC_URL_PREVIEW_ENDPOINT": "",
+    "INTERGALACTIC_URL_PREVIEW_ALLOWED_HOMESERVERS": "",
+    "UPDATE_MANIFEST_URL": "https://app.ourgalaxy.space/updates/latest.json",
+    "SPOTIFY_CLIENT_ID": "",
+    "SPOTIFY_REDIRECT_URI": "",
+    "STEAM_ACTIVITY_API_BASE_URL": ""
+  }
+}

@@ -1,12 +1,9 @@
 # Settings UI Map
 
-Static review snapshot: 2026-06-11
-Agent: DESIGN
 Base repo path: `intergalactic-app/inter-galactic`
 
 This map tracks the current Settings architecture, navigation, visible settings
-areas, persistence, and risk points after the implemented settings chrome,
-account-scope, Account Security, and Matrix encryption updates.
+areas, persistence, and risk points.
 
 Phase 1 information-architecture decisions are recorded in
 `docs/architecture/features/settings-information-architecture.md`. That addendum keeps
@@ -14,151 +11,50 @@ the current Settings routes/shells intact while defining target groups, risk
 tiers, developer separation, and room/space copy policy for later overhaul
 phases.
 
-The staged app-settings migration plan has been archived after implementation.
 Use this map, `docs/architecture/features/settings-information-architecture.md`, and the
 design-system settings guidance for current contributor-facing orientation.
 
-Implementation update, 2026-06-11: App Settings account selection now lives in
-the settings chrome instead of repeated tab-level account dropdowns. Desktop
-uses the existing top-left account header as a clickable account menu; mobile
-settings and mobile subpages expose the same selector in their header area. The
-shared settings account controller initializes from `filter_client_id`, so
-multi-account settings default to the focused account when one is active, while
-header changes only affect which account settings edit and do not mutate the
-main-shell focus preference.
+App Settings uses one shared account selector in the settings chrome rather
+than per-tab account dropdowns: desktop exposes it through the account header,
+mobile exposes it in the settings/subpage header. The controller initializes
+from the focused account (`filter_client_id`) when one is active; changing it
+only affects which account the open settings surface edits, not the
+main-shell focus preference. Contextual Room and Space Settings are pinned to
+the client that owns the room or space object instead of using that shared
+selector.
 
-Implementation update, 2026-06-11: Account Security now groups password
-management and account recovery codes under one Account security section without
-nested background cards. Matrix encryption health keeps the fuller desktop chip
-set, switches to compact chips on mobile, hides biometric recovery-key storage
-on desktop, and combines encrypted-message repair/retry behind one **Encrypted
-message tools** chooser with distinct repair-vs-retry explanations.
+Desktop App, Room, and Space settings open through `SettingsNavigation.show(...)`,
+an adaptive overlay route over the live app with a close action, account
+header, search, and centered content width. Mobile settings use a full-page
+flow instead.
 
-Implementation update, 2026-05-10: desktop App, Room, and Space settings now
-open through `SettingsNavigation.show(...)`, which presents an adaptive overlay
-route over the live app. Mobile settings keep the existing full-page flow. The
-desktop shell still uses the same `SettingsCategory` / `SettingsTab` model, but
-renders inside overlay chrome with a close action, account header, search, and
-centered content width.
+Settings search supports row-level `SettingsSearchEntry` metadata on each
+`SettingsTab`, matching row names/descriptions/aliases as well as tab-level
+category/label/keyword fallbacks, and a matched row can carry an optional
+route anchor that scrolls to and briefly highlights the target after the
+owning tab opens (reduced-motion settings skip the scroll animation). This is
+presentation/navigation only; it does not change persistence, Matrix writes,
+or account selection.
 
-Implementation update, 2026-05-12: the staged App Settings reorganization has
-folded the former Window Behaviour tab into General, moved Account Emoticons
-into App Settings, added App-level Soundboard discovery, and split the Windows
-Desktop Companion controls out of Notifications. A follow-up added
-user-defined room/space navigation shortcuts and lets Soundboard discovery
-cards open the matching contextual Space Settings soundboard tab.
+App Settings > Accessibility owns local app-level accessibility preferences:
+contrast, color-safe mode, non-color cues, link underlines, focus indicators,
+On/Off labels, text size, bold text, transparency, UI separation, reduced
+motion, animated media pause, larger targets, and persistent action labels.
+`AccessibilityScope` resolves those overrides with Flutter platform signals,
+exposes semantic tokens to shared settings/status/navigation primitives, and
+publishes effective text scaling/bold text through descendant `MediaQuery`
+data; `AccessibleInteractiveRegion` extends the same foundation to custom
+room/space/rail and composer controls for consistent action semantics,
+keyboard activation, focus rings, larger-target constraints, and opt-in
+visible labels. Shared rich-text links use the resolved accessibility
+link/underline tokens through `LinkSpan` so links are not color-only under
+color-safe/high-contrast preferences.
 
-Implementation update, 2026-05-12: App Settings **Advanced** is now labeled
-**Developer**. Account Developer JSON moved out of the Account category into a
-collapsible Developer panel, and Notifications now keeps user-facing mode,
-appearance, sound, and override controls while push transport/gateway setup and
-registered pusher diagnostics live under Developer.
-
-Implementation update, 2026-05-12: Developer diagnostics are organized as
-collapsible panels for Account JSON, Notification Developer Settings, and Voice
-and Video Developer Settings. The migrated Emoticons, Soundboard,
-Notifications, Desktop Companion, and Developer diagnostic cards use
-`surfaceContainerLow`, and RNNoise diagnostics/Audio Processing now render as
-status cards instead of loose diagnostic text.
-
-Implementation update, 2026-05-12: Phase 6 developer consolidation moved Logs
-out of About and Developer Utils out of the main settings navigation. Both now
-live as collapsible panels inside App Settings > Developer, with Developer
-Utils broken into described utility groups. The Voice and Video call/stream
-stats toggle moved into the Voice and Video developer panel.
-
-Implementation update, 2026-05-13: Developer now uses the existing Developer
-localization key instead of the stale Advanced key. The Developer panel order
-starts with Logs, then Account state JSON. Help & Safety and Account Security
-received a visual alignment pass: Help cards use the current settings card
-treatment with a deeper red Block User action, and Security moved the Sessions
-heading outside its session list while aligning Cross Signing & Backup rows and
-Account Deletion to the current section rhythm.
-
-Implementation update, 2026-05-13: Settings search now supports row-level
-`SettingsSearchEntry` metadata on each `SettingsTab`. The shared filter returns
-matching row entries when row names/descriptions/aliases match, while preserving
-tab fallback matches for category names, tab labels, and legacy keywords. The
-desktop and mobile shells display row hits with their parent tab/section, and
-the app/account metadata keeps moved labels such as Privacy, Advanced, Manage
-Accounts, and Window Behaviour searchable.
-
-Implementation update, 2026-05-13: contextual Room and Space Settings now follow
-the proposed room/space IA. Notifications owns push rules, read receipts, typing
-indicators, and desktop sound overrides; Room Security owns encryption, room
-visibility, and room history visibility; Admin Settings owns room/space
-identity, addresses, and room events where supported.
-Room Appearance is now focused on room-local message background and bubble
-styling. General and Appearance remain searchable legacy aliases where their
-controls moved.
-
-Implementation update, 2026-05-28: Room Settings exposes Security as a visible
-tab. Permissions still exposes the power-level requirement for "History
-Visibility", while Security -> Room History owns the current room-history
-visibility value used by invite history sharing.
-
-Implementation update, 2026-05-13: Room Settings now includes a **Nicknames**
-tab for Matrix rooms. It surfaces the current user's room nickname, member
-display names, existing room nicknames, and permission-gated edit actions for
-other members. The outside-settings Room Members side panel includes a pinned
-Nicknames action that opens Room Settings directly to this tab.
-
-Implementation update, 2026-05-17: App Settings > Help now includes a **FAQ**
-tab. The FAQ page groups question cards by General, Security, and Features;
-clicking a card opens a popup answer. Each FAQ item is also represented as a
-row-level settings search entry with question, summary, and support keywords so
-search can find the FAQ content directly.
-
-Implementation update, 2026-06-14: App Settings > General now exposes separate
-**Message effects** and **Automatic message effects** local toggles. The
-automatic toggle defaults off, has its own row-level search entry, and only
-enables trigger-based sends when the parent message-effects preference is also
-enabled. Manual message-effect commands and the composer effects menu remain
-separate from the automatic-send toggle.
-
-Implementation update, 2026-06-24: Settings search row results can now carry an
-optional route anchor. `SettingsControlRow` derives a stable default anchor from
-its visible title, non-row targets can opt in with
-`SettingsSearchHighlightTarget`, and desktop/mobile settings shells trigger a
-shared highlight controller after selecting or pushing the owning tab. The
-highlight scrolls the nearest settings scroll owner to the matched target and
-briefly paints a theme-token outline/fill; reduced-motion settings collapse the
-scroll animation. This is a presentation/navigation affordance only and does
-not change settings persistence, Matrix writes, account selection, or search
-matching semantics.
-
-Implementation update, 2026-06-29: App Settings now includes an
-**Accessibility** tab after Appearance. The tab owns local app-level
-accessibility preferences for contrast, color-safe mode, non-color cues, link
-underlines, focus indicators, On/Off labels, text size, bold text, transparency,
-UI separation, reduced motion, animated media pause, larger targets, and
-persistent action labels. Its settings-search metadata covers the reset preset
-and each MVP control row so row-level search can open and highlight the
-matching Accessibility setting. `AccessibilityScope` resolves those stored
-overrides with Flutter platform signals and exposes semantic tokens consumed by shared
-settings/status/navigation primitives. The scope also publishes effective text
-scaling and bold text through descendant `MediaQuery` data, and the shared
-Tiamat text atom consumes that signal for heavier readable text weights without
-importing app-only accessibility state. `AccessibleInteractiveRegion` extends
-that foundation to custom room/space/rail and composer presentation controls so
-they expose consistent action semantics, keyboard activation, theme-token focus
-rings, larger-target constraints, and opt-in short visible labels for important
-icon-only actions when requested. Shared rich-text links now use the resolved
-accessibility link token and underline setting through `LinkSpan`, so plain URL
-and Matrix HTML links are not color-only when color-safe/high-contrast or
-underline-link preferences require stronger cues. Main-shell rail visible
-labels, call runtime, media playback runtime, and story editor runtime behavior
-remain lane-owned follow-ups where they need more than shared presentation
-tokens.
-
-Implementation update, 2026-06-29: Favorites settings moved out of App
-Settings > Appearance into a contextual **Favorites Settings** surface opened
-from the Favorites virtual-space gear. The surface uses the shared settings
-shell with **Appearance** and **Categories** tabs. Appearance continues to edit
-local Favorites icon/banner preference data, while Categories uses the existing
-space-room category model under the local virtual Favorites id so favorite
-rooms from multiple signed-in accounts and homeservers can be grouped without
-writing Matrix space state.
+Favorites settings live in a contextual **Favorites Settings** surface opened
+from the Favorites virtual-space gear, with **Appearance** (local Favorites
+icon/banner data) and **Categories** (the space-room category model under the
+local virtual Favorites id) tabs, so favorite rooms from multiple signed-in
+accounts and homeservers can be grouped without writing Matrix space state.
 
 ## 1. Executive Summary
 
@@ -309,6 +205,7 @@ File: `intergalactic/lib/ui/pages/settings/categories/favorites/settings_categor
 | Visible UI name | Widget/class | File/location | Route/navigation entry | Dependencies | Surface | Visibility |
 | --- | --- | --- | --- | --- | --- | --- |
 | Help & Safety | `HelpSafetyPage` | `categories/help/help_safety_page.dart:8` | `settings_category_help.dart:30-39` | Matrix client/room selectors, report/block flows, support copy | Shared tab body | User-facing |
+| FAQ | `HelpFaqPage` | `categories/help/help_faq_page.dart:334` | `settings_category_help.dart` | Static FAQ content grouped by General, Security, and Features; each question exports row-level search entries with question, answer summary, and aliases | Shared tab body | User-facing |
 | Policies | `HelpPoliciesPage` | `categories/help/help_safety_page.dart:576` | `settings_category_help.dart:42-50` | Policy content/config | Shared tab body | User-facing |
 | Tutorial | `HelpTutorialPage` | `categories/help/help_tutorial_page.dart:7` | `settings_category_help.dart:53-61` | `OnboardingService`, `OnboardingPage(replay: true)` | Shared tab body | User-facing |
 | About | `_AppInfo` | `categories/about/settings_category_about.dart:35-44` | `SettingsCategoryAbout` tab | Build, source, license, device, encryption info | Shared tab body, no shell scroll | User-facing |

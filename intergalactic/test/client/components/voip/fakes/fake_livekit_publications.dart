@@ -70,6 +70,7 @@ class FakeRemoteTrackPublication<T extends lk.RemoteTrack>
     this.mimeType = 'audio/opus',
     this.propagateTrackMute = true,
     this.trackAttachedOnSubscribe,
+    this.onSubscribe,
   }) : name = name ?? _defaultPublicationName(source),
        _track = track,
        _muted = muted,
@@ -130,6 +131,11 @@ class FakeRemoteTrackPublication<T extends lk.RemoteTrack>
   /// the real SDK, where `subscribe()` only sends a request and the media
   /// arrives later as a separate `TrackSubscribedEvent`.
   final T? trackAttachedOnSubscribe;
+
+  /// Runs inside `subscribe()`, before the track is attached. Models what the
+  /// room can do to this publication WHILE a repair is awaiting it - an
+  /// unpublish landing mid-repair, above all (BUG-321).
+  final Future<void> Function()? onSubscribe;
 
   final FakePublicationOperations operations = FakePublicationOperations();
 
@@ -239,6 +245,7 @@ class FakeRemoteTrackPublication<T extends lk.RemoteTrack>
     if (!_subscriptionAllowed) {
       return;
     }
+    await onSubscribe?.call();
     final attach = trackAttachedOnSubscribe;
     if (attach != null) {
       setTrack(attach);

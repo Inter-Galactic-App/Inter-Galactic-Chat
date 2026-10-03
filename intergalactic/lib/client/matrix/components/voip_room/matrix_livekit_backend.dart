@@ -20,6 +20,7 @@ import 'package:intergalactic/config/build_config.dart';
 import 'package:intergalactic/config/platform_utils.dart';
 import 'package:intergalactic/debug/log.dart';
 import 'package:intergalactic/main.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:livekit_client/livekit_client.dart' as lk;
 import 'package:matrix/matrix.dart';
@@ -236,10 +237,44 @@ class MatrixLivekitBackend {
   static bool _tokenServiceRejectsClientMetadata = false;
   static bool _loggedTokenMetadataFallback = false;
 
+  /// Test-only override for the Push to Talk join microphone timeout.
+  ///
+  /// Null in production, where the value is always
+  /// [_initialMicrophoneEnableTimeout]. Scoped to
+  /// [_publishInitialMicrophoneMutedForPushToTalk] on purpose: the branches
+  /// worth covering there are the ones taken AFTER a 12s timeout fires, and a
+  /// test cannot reach them by waiting.
+  @visibleForTesting
+  static Duration? debugPushToTalkJoinMicrophoneTimeoutForTesting;
+
+  static Duration get _pushToTalkJoinMicrophoneTimeout =>
+      debugPushToTalkJoinMicrophoneTimeoutForTesting ??
+      _initialMicrophoneEnableTimeout;
+
+  /// Test-only override for `lk.LocalAudioTrack.create`.
+  ///
+  /// The real create reaches `getUserMedia` over a platform channel, so under
+  /// `flutter_test` it can only ever throw - which leaves everything after it
+  /// in [_publishInitialMicrophoneMutedForPushToTalk], including the
+  /// late-completion cleanup, unreachable from a test. Null in production.
+  @visibleForTesting
+  static Future<lk.LocalAudioTrack> Function(lk.AudioCaptureOptions options)?
+  debugLocalAudioTrackFactoryForTesting;
+
+  static Future<lk.LocalAudioTrack> _createLocalAudioTrack(
+    lk.AudioCaptureOptions audioCaptureOptions,
+  ) {
+    final factory = debugLocalAudioTrackFactoryForTesting;
+    if (factory != null) {
+      return factory(audioCaptureOptions);
+    }
+    return lk.LocalAudioTrack.create(audioCaptureOptions);
+  }
+
   Future<List<Uri>> getFociUrl() async {
     final selectedFocus = findSelectedFocus();
 
-    final wellKnown = await room.matrixRoom.client.getWellknown();
+    final wellKnown = await _getWellKnownForFocusDiscovery();
     final livekitJwtServiceUrl =
         wellKnown.additionalProperties["org.matrix.msc4143.rtc_foci"];
 
@@ -277,6 +312,25 @@ class MatrixLivekitBackend {
     }
 
     return [if (selectedFocus != null) selectedFocus];
+  }
+
+  Future<dynamic> _getWellKnownForFocusDiscovery() async {
+    try {
+      return await room.matrixRoom.client.getWellknown();
+    } catch (error) {
+      // Attribution only: this boundary retains the call-refresh context that
+      // the asynchronous root-zone error handler can lose. Do not retry here.
+      final outcome = error.toString().toLowerCase().contains('errno = 11004')
+          ? 'nodata'
+          : 'other';
+      Log.w(
+        'call_focus_discovery operation=matrix_well_known result=error '
+        'resolver_outcome=$outcome',
+        category: LogCategory.livekit,
+        source: 'matrix-livekit-backend',
+      );
+      rethrow;
+    }
   }
 
   Uri? findSelectedFocus() {
@@ -624,8 +678,11 @@ class MatrixLivekitBackend {
       final initialMicrophoneEnableState =
           MatrixLivekitInitialMicrophoneEnableState();
       try {
-        final joinMutedForWindowsPushToTalk =
-            PlatformUtils.isWindows && preferences.voipPushToTalkEnabled.value;
+        final initialMicrophoneJoinMode =
+            LivekitMicrophoneSenderGate.initialJoinMode(
+              isWindows: PlatformUtils.isWindows,
+              pushToTalkEnabled: preferences.voipPushToTalkEnabled.value,
+            );
         var device = await WebrtcDefaultDevices.getDefaultMicrophoneId();
 
         Log.d("Using default microphone device: $device");
@@ -638,13 +695,21 @@ class MatrixLivekitBackend {
             category: LogCategory.livekit,
             source: 'matrix-livekit-backend',
           );
-        } else if (joinMutedForWindowsPushToTalk) {
-          initialMicrophoneEnableState.markDesiredMicrophoneEnabled(false);
-          Log.i(
-            'LiveKit initial microphone enable skipped: '
-            'reason=windows_push_to_talk_join_muted',
-            category: LogCategory.livekit,
-            source: 'matrix-livekit-backend',
+          initialMicrophoneEnableState.markInitialEnableSettled(
+            outcome: 'skipped_no_local_participant',
+          );
+        } else if (initialMicrophoneJoinMode ==
+            InitialMicrophoneJoinMode.publishMutedForPushToTalk) {
+          final audioCaptureOptions = device != null
+              ? defaultAudioCaptureOptions.copyWith(deviceId: device)
+              : defaultAudioCaptureOptions;
+          // BUG-320 x BUG-322. This settles the initial-enable outcome itself,
+          // like the enable path below; see its doc for why the marking is not
+          // duplicated here.
+          await _publishInitialMicrophoneMutedForPushToTalk(
+            lkRoom.localParticipant!,
+            audioCaptureOptions: audioCaptureOptions,
+            initialMicrophoneEnableState: initialMicrophoneEnableState,
           );
         } else {
           final audioCaptureOptions = device != null
@@ -728,6 +793,368 @@ class MatrixLivekitBackend {
     }
   }
 
+  /// BUG-322. Publishes the join-time microphone with its RTP sender
+  /// detached, which is Push to Talk's steady state on Windows.
+  ///
+  /// The publish itself is what the call surface needs: without a local
+  /// publication there is no "You" tile ("Waiting for streams...") and the
+  /// mute indicator has nothing to read. Silence is guaranteed at every
+  /// step: the track is disabled BEFORE it is published so no frame leaves
+  /// while the sender is being negotiated, the sender is detached the moment
+  /// the publication exists, and only then is the track re-enabled so the
+  /// Push to Talk press - which reattaches the sender - carries live audio.
+  /// `publication.muted` ends TRUE here, signalled by the arm itself:
+  /// `armPushToTalkJoinPublication` -> `setDetached(detached: true)` finishes
+  /// with `updateMuted(true, shouldSendSignal: true)` on every branch that
+  /// leaves the sender carrying nothing, and that signal is what the remote
+  /// mute indicator reads. The hazard the flag used to carry is real but is
+  /// handled on the other side: the app's Windows mute model is sender
+  /// attachment and an SDK-native unmute does NOT reattach the sender, so a
+  /// publication signalled muted here would be stranded muted for the rest of
+  /// the call if nothing cleared it. `setDetached(detached: false)` - the
+  /// Push to Talk press path - is what clears it. Do not remove that
+  /// reattach-side `updateMuted` call.
+  ///
+  /// Any failure falls back to what this path used to do - no publication -
+  /// and says so, both in the log and in the settled outcome, rather than
+  /// leaving a half-built track behind.
+  ///
+  /// Settling the outcome belongs here rather than at the call site, the same
+  /// way [_enableInitialMicrophoneDuringJoin] settles its own: the join-time
+  /// sender reconcile waits on it, so a path that does not mark it costs every
+  /// Push to Talk join the full 15s fallback, and a call site that marks it
+  /// separately can only disagree with what this method actually did. The
+  /// success outcome is NOT the pre-merge `skipped_push_to_talk_join_muted`:
+  /// that named a branch which published nothing, and this one publishes. A
+  /// capture that still says `skipped_` here would be describing the old code.
+  Future<void> _publishInitialMicrophoneMutedForPushToTalk(
+    lk.LocalParticipant participant, {
+    required lk.AudioCaptureOptions audioCaptureOptions,
+    required MatrixLivekitInitialMicrophoneEnableState
+    initialMicrophoneEnableState,
+  }) async {
+    initialMicrophoneEnableState.markDesiredMicrophoneMuted(stopOnMute: false);
+    // Same guard shape as _enableInitialMicrophoneDuringJoin, and for the same
+    // reason: this path reaches the native microphone boundary twice - through
+    // LocalAudioTrack.create and through publishAudioTrack - and it is the only
+    // join path used on Windows with Push to Talk on, so a crash inside it
+    // would otherwise arrive with nothing naming where it happened.
+    final nativeActionGuard = await PendingNativeCallCrashGuard.recordAction(
+      source: 'matrix-livekit-native-call-action-push-to-talk-join-publish',
+      actionKind: 'LiveKit Push to Talk join microphone publish',
+    );
+    final stopwatch = Stopwatch()..start();
+    // Deliberately never stopped: `stopwatch` is stopped the moment this
+    // method settles, so the late-completion observers below would read the
+    // timeout duration back instead of how long the native call actually
+    // took. This one keeps running, so `elapsed_ms` on a late line is the
+    // real time from the start of the join publish to the late arrival.
+    final lateStopwatch = Stopwatch()..start();
+    final timeout = _pushToTalkJoinMicrophoneTimeout;
+    Log.i(
+      'LiveKit initial microphone publishing muted for Push to Talk: '
+      'timeout_ms=${timeout.inMilliseconds} '
+      "constraints=${NoiseSuppressionCaptureProfile.describeAudioCaptureOptions(audioCaptureOptions)}",
+      category: LogCategory.livekit,
+      source: 'matrix-livekit-backend',
+    );
+    lk.LocalAudioTrack? track;
+    // Neither `.timeout()` below cancels the future it wraps - a `Future` has
+    // no cancel to reach - so a create or a publish that is merely SLOW keeps
+    // running after this method has given up on it. Both reach the Windows
+    // native microphone, so an abandoned completion is an orphaned capture:
+    // a `LocalAudioTrack` nobody holds still owns the device, and a
+    // publication nobody armed still exists in the room while the session's
+    // settled outcome says it does not.
+    //
+    // Same shape as `_observeLateInitialMicrophoneEnable` below and
+    // `_publishScreenShareVideoTrack` in matrix_livekit_voip_session.dart:
+    // keep the un-timed future, attach an observer that acts ONLY when the
+    // timeout actually fired, and say so in the log so a field capture can
+    // tell "arrived late and was cleaned up" from "never arrived at all".
+    // `onTimeout` writes the flag and the observer reads it at completion
+    // time, which is necessarily afterwards.
+    var createTimedOut = false;
+    var publishTimedOut = false;
+    try {
+      final createFuture = _createLocalAudioTrack(audioCaptureOptions);
+      unawaited(
+        createFuture.then<void>(
+          (lateTrack) async {
+            if (!createTimedOut) {
+              return;
+            }
+            await _stopLatePushToTalkJoinMicrophoneTrack(
+              lateTrack,
+              lateStopwatch,
+              timeout: timeout,
+            );
+          },
+          onError: (Object error, StackTrace stackTrace) {
+            if (!createTimedOut) {
+              return;
+            }
+            Log.onError(
+              error,
+              stackTrace,
+              content:
+                  'LiveKit initial microphone Push to Talk join create failed '
+                  'after its timeout; no capture was opened, so there is '
+                  'nothing to release '
+                  '(elapsed_ms=${lateStopwatch.elapsedMilliseconds})',
+              category: LogCategory.livekit,
+              source: 'matrix-livekit-backend',
+            );
+          },
+        ),
+      );
+      track = await createFuture.timeout(
+        timeout,
+        onTimeout: () {
+          createTimedOut = true;
+          throw TimeoutException(
+            'LiveKit Push to Talk join microphone create timed out',
+            timeout,
+          );
+        },
+      );
+      await track.disable();
+      final createdTrack = track;
+      final publishFuture = participant.publishAudioTrack(createdTrack);
+      unawaited(
+        publishFuture.then<void>(
+          (publication) async {
+            if (!publishTimedOut) {
+              return;
+            }
+            await _rollbackLatePushToTalkJoinPublication(
+              participant,
+              publication,
+              createdTrack,
+              lateStopwatch,
+              timeout: timeout,
+            );
+          },
+          onError: (Object error, StackTrace stackTrace) {
+            if (!publishTimedOut) {
+              return;
+            }
+            Log.onError(
+              error,
+              stackTrace,
+              content:
+                  'LiveKit initial microphone Push to Talk join publish failed '
+                  'after its timeout; no publication to roll back and the '
+                  'track was already stopped '
+                  '(elapsed_ms=${lateStopwatch.elapsedMilliseconds})',
+              category: LogCategory.livekit,
+              source: 'matrix-livekit-backend',
+            );
+          },
+        ),
+      );
+      final publication = await publishFuture.timeout(
+        timeout,
+        onTimeout: () {
+          publishTimedOut = true;
+          throw TimeoutException(
+            'LiveKit Push to Talk join microphone publish timed out',
+            timeout,
+          );
+        },
+      );
+      final armed =
+          await LivekitMicrophoneSenderGate.armPushToTalkJoinPublication(
+            publication: publication,
+            track: track,
+            source: 'matrix-livekit-backend',
+          );
+      stopwatch.stop();
+      Log.i(
+        'LiveKit initial microphone published muted for Push to Talk: '
+        'sid=${publication.sid} sender_detached=${armed.senderMoved} '
+        'track_enabled=${armed.trackEnabled} '
+        'sender_attachment=${armed.attachment.name} '
+        'elapsed_ms=${stopwatch.elapsedMilliseconds}',
+        category: LogCategory.livekit,
+        source: 'matrix-livekit-backend',
+      );
+      _logInitialMicrophonePublication(participant);
+      initialMicrophoneEnableState.markInitialEnableSettled(
+        outcome: 'published_muted_push_to_talk_join',
+      );
+    } catch (error, stackTrace) {
+      stopwatch.stop();
+      Log.onError(
+        error,
+        stackTrace,
+        content:
+            'LiveKit initial microphone muted publish failed during Windows '
+            'Push to Talk join; continuing with no microphone publication '
+            '(elapsed_ms=${stopwatch.elapsedMilliseconds})',
+        category: LogCategory.livekit,
+        source: 'matrix-livekit-backend',
+      );
+      final created = track;
+      if (createTimedOut || publishTimedOut) {
+        // A TIMEOUT is not a failure that has finished happening: the native
+        // call is still running, so the participant cannot answer "was
+        // anything published" yet. `publishAudioTrack` registers the
+        // publication at livekit_client-2.5.4 `participant/local.dart:187`
+        // and then keeps awaiting `track.onPublish()`, `processor.onPublish`,
+        // `room.applyAudioSpeakerSettings()` and `track.start()`, so a read
+        // here reports WHERE inside the publish the timeout landed, not
+        // whether a publication exists - and either way the observer above
+        // rolls back whatever finally arrives. So this branch does not read
+        // the participant, and the outcome names the timeout instead of
+        // claiming a publication in either direction.
+        if (created != null) {
+          // Release the device now rather than waiting on a publish that has
+          // already outrun its budget. Idempotent with the observer's own
+          // stop: `LocalTrack.stop()` is guarded by its `_stopped` flag.
+          try {
+            await created.stop();
+          } catch (_) {
+            // Best effort: the join goes on either way.
+          }
+        }
+        initialMicrophoneEnableState.markInitialEnableSettled(
+          outcome: publishTimedOut
+              ? 'timed_out_push_to_talk_join_publish'
+              : 'timed_out_push_to_talk_join_create',
+        );
+      } else {
+        final publication = participant.getTrackPublicationBySource(
+          lk.TrackSource.microphone,
+        );
+        if (created != null && publication == null) {
+          try {
+            await created.stop();
+          } catch (_) {
+            // Best effort: the track never published and the join goes on.
+          }
+        }
+        // The outcome has to say which of the two failures this was. Reporting
+        // `published_` for a create/publish failure told the sender-reconcile
+        // diagnostics - the only consumer of this field - that a publication it
+        // then could not find had been made, which is the one thing they cannot
+        // work out for themselves. A failure AFTER the publish still leaves a
+        // publication, so the flag is read back from the participant rather
+        // than assumed from reaching this catch. This read is only sound
+        // because the publish has SETTLED on this branch.
+        initialMicrophoneEnableState.markInitialEnableSettled(
+          outcome: publication != null
+              ? 'published_muted_push_to_talk_join'
+              : 'failed_push_to_talk_join_publish',
+        );
+      }
+    } finally {
+      await nativeActionGuard?.clear();
+    }
+  }
+
+  /// Releases a join-time microphone capture that arrived after its create
+  /// timed out.
+  ///
+  /// Nothing else can: [_publishInitialMicrophoneMutedForPushToTalk] gave up
+  /// with `track` still null, so this `LocalAudioTrack` has no owner. Left
+  /// alone its native capture stays open for the rest of the call with the
+  /// device claimed and no publication carrying it - which is one candidate
+  /// shape for both "publishes but Windows delivers zero frames" (BUG-325)
+  /// and "the microphone only works again after an app restart" (BUG-320),
+  /// so the log line has to name it whether or not the stop succeeds.
+  Future<void> _stopLatePushToTalkJoinMicrophoneTrack(
+    lk.LocalAudioTrack lateTrack,
+    Stopwatch lateStopwatch, {
+    required Duration timeout,
+  }) async {
+    Log.w(
+      'LiveKit initial microphone Push to Talk join create completed after '
+      'timeout; stopping the orphaned capture: '
+      'timeout_ms=${timeout.inMilliseconds} '
+      'elapsed_ms=${lateStopwatch.elapsedMilliseconds}',
+      category: LogCategory.livekit,
+      source: 'matrix-livekit-backend',
+    );
+    try {
+      await lateTrack.stop();
+    } catch (error, stackTrace) {
+      Log.onError(
+        error,
+        stackTrace,
+        content:
+            'Failed to stop the LiveKit Push to Talk join microphone track '
+            'that completed after its create timed out; the native capture '
+            'may still hold the device',
+        category: LogCategory.livekit,
+        source: 'matrix-livekit-backend',
+      );
+    }
+  }
+
+  /// Rolls back a join-time microphone publication that arrived after its
+  /// publish timed out.
+  ///
+  /// The join has already settled `timed_out_push_to_talk_join_publish` and
+  /// nothing armed this publication, so leaving it in the room would give the
+  /// session a microphone publication it believes does not exist. Mirrors
+  /// `_rollbackPublishedScreenShareTracks`, which is what
+  /// `_publishScreenShareVideoTrack` calls from the same observer position.
+  Future<void> _rollbackLatePushToTalkJoinPublication(
+    lk.LocalParticipant participant,
+    lk.LocalTrackPublication<lk.LocalAudioTrack> publication,
+    lk.LocalAudioTrack lateTrack,
+    Stopwatch lateStopwatch, {
+    required Duration timeout,
+  }) async {
+    Log.w(
+      'LiveKit initial microphone Push to Talk join publish completed after '
+      'timeout; rolling back the late publication: sid=${publication.sid} '
+      'timeout_ms=${timeout.inMilliseconds} '
+      'elapsed_ms=${lateStopwatch.elapsedMilliseconds}',
+      category: LogCategory.livekit,
+      source: 'matrix-livekit-backend',
+    );
+    try {
+      await participant.removePublishedTrack(publication.sid);
+    } catch (error, stackTrace) {
+      Log.onError(
+        error,
+        stackTrace,
+        content:
+            'Failed to unpublish the LiveKit Push to Talk join microphone '
+            'publication that completed after its publish timed out',
+        category: LogCategory.livekit,
+        source: 'matrix-livekit-backend',
+      );
+    }
+    // Runs even when the unpublish threw, and even though
+    // `removePublishedTrack` stops the track itself while
+    // `stopLocalTrackOnUnpublish` is on: releasing the device is the part
+    // that must not depend on the room agreeing to anything.
+    try {
+      await lateTrack.stop();
+    } catch (_) {
+      // Best effort, and already stopped in the common case.
+    }
+  }
+
+  /// Drives [_publishInitialMicrophoneMutedForPushToTalk] without a live room.
+  ///
+  /// The outcome this path settles is only reachable through `join()`, which
+  /// needs a homeserver and an SFU; the method itself needs neither.
+  @visibleForTesting
+  Future<void> debugPublishInitialMicrophoneMutedForPushToTalkForTesting(
+    lk.LocalParticipant participant, {
+    required lk.AudioCaptureOptions audioCaptureOptions,
+    required MatrixLivekitInitialMicrophoneEnableState
+    initialMicrophoneEnableState,
+  }) => _publishInitialMicrophoneMutedForPushToTalk(
+    participant,
+    audioCaptureOptions: audioCaptureOptions,
+    initialMicrophoneEnableState: initialMicrophoneEnableState,
+  );
+
   Future<void> _enableInitialMicrophoneDuringJoin(
     lk.LocalParticipant participant, {
     required lk.AudioCaptureOptions audioCaptureOptions,
@@ -762,8 +1189,14 @@ class MatrixLivekitBackend {
         await enableFuture;
       }
       _logInitialMicrophoneEnableCompleted(stopwatch, participant: participant);
+      initialMicrophoneEnableState.markInitialEnableSettled(
+        outcome: 'completed',
+      );
     } on TimeoutException catch (error, stackTrace) {
       if (!PlatformUtils.isWindows) {
+        initialMicrophoneEnableState.markInitialEnableSettled(
+          outcome: 'timed_out',
+        );
         rethrow;
       }
       clearActionGuard = false;
@@ -785,6 +1218,7 @@ class MatrixLivekitBackend {
         ),
       );
     } catch (error, stackTrace) {
+      initialMicrophoneEnableState.markInitialEnableSettled(outcome: 'failed');
       if (!PlatformUtils.isWindows) {
         rethrow;
       }
@@ -819,12 +1253,18 @@ class MatrixLivekitBackend {
           initialMicrophoneEnableState,
           stopwatch,
         );
+        initialMicrophoneEnableState.markInitialEnableSettled(
+          outcome: 'stale_rolled_back_after_timeout',
+        );
         return;
       }
       _logInitialMicrophoneEnableCompleted(
         stopwatch,
         afterTimeout: true,
         participant: participant,
+      );
+      initialMicrophoneEnableState.markInitialEnableSettled(
+        outcome: 'completed_after_timeout',
       );
     } catch (error, stackTrace) {
       Log.onError(
@@ -834,6 +1274,9 @@ class MatrixLivekitBackend {
             'LiveKit initial microphone enable failed after Windows call join timeout',
         category: LogCategory.livekit,
         source: 'matrix-livekit-backend',
+      );
+      initialMicrophoneEnableState.markInitialEnableSettled(
+        outcome: 'failed_after_timeout',
       );
     } finally {
       await nativeActionGuard?.clear();
@@ -963,13 +1406,40 @@ class MatrixLivekitBackend {
     );
   }
 
+  /// Records why a call join was PERMITTED, not only why one was refused.
+  ///
+  /// BUG-202. Every allow path used to return silently, so a capture of a join
+  /// that went through contained nothing at all - and "the log says nothing" was
+  /// then read as "the gate did nothing wrong", which it cannot support. The
+  /// owner joined an encrypted-room call unverified with cross-signing on and
+  /// was not blocked; no log line exists that could say which of three
+  /// mechanisms let them through. Same shape as BUG-301: a failure-only log
+  /// cannot show a leak.
+  ///
+  /// Redaction matches the block line - hashes, never identifiers.
+  void _logCallJoinPreflightAllowed(String reason, {String? clauses}) {
+    Log.i(
+      'Allowed LiveKit join past E2EE preflight reason=$reason'
+      '${clauses == null ? '' : ' $clauses'}',
+      category: LogCategory.livekit,
+      source: 'matrix-livekit-backend',
+    );
+  }
+
   Future<void> _ensureE2eeCallJoinAllowed() async {
     if (!room.isE2EE) {
+      // The most likely explanation for a permitted join, and until BUG-335
+      // landed it was nearly the only reachable one: an encrypted call room had
+      // no join control on a release build, and BUILD_MODE defaults to release.
+      // The gate has therefore guarded rooms almost nobody could enter, which
+      // is why its fail-open has never been exercised.
+      _logCallJoinPreflightAllowed('room_not_encrypted');
       return;
     }
 
     final appClient = room.client;
     if (appClient is! MatrixClient) {
+      _logCallJoinPreflightAllowed('client_not_matrix');
       return;
     }
 
@@ -988,19 +1458,37 @@ class MatrixLivekitBackend {
     }
 
     final status = appClient.e2eeTrustStatus;
+    final clauses =
+        'client=${status.clientIdHash} user=${status.userIdHash} '
+        'encryption=${status.encryptionAvailable} '
+        'cross_signing=${status.crossSigningEnabled} '
+        'known=${status.currentDeviceKnown} '
+        'verified=${status.currentDeviceVerified} '
+        'blocked=${status.currentDeviceBlocked} '
+        'backup=${status.keyBackupEnabled}';
+
     if (status.currentDeviceHealthy) {
+      // THE CLAUSES ARE THE POINT, not the outcome. `currentDeviceHealthy` is
+      // `encryptionAvailable && currentDeviceKnown && blocked != true &&
+      // (currentDeviceVerified == true || !crossSigningEnabled)`, so a healthy
+      // verdict on an UNVERIFIED device means the last term carried it - which
+      // is only possible when `crossSigningEnabled` reads false. That flag is
+      // three SSSS account-data reads (`CrossSigning.enabled`, cross_signing
+      // .dart:55 in the pinned SDK) and it does NOT await
+      // `client.accountDataLoading`, while `isCached()` five lines below it
+      // does. So `cross_signing=false verified=null` here, on an account that
+      // has cross-signing, is the fail-open in the act - and this line is the
+      // only thing that would show it.
+      _logCallJoinPreflightAllowed('device_healthy', clauses: clauses);
       return;
     }
 
+    // Same `clauses` string as the allow line above, deliberately shared: two
+    // hand-maintained copies drift, and a block and an allow that report
+    // different fields cannot be compared against each other - which is the
+    // whole reason the allow line was added.
     Log.w(
-      'Blocked LiveKit join from unhealthy E2EE session '
-      'client=${status.clientIdHash} user=${status.userIdHash} '
-      'encryption=${status.encryptionAvailable} '
-      'cross_signing=${status.crossSigningEnabled} '
-      'known=${status.currentDeviceKnown} '
-      'verified=${status.currentDeviceVerified} '
-      'blocked=${status.currentDeviceBlocked} '
-      'backup=${status.keyBackupEnabled}',
+      'Blocked LiveKit join from unhealthy E2EE session $clauses',
       category: LogCategory.livekit,
       source: 'matrix-livekit-backend',
     );

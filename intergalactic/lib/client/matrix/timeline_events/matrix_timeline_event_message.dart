@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:intergalactic/client/attachment.dart';
 import 'package:intergalactic/client/matrix/components/threads/matrix_thread_timeline.dart';
+import 'package:intergalactic/client/matrix/components/message_forwarding/matrix_forwarded_message.dart';
 import 'package:intergalactic/client/matrix/extensions/matrix_event_extensions.dart';
 import 'package:intergalactic/client/matrix/matrix_mxc_file_provider.dart';
 import 'package:intergalactic/client/matrix/matrix_mxc_image_provider.dart';
@@ -19,6 +20,7 @@ import 'package:flutter/material.dart';
 import 'package:matrix/matrix.dart' as matrix;
 
 import 'package:html/parser.dart' as html_parser;
+import 'package:html_unescape/html_unescape.dart';
 
 class MatrixTimelineEventMessage extends MatrixTimelineEvent
     with MatrixTimelineEventRelated, MatrixTimelineEventReactions
@@ -96,12 +98,44 @@ class MatrixTimelineEventMessage extends MatrixTimelineEvent
     return displayEvent.plaintextBody;
   }
 
+  /// The visible body once a forward's fallback attribution is removed.
+  ///
+  /// A forward carries its attribution twice on purpose: in the presentation
+  /// envelope, which this client draws above the message, and as a header line
+  /// inside `body`, so a client that cannot read the envelope still sees who
+  /// wrote it. Rendering the body verbatim printed the same sentence twice -
+  /// and for a forward with no text of its own, the header WAS the whole
+  /// message.
+  ///
+  /// Every render branch in [buildFormattedContent] goes through here,
+  /// including the one that runs before the room is loaded. Three branches each
+  /// remembering to strip is three chances to forget, and the branch that
+  /// forgets looks exactly like the bug this exists to fix.
+  static String visibleForwardedBody(
+    MatrixForwardedPresentation? forwarded,
+    String raw, {
+    required bool html,
+  }) {
+    if (forwarded == null) {
+      return raw;
+    }
+
+    return html
+        ? forwarded.stripFallbackHeaderHtml(raw)
+        : forwarded.stripFallbackHeader(raw);
+  }
+
   @override
   Widget? buildFormattedContent({Timeline? timeline}) {
     final roomId = event.roomId;
     final room = roomId == null ? null : client.getRoom(roomId);
+    final forwarded = MatrixForwardedPresentation.tryParse(this);
     if (room == null) {
-      final plain = _getPlaintextBody(timeline: timeline);
+      final plain = visibleForwardedBody(
+        forwarded,
+        _getPlaintextBody(timeline: timeline),
+        html: false,
+      );
       if (plain.isNotEmpty) {
         return PlaintextMessageBody(
           content: plain,
@@ -115,10 +149,25 @@ class MatrixTimelineEventMessage extends MatrixTimelineEvent
     var displayEvent = getDisplayEvent(timeline);
     bool isFormatted = displayEvent.content.tryGet<String>("format") != null;
     if (isFormatted) {
-      return MatrixHtmlParser.parse(
-          _getFormattedBody(timeline: timeline), client, room);
+      final visible = visibleForwardedBody(
+        forwarded,
+        _getFormattedBody(timeline: timeline),
+        html: true,
+      );
+      // Once the attribution is gone, a forwarded attachment has nothing left
+      // to draw and the attachment stands on its own. Scoped to forwards so a
+      // message with an empty formatted body keeps whatever it rendered before.
+      if (forwarded != null && visible.trim().isEmpty) {
+        return null;
+      }
+
+      return MatrixHtmlParser.parse(visible, client, room);
     } else {
-      var plain = _getPlaintextBody(timeline: timeline);
+      final plain = visibleForwardedBody(
+        forwarded,
+        _getPlaintextBody(timeline: timeline),
+        html: false,
+      );
       if (plain != "") {
         return PlaintextMessageBody(
           content: plain,
@@ -140,7 +189,8 @@ class MatrixTimelineEventMessage extends MatrixTimelineEvent
     String filename = event.content.containsKey("filename")
         ? event.content["filename"] as String
         : event.body;
-    final spoiler = event.content["chat.intergalactic.spoiler"] == true ||
+    final spoiler =
+        event.content["chat.intergalactic.spoiler"] == true ||
         event.content["org.matrix.msc1767.spoiler"] == true ||
         event.content["fi.mau.spoiler"] == true;
 
@@ -149,71 +199,84 @@ class MatrixTimelineEventMessage extends MatrixTimelineEvent
       double? height = event.attachmentHeight;
       final attachmentMimeType = event.attachmentMimetype;
       final looksAudio = _attachmentLooksAudio(
-          attachmentMimeType, filename, event.messageType);
+        attachmentMimeType,
+        filename,
+        event.messageType,
+      );
 
       Attachment? attachment;
 
       if (Mime.imageTypes.contains(attachmentMimeType)) {
         attachment = ImageAttachment(
-            MatrixMxcImage(event.attachmentMxcUrl!, mx,
-                blurhash: event.attachmentBlurhash,
-                doThumbnail: event.hasThumbnail,
-                doFullres: true,
-                thumbnailHeight: event.thumbnailHeight != null
-                    ? min(700, event.thumbnailHeight!.toInt())
-                    : 700,
-                // I noticed on linux, decoding really high res images would cause a flicker, so we will limit it to 1440p
-                fullResHeight: PlatformUtils.isLinux
-                    ? (event.attachmentHeight != null
-                        ? min(1440, event.attachmentHeight!.toInt())
-                        : 1440)
-                    : null,
-                autoLoadFullRes: !event.hasThumbnail,
-                matrixEvent: event),
-            MxcFileProvider(mx, event.attachmentMxcUrl!, event: event),
-            mimeType: attachmentMimeType,
-            width: width,
-            fileSize: event.infoMap['size'] as int?,
-            name: filename,
-            spoiler: spoiler,
-            height: height);
+          MatrixMxcImage(
+            event.attachmentMxcUrl!,
+            mx,
+            blurhash: event.attachmentBlurhash,
+            doThumbnail: event.hasThumbnail,
+            doFullres: true,
+            thumbnailHeight: event.thumbnailHeight != null
+                ? min(700, event.thumbnailHeight!.toInt())
+                : 700,
+            // I noticed on linux, decoding really high res images would cause a flicker, so we will limit it to 1440p
+            fullResHeight: PlatformUtils.isLinux
+                ? (event.attachmentHeight != null
+                      ? min(1440, event.attachmentHeight!.toInt())
+                      : 1440)
+                : null,
+            autoLoadFullRes: !event.hasThumbnail,
+            matrixEvent: event,
+          ),
+          MxcFileProvider(mx, event.attachmentMxcUrl!, event: event),
+          mimeType: attachmentMimeType,
+          width: width,
+          fileSize: event.infoMap['size'] as int?,
+          name: filename,
+          spoiler: spoiler,
+          height: height,
+        );
       } else if (looksAudio) {
         attachment = AudioAttachment(
-            MxcFileProvider(mx, event.attachmentMxcUrl!, event: event),
-            name: filename,
-            mimeType: attachmentMimeType,
-            duration: event.attachmentDuration,
-            spoiler: spoiler,
-            fileSize: event.infoMap['size'] as int?);
+          MxcFileProvider(mx, event.attachmentMxcUrl!, event: event),
+          name: filename,
+          mimeType: attachmentMimeType,
+          duration: event.attachmentDuration,
+          spoiler: spoiler,
+          fileSize: event.infoMap['size'] as int?,
+        );
       } else if (Mime.videoTypes.contains(attachmentMimeType)) {
         // Only load videos if the event has finished sending, otherwise
         // matrix dart sdk gives us the video file when we ask for thumbnail
         if (event.status.isSending == false) {
           attachment = VideoAttachment(
-              MxcFileProvider(mx, event.attachmentMxcUrl!, event: event),
-              thumbnail: event.videoThumbnailUrl != null
-                  ? MatrixMxcImage(event.videoThumbnailUrl!, mx,
-                      blurhash: event.attachmentBlurhash,
-                      doFullres: false,
-                      autoLoadFullRes: false,
-                      doThumbnail: true,
-                      matrixEvent: event)
-                  : null,
-              name: filename,
-              mimeType: attachmentMimeType,
-              duration: event.attachmentDuration,
-              width: width,
-              fileSize: event.infoMap['size'] as int?,
-              spoiler: spoiler,
-              height: height);
+            MxcFileProvider(mx, event.attachmentMxcUrl!, event: event),
+            thumbnail: event.videoThumbnailUrl != null
+                ? MatrixMxcImage(
+                    event.videoThumbnailUrl!,
+                    mx,
+                    blurhash: event.attachmentBlurhash,
+                    doFullres: false,
+                    autoLoadFullRes: false,
+                    doThumbnail: true,
+                    matrixEvent: event,
+                  )
+                : null,
+            name: filename,
+            mimeType: attachmentMimeType,
+            duration: event.attachmentDuration,
+            width: width,
+            fileSize: event.infoMap['size'] as int?,
+            spoiler: spoiler,
+            height: height,
+          );
         }
       } else {
         attachment = FileAttachment(
-            MxcFileProvider(mx, event.attachmentMxcUrl!, event: event),
-            name: filename,
-            mimeType: attachmentMimeType,
-            spoiler: spoiler,
-            fileSize: event.infoMap['size'] as int?);
+          MxcFileProvider(mx, event.attachmentMxcUrl!, event: event),
+          name: filename,
+          mimeType: attachmentMimeType,
+          spoiler: spoiler,
+          fileSize: event.infoMap['size'] as int?,
+        );
       }
 
       return List.from([attachment]);
@@ -223,7 +286,10 @@ class MatrixTimelineEventMessage extends MatrixTimelineEvent
   }
 
   bool _attachmentLooksAudio(
-      String? mimeType, String filename, String messageType) {
+    String? mimeType,
+    String filename,
+    String messageType,
+  ) {
     if (messageType == 'm.audio') {
       return true;
     }
@@ -258,6 +324,14 @@ class MatrixTimelineEventMessage extends MatrixTimelineEvent
       text = text.replaceRange(start, end, "");
     }
 
+    // The formatted body is HTML, which entity-encodes `&` as `&amp;`.
+    // TextUtils' URL regex does not match `;`, so a query string containing
+    // `&` (routine on TikTok, YouTube, and most tracking links) truncated at
+    // `&amp` and the request went out for a URL that was never the real one.
+    // Unescaping first is a no-op on plain text, which is what this is when
+    // the event carries no `formatted_body`.
+    text = HtmlUnescape().convert(text);
+
     var foundLinks = TextUtils.findUrls(text);
 
     foundLinks?.removeWhere((element) => element.authority == "matrix.to");
@@ -288,8 +362,11 @@ class MatrixTimelineEventMessage extends MatrixTimelineEvent
 }
 
 class PlaintextMessageBody extends StatelessWidget {
-  const PlaintextMessageBody(
-      {required this.content, required this.clientIdentifier, super.key});
+  const PlaintextMessageBody({
+    required this.content,
+    required this.clientIdentifier,
+    super.key,
+  });
   final String content;
   final String clientIdentifier;
 
@@ -298,9 +375,15 @@ class PlaintextMessageBody extends StatelessWidget {
     var document = html_parser.parse(content);
     bool big = shouldDoBigEmoji(document);
 
-    return Text.rich(TextSpan(
+    return Text.rich(
+      TextSpan(
         style: TextStyle(fontSize: big ? 34 : null),
-        children: TextUtils.linkifyString(content,
-            context: context, clientId: clientIdentifier)));
+        children: TextUtils.linkifyString(
+          content,
+          context: context,
+          clientId: clientIdentifier,
+        ),
+      ),
+    );
   }
 }

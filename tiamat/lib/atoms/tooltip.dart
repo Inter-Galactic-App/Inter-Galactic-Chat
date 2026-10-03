@@ -22,11 +22,28 @@ class Tooltip extends StatelessWidget {
   const Tooltip(
       {required this.child,
       required this.text,
+      this.content,
       this.preferredDirection = AxisDirection.up,
       this.excludeFromSemantics = false,
+      this.backgroundColor,
+      this.textColor,
+      this.padding = const EdgeInsets.all(8.0),
       super.key});
   final Widget child;
+
+  /// The tooltip's message, and always its screen-reader announcement.
+  ///
+  /// Required even when [content] replaces the visible text, so a rich
+  /// tooltip cannot silently ship with nothing to announce - the failure D7
+  /// was written about.
   final String text;
+
+  /// Visible body, replacing the rendered [text].
+  ///
+  /// For tooltips that show something a string cannot express - a member
+  /// list, an image, formatted spans. It is wrapped in `ExcludeSemantics`
+  /// exactly as the plain body is, because [text] is what a reader hears.
+  final Widget? content;
   final AxisDirection preferredDirection;
 
   /// Suppresses the screen-reader announcement of [text].
@@ -41,6 +58,22 @@ class Tooltip extends StatelessWidget {
   /// exist *for* accessibility, so silence must be opted into rather than
   /// inherited - see DECISIONS.md 2026-08-18, D7.
   final bool excludeFromSemantics;
+
+  /// Overrides the house surface colour.
+  ///
+  /// ESCAPE HATCH, and the drift this component exists to stop started with
+  /// per-site styling - so use it only where the house surface genuinely
+  /// fails, such as a tooltip drawn over live video where the app surface has
+  /// no contrast against the frame. Default: `surfaceContainerLowest`.
+  final Color? backgroundColor;
+
+  /// Overrides the body text colour. Pair it with [backgroundColor]; setting
+  /// one alone is how a tooltip ends up unreadable in the other theme.
+  /// Default: `onSurface`.
+  final Color? textColor;
+
+  /// Padding around the body. Default `EdgeInsets.all(8)`, the house value.
+  final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context) {
@@ -62,17 +95,19 @@ class Tooltip extends StatelessWidget {
   }
 
   Widget _buildTooltip(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return JustTheTooltip(
         content: ExcludeSemantics(
           child: Theme(
             data: Theme.of(context),
             child: Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: tiamat.Text(
-                text,
-                type: tiamat.TextType.body,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
+              padding: padding,
+              child: content ??
+                  tiamat.Text(
+                    text,
+                    type: tiamat.TextType.body,
+                    color: textColor ?? scheme.onSurface,
+                  ),
             ),
           ),
         ),
@@ -80,7 +115,7 @@ class Tooltip extends StatelessWidget {
         offset: 5,
         tailLength: 5,
         tailBaseWidth: 5,
-        backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
+        backgroundColor: backgroundColor ?? scheme.surfaceContainerLowest,
         child: child);
   }
 }

@@ -131,6 +131,14 @@ class NoiseSuppressionManager {
     return true;
   }
 
+  bool SetSpeechProtectHysteresis(bool enabled) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    speech_protect_hysteresis_enabled_ = enabled;
+    shared_state_->deepfilternet_speech_protect_hysteresis_enabled.store(
+        enabled);
+    return true;
+  }
+
   bool StartDiagnosticCapture(const char* directory,
                               int duration_ms,
                               int stage_mask) {
@@ -363,6 +371,10 @@ class NoiseSuppressionManager {
     json << "\"deepFilterNetLastSpeechProtectWetMix\":"
          << shared_state_->deepfilternet_last_speech_protect_wet_mix.load()
          << ",";
+    json << "\"deepFilterNetSpeechProtectHysteresisEnabled\":"
+         << (shared_state_->deepfilternet_speech_protect_hysteresis_enabled.load()
+                 ? "true" : "false")
+         << ",";
     json << "\"deepFilterNetAttenuationLimitDb\":"
          << intergalactic_noise_suppression::DeepFilterNetRuntime::
                 AttenuationLimitDb()
@@ -542,6 +554,8 @@ class NoiseSuppressionManager {
         deepfilternet_transient_suppression_enabled_);
     shared_state_->deepfilternet_hush_suppression_enabled.store(
         deepfilternet_hush_suppression_enabled_);
+    shared_state_->deepfilternet_speech_protect_hysteresis_enabled.store(
+        speech_protect_hysteresis_enabled_);
     if (!deepfilternet_transient_suppression_enabled_) {
       shared_state_->deepfilternet_transient_suppressed_frames.store(0);
       shared_state_->deepfilternet_transient_adjusted_samples.store(0);
@@ -688,6 +702,7 @@ class NoiseSuppressionManager {
   bool fast_close_enabled_ = false;
   bool deepfilternet_transient_suppression_enabled_ = false;
   bool deepfilternet_hush_suppression_enabled_ = false;
+  bool speech_protect_hysteresis_enabled_ = false;
   std::string reason_ = "not_initialized";
   intergalactic_noise_suppression::WasapiSidecarCapture sidecar_capture_;
   std::thread prewarm_thread_;
@@ -741,6 +756,13 @@ int intergalactic_noise_suppression_configure(double vad_threshold,
 
 int intergalactic_noise_suppression_set_pipeline_mode(int mode) {
   return NoiseSuppressionManager::Instance().SetPipelineMode(mode) ? 1 : 0;
+}
+
+int intergalactic_noise_suppression_set_speech_protect_hysteresis(int enabled) {
+  return NoiseSuppressionManager::Instance().SetSpeechProtectHysteresis(
+             enabled != 0)
+      ? 1
+      : 0;
 }
 
 int intergalactic_noise_suppression_start_diagnostic_capture(

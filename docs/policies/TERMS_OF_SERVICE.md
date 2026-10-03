@@ -2,14 +2,9 @@
 
 Effective date: 2026-05-03
 
-Publication status: public beta terms, **owner-reviewed and in force**. Public
+Publication status: public beta terms, owner-reviewed and in force. Public
 support and source-offer publication details are tracked in
 `PUBLIC_RELEASE_READINESS_TRACKER.md`. This is not legal advice.
-
-*(Status corrected 2026-08-09 with owner approval: this previously read "draft
-pending review", which left terms that are already published and relied on
-labelled a draft indefinitely. Only the status line changed. **No term was
-added, removed or reworded.**)*
 
 ## What Inter Galactic Is
 

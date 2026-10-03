@@ -1,4 +1,10 @@
 {
+  "notificationAttachmentSentImage": "Envió una imagen",
+  "notificationAttachmentSentVideo": "Envió un video",
+  "notificationAttachmentSentAudio": "Envió un mensaje de audio",
+  "notificationAttachmentSentFile": "Envió un archivo",
+  "notificationAttachmentSharedLocation": "Compartió una ubicación",
+  "notificationAttachmentSentSticker": "Envió una pegatina",
   "promptConfirmSpaceCreation": "¡Crear un espacio!",
   "@promptConfirmSpaceCreation": {
     "description": "Label for a button which confirms the creation of a space",

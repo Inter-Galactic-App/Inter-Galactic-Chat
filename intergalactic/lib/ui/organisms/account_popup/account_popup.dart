@@ -56,10 +56,7 @@ class _DesktopAccountPopupAnchorState extends State<DesktopAccountPopupAnchor> {
       link: _layerLink,
       child: Material(
         color: Colors.transparent,
-        child: InkWell(
-          onTap: _togglePopup,
-          child: widget.child,
-        ),
+        child: InkWell(onTap: _togglePopup, child: widget.child),
       ),
     );
   }
@@ -183,8 +180,9 @@ class _AccountPopupState extends State<AccountPopup> {
     _profile = widget.client.self;
     _activity = widget.activityService.currentActivity;
     _listenForPresence();
-    _activitySubscription =
-        widget.activityService.onActivityChanged.listen((activity) {
+    _activitySubscription = widget.activityService.onActivityChanged.listen((
+      activity,
+    ) {
       if (!mounted) return;
       setState(() {
         _activity = activity;
@@ -298,14 +296,14 @@ class _AccountPopupState extends State<AccountPopup> {
         .getComponent<UserPresenceComponent>()
         ?.onPresenceChanged
         .listen((event) {
-      if (event.$1 != userId || !mounted) {
-        return;
-      }
+          if (event.$1 != userId || !mounted) {
+            return;
+          }
 
-      setState(() {
-        _presence = event.$2;
-      });
-    });
+          setState(() {
+            _presence = event.$2;
+          });
+        });
   }
 
   Future<void> _loadProfile() async {
@@ -353,14 +351,14 @@ class _AccountPopupState extends State<AccountPopup> {
     }
 
     final trimmed = status.trim();
-    await widget.client
-        .getComponent<UserProfileComponent>()
-        ?.setStatus(trimmed.isEmpty ? null : trimmed);
+    await widget.client.getComponent<UserProfileComponent>()?.setStatus(
+      trimmed.isEmpty ? null : trimmed,
+    );
     await widget.client.getComponent<UserPresenceComponent>()?.setStatus(
-          UserPresenceStatus.online,
-          message: trimmed.isEmpty ? null : trimmed,
-          clearMessage: trimmed.isEmpty,
-        );
+      UserPresenceStatus.online,
+      message: trimmed.isEmpty ? null : trimmed,
+      clearMessage: trimmed.isEmpty,
+    );
 
     if (!mounted) {
       return;
@@ -371,8 +369,10 @@ class _AccountPopupState extends State<AccountPopup> {
           ? UserPresence(UserPresenceStatus.online)
           : UserPresence(
               UserPresenceStatus.online,
-              message:
-                  UserPresenceMessage(trimmed, PresenceMessageType.userCustom),
+              message: UserPresenceMessage(
+                trimmed,
+                PresenceMessageType.userCustom,
+              ),
             );
     });
   }
@@ -410,9 +410,7 @@ class _AccountPopupState extends State<AccountPopup> {
     final choice = await AdaptiveDialog.show<_AccountSwitchChoice>(
       widget.navigationContext,
       title: "Switch accounts",
-      builder: (_) => _AccountSwitchDialog(
-        clientManager: widget.clientManager,
-      ),
+      builder: (_) => _AccountSwitchDialog(clientManager: widget.clientManager),
     );
 
     if (choice == null) {
@@ -463,7 +461,8 @@ class _ProfileSummary extends StatelessWidget {
     final resolvedProfile = profile ?? client.self;
     final displayName =
         resolvedProfile?.displayName ?? client.self?.displayName ?? "Account";
-    final identifier = resolvedProfile?.identifier ??
+    final identifier =
+        resolvedProfile?.identifier ??
         client.self?.identifier ??
         client.identifier;
     var profileColor = resolvedProfile?.defaultColor ?? scheme.primary;
@@ -493,9 +492,7 @@ class _ProfileSummary extends StatelessWidget {
                 top: 0,
                 height: 132,
                 child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: scheme.surfaceContainerLow,
-                  ),
+                  decoration: BoxDecoration(color: scheme.surfaceContainerLow),
                   child: resolvedProfile?.banner != null
                       ? Image(
                           image: resolvedProfile!.banner!,
@@ -538,10 +535,7 @@ class _ProfileSummary extends StatelessWidget {
               Positioned(
                 right: 42,
                 bottom: 28,
-                child: _StatusPill(
-                  status: status,
-                  onTap: onStatusTap,
-                ),
+                child: _StatusPill(status: status, onTap: onStatusTap),
               ),
             ],
           ),
@@ -559,20 +553,19 @@ class _ProfileSummary extends StatelessWidget {
                       displayName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style:
-                          Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                color: scheme.onSurface,
-                                fontSize: 30,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0,
-                              ),
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(
+                            color: scheme.onSurface,
+                            fontSize: 30,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0,
+                          ),
                     ),
                     const SizedBox(height: 2),
                     InkWell(
                       borderRadius: BorderRadius.circular(4),
-                      onTap: () => Clipboard.setData(
-                        ClipboardData(text: identifier),
-                      ),
+                      onTap: () =>
+                          Clipboard.setData(ClipboardData(text: identifier)),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -581,9 +574,7 @@ class _ProfileSummary extends StatelessWidget {
                               identifier,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .labelSmall
+                              style: Theme.of(context).textTheme.labelSmall
                                   ?.copyWith(
                                     color: scheme.onSurfaceVariant,
                                     fontFamily: "Code",
@@ -618,10 +609,10 @@ class _ProfileSummary extends StatelessWidget {
               maxLines: 4,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: scheme.onSurface,
-                    height: 1.25,
-                    letterSpacing: 0,
-                  ),
+                color: scheme.onSurface,
+                height: 1.25,
+                letterSpacing: 0,
+              ),
             ),
           ),
       ],
@@ -647,10 +638,7 @@ class _ProfileSummary extends StatelessWidget {
 }
 
 class _StatusPill extends StatelessWidget {
-  const _StatusPill({
-    required this.status,
-    required this.onTap,
-  });
+  const _StatusPill({required this.status, required this.onTap});
 
   final String status;
   final VoidCallback onTap;
@@ -668,9 +656,7 @@ class _StatusPill extends StatelessWidget {
           decoration: BoxDecoration(
             color: scheme.surfaceContainerHigh.withValues(alpha: 0.9),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: scheme.outline.withValues(alpha: 0.28),
-            ),
+            border: Border.all(color: scheme.outline.withValues(alpha: 0.28)),
           ),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 7, 12, 7),
@@ -681,10 +667,10 @@ class _StatusPill extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: scheme.onSurface,
-                      fontSize: 14,
-                      letterSpacing: 0,
-                    ),
+                  color: scheme.onSurface,
+                  fontSize: 14,
+                  letterSpacing: 0,
+                ),
               ),
             ),
           ),
@@ -701,8 +687,8 @@ class _ProfileBadgeIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: badge.body,
+    return tiamat.Tooltip(
+      text: badge.body,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(18),
         child: Image(
@@ -733,10 +719,7 @@ class _AccountActivityView extends StatelessWidget {
     }
 
     if (activities.length == 1) {
-      return _ActivityViewCard(
-        activity: activities.first,
-        service: service,
-      );
+      return _ActivityViewCard(activity: activities.first, service: service);
     }
 
     final current = currentActivity ?? activities.first;
@@ -769,16 +752,13 @@ class _AccountActivityView extends StatelessWidget {
             left: 0,
             right: 10,
             top: 0,
-            child: _ActivityViewCard(
-              activity: top,
-              service: service,
-            ),
+            child: _ActivityViewCard(activity: top, service: service),
           ),
           Positioned(
             right: 8,
             top: 8,
-            child: Tooltip(
-              message: "Swap activity view",
+            child: tiamat.Tooltip(
+              text: "Swap activity view",
               child: Material(
                 color: Colors.transparent,
                 child: InkResponse(
@@ -787,8 +767,9 @@ class _AccountActivityView extends StatelessWidget {
                   child: DecoratedBox(
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color:
-                          Theme.of(context).colorScheme.surfaceContainerHighest,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerHighest,
                     ),
                     child: SizedBox(
                       width: 26,
@@ -835,9 +816,9 @@ class _EmptyActivityView extends StatelessWidget {
               child: Text(
                 "No current activity",
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                      letterSpacing: 0,
-                    ),
+                  color: scheme.onSurfaceVariant,
+                  letterSpacing: 0,
+                ),
               ),
             ),
           ],
@@ -877,8 +858,12 @@ class _ActivityViewCard extends StatelessWidget {
         border: Border.all(color: scheme.outline.withValues(alpha: 0.16)),
       ),
       child: Padding(
-        padding:
-            EdgeInsets.fromLTRB(12, compact ? 8 : 10, 10, compact ? 8 : 10),
+        padding: EdgeInsets.fromLTRB(
+          12,
+          compact ? 8 : 10,
+          10,
+          compact ? 8 : 10,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -900,10 +885,10 @@ class _ActivityViewCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                              fontSize: 11,
-                              letterSpacing: 0,
-                            ),
+                          color: scheme.onSurfaceVariant,
+                          fontSize: 11,
+                          letterSpacing: 0,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -911,10 +896,10 @@ class _ActivityViewCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: scheme.onSurface,
-                              fontWeight: FontWeight.w500,
-                              letterSpacing: 0,
-                            ),
+                          color: scheme.onSurface,
+                          fontWeight: FontWeight.w500,
+                          letterSpacing: 0,
+                        ),
                       ),
                       Text(
                         activity.subtitle == null
@@ -923,9 +908,9 @@ class _ActivityViewCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                              letterSpacing: 0,
-                            ),
+                          color: scheme.onSurfaceVariant,
+                          letterSpacing: 0,
+                        ),
                       ),
                     ],
                   ),
@@ -960,9 +945,9 @@ class _ActivityViewCard extends StatelessWidget {
                               ),
                               onPressed: control.enabled
                                   ? () => service.executeControlForActivity(
-                                        activity,
-                                        control,
-                                      )
+                                      activity,
+                                      control,
+                                    )
                                   : null,
                             ),
                           )
@@ -1073,11 +1058,7 @@ class _ActivityArtwork extends StatelessWidget {
       borderRadius: BorderRadius.circular(radius),
       child: DecoratedBox(
         decoration: BoxDecoration(color: scheme.surfaceContainerHighest),
-        child: SizedBox(
-          width: size,
-          height: size,
-          child: child,
-        ),
+        child: SizedBox(width: size, height: size, child: child),
       ),
     );
   }
@@ -1139,10 +1120,10 @@ class _ActivityProgressBar extends StatelessWidget {
         Text(
           _formatDuration(progress.position),
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: scheme.onSurfaceVariant,
-                fontSize: 10,
-                fontFamily: "Code",
-              ),
+            color: scheme.onSurfaceVariant,
+            fontSize: 10,
+            fontFamily: "Code",
+          ),
         ),
         const SizedBox(width: 6),
         Expanded(
@@ -1162,10 +1143,10 @@ class _ActivityProgressBar extends StatelessWidget {
         Text(
           _formatDuration(progress.duration),
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: scheme.onSurfaceVariant,
-                fontSize: 10,
-                fontFamily: "Code",
-              ),
+            color: scheme.onSurfaceVariant,
+            fontSize: 10,
+            fontFamily: "Code",
+          ),
         ),
       ],
     );
@@ -1179,10 +1160,7 @@ class _ActivityProgressBar extends StatelessWidget {
 }
 
 class _ActivityProgress {
-  const _ActivityProgress({
-    required this.position,
-    required this.duration,
-  });
+  const _ActivityProgress({required this.position, required this.duration});
 
   final Duration position;
   final Duration duration;
@@ -1296,10 +1274,10 @@ class _AccountActionButton extends StatelessWidget {
                 child: Text(
                   label,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: scheme.onSurface,
-                        fontSize: 16,
-                        letterSpacing: 0,
-                      ),
+                    color: scheme.onSurface,
+                    fontSize: 16,
+                    letterSpacing: 0,
+                  ),
                 ),
               ),
             ],
@@ -1360,10 +1338,7 @@ class _StatusPromptState extends State<_StatusPrompt> {
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: tiamat.Button(
-                  text: "Save",
-                  onTap: _save,
-                ),
+                child: tiamat.Button(text: "Save", onTap: _save),
               ),
             ],
           ),
@@ -1380,9 +1355,7 @@ class _StatusPromptState extends State<_StatusPrompt> {
 class _AccountSwitchChoice {
   const _AccountSwitchChoice.client(this.client) : addAccount = false;
 
-  const _AccountSwitchChoice.addAccount()
-      : client = null,
-        addAccount = true;
+  const _AccountSwitchChoice.addAccount() : client = null, addAccount = true;
 
   final Client? client;
   final bool addAccount;
@@ -1406,9 +1379,9 @@ class _AccountSwitchDialog extends StatelessWidget {
             icon: Icons.all_inclusive_rounded,
             title: "All accounts",
             subtitle: "Show rooms and messages from every signed-in account.",
-            onTap: () => Navigator.of(context).pop(
-              const _AccountSwitchChoice.client(null),
-            ),
+            onTap: () => Navigator.of(
+              context,
+            ).pop(const _AccountSwitchChoice.client(null)),
           ),
           const SizedBox(height: 8),
           for (final client in clientManager.clients)
@@ -1420,9 +1393,9 @@ class _AccountSwitchDialog extends StatelessWidget {
                 avatarText: client.self?.displayName ?? client.identifier,
                 title: client.self?.displayName ?? client.identifier,
                 subtitle: client.self?.identifier ?? client.identifier,
-                onTap: () => Navigator.of(context).pop(
-                  _AccountSwitchChoice.client(client),
-                ),
+                onTap: () => Navigator.of(
+                  context,
+                ).pop(_AccountSwitchChoice.client(client)),
               ),
             ),
           Divider(color: scheme.outline.withValues(alpha: 0.28)),
@@ -1430,9 +1403,9 @@ class _AccountSwitchDialog extends StatelessWidget {
             icon: Icons.add_rounded,
             title: "Add account",
             subtitle: "Sign in to another Matrix account on this device.",
-            onTap: () => Navigator.of(context).pop(
-              const _AccountSwitchChoice.addAccount(),
-            ),
+            onTap: () => Navigator.of(
+              context,
+            ).pop(const _AccountSwitchChoice.addAccount()),
           ),
         ],
       ),
@@ -1500,19 +1473,19 @@ class _SwitchAccountRow extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: scheme.onSurface,
-                              fontWeight: FontWeight.w500,
-                              letterSpacing: 0,
-                            ),
+                          color: scheme.onSurface,
+                          fontWeight: FontWeight.w500,
+                          letterSpacing: 0,
+                        ),
                       ),
                       Text(
                         subtitle,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                              letterSpacing: 0,
-                            ),
+                          color: scheme.onSurfaceVariant,
+                          letterSpacing: 0,
+                        ),
                       ),
                     ],
                   ),

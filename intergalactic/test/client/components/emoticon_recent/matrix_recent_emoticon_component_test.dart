@@ -2,6 +2,26 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:intergalactic/client/matrix/components/emoticon_recent/matrix_recent_emoticon_component.dart';
 
 void main() {
+  test(
+    'sticker recents move the selected sticker to the front and bound the list',
+    () {
+      final existing = List.generate(
+        30,
+        (index) => RecentEmoji(key: 'sticker-$index'),
+      );
+
+      final updated = MatrixRecentEmoticonComponent.recordRecentSticker(
+        existing: existing,
+        sticker: RecentEmoji(key: 'sticker-12'),
+      );
+
+      expect(updated, hasLength(30));
+      expect(updated.first.key, 'sticker-12');
+      expect(updated.where((entry) => entry.key == 'sticker-12'), hasLength(1));
+      expect(updated.last.key, 'sticker-29');
+    },
+  );
+
   test('quick reaction normalization preserves duplicate slot values', () {
     final reactions =
         MatrixRecentEmoticonComponent.normalizeQuickReactionRecents([

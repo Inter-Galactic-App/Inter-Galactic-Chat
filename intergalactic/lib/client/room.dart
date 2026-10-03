@@ -290,8 +290,20 @@ abstract class Room {
   /// Gets the color of a user based on their ID
   Color getColorOfUser(String userId);
 
-  /// Gets the timeline of a room, loading it if not yet loaded
+  /// Gets the room-owned timeline, loading it if not yet loaded.
   Future<Timeline> getTimeline({String contextEventId});
+
+  /// Loads a timeline around [contextEventId] for a short-lived caller.
+  ///
+  /// Backends that cannot create an independent context timeline retain their
+  /// existing [getTimeline] behaviour. Matrix rooms override this to return a
+  /// caller-owned timeline, which must be released with
+  /// [RoomTimelineLease.close].
+  Future<RoomTimelineLease> getTimelineForEventContext(
+    String contextEventId,
+  ) async => RoomTimelineLease.shared(
+    await getTimeline(contextEventId: contextEventId),
+  );
 
   /// Enables end to end encryption in a room
   Future<void> enableE2EE();
@@ -351,6 +363,37 @@ abstract class Room {
 
   @override
   int get hashCode => identifier.hashCode;
+}
+
+/// A timeline obtained for a one-off event-context operation.
+///
+/// The lease makes the ownership boundary explicit: shared fallbacks are not
+/// closed by the caller, while an independently created timeline is.
+class RoomTimelineLease {
+  const RoomTimelineLease.shared(this.timeline) : _callerOwnsTimeline = false;
+
+  const RoomTimelineLease.owned(this.timeline) : _callerOwnsTimeline = true;
+
+  /// Initializes an independently created timeline, closing it if loading
+  /// fails before ownership can be handed to the caller.
+  static Future<RoomTimelineLease> initializeOwned(
+    Timeline timeline,
+    Future<void> Function() initialize,
+  ) async {
+    try {
+      await initialize();
+    } catch (_) {
+      await timeline.close();
+      rethrow;
+    }
+    return RoomTimelineLease.owned(timeline);
+  }
+
+  final Timeline timeline;
+  final bool _callerOwnsTimeline;
+
+  Future<void> close() =>
+      _callerOwnsTimeline ? timeline.close() : Future.value();
 }
 
 abstract interface class RoomJoinRequestActions {

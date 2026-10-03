@@ -59,6 +59,32 @@ bool androidNotificationAttachmentSupportsPreview(
     type == NotificationAttachmentType.gif ||
     type == NotificationAttachmentType.sticker;
 
+/// Whether Android may include media in a message notification.
+///
+/// Staging the new attachment only. It used to gate reuse of the active
+/// [MessagingStyleInformation] as well, which meant turning "Show images" off
+/// also threw away the conversation history in the shade - a preference about
+/// images silently became a preference about message history. The image that
+/// gate existed to suppress is removed by
+/// [androidNotificationMessagesWithoutMedia] instead.
+bool androidNotificationAllowsMediaPreview({
+  required bool usePrivatePreviews,
+  required bool showMediaInNotifications,
+}) => !usePrivatePreviews && showMediaInNotifications;
+
+/// The retained messages of an active notification, with staged media dropped.
+///
+/// Messages read back from the shade carry the `dataUri` they were posted
+/// with, so replaying them verbatim would keep showing an image staged before
+/// the user turned media previews off. Only the media fields go; the text,
+/// timestamp and sender are what make the history a history.
+List<Message> androidNotificationMessagesWithoutMedia(List<Message> retained) {
+  return [
+    for (final message in retained)
+      Message(message.text, message.timestamp, message.person),
+  ];
+}
+
 class AndroidNotifier implements Notifier {
   static const String notificationIcon = "ig_notification_icon";
 
@@ -313,6 +339,10 @@ class AndroidNotifier implements Notifier {
     }
 
     final usePrivatePreviews = preferences.usePrivateNotificationPreviews;
+    final allowsMediaPreview = androidNotificationAllowsMediaPreview(
+      usePrivatePreviews: usePrivatePreviews,
+      showMediaInNotifications: preferences.showMediaInNotifications.value,
+    );
 
     Uri? userAvatar;
     if (!usePrivatePreviews) {
@@ -345,10 +375,19 @@ class AndroidNotifier implements Notifier {
 
     final roomKey = NotificationIdentity.roomKeyForMessage(content);
     final id = NotificationIdentity.messageThreadNotificationId(content);
+    // Gated on private previews alone: this style is the only source of the
+    // thread's previous messages, and dropping it collapses the shade to the
+    // one message being posted. Private previews are the case where the
+    // retained text itself must not be replayed.
     var activeStyleInfo = usePrivatePreviews
         ? null
         : await AndroidFlutterLocalNotificationsPlugin()
               .getActiveNotificationMessagingStyle(id);
+
+    final retained = activeStyleInfo?.messages;
+    if (retained != null && !allowsMediaPreview) {
+      retained.setAll(0, androidNotificationMessagesWithoutMedia(retained));
+    }
 
     var person = Person(
       name: content.senderName,
@@ -362,14 +401,10 @@ class AndroidNotifier implements Notifier {
 
     final displayContent =
         content.attachmentPresentation?.displayText ?? content.content;
-    // `NotificationModifierHideContent` already nulls the presentation and
-    // clears `allowsRichActions` when private previews are on, so this is the
-    // second gate rather than the first. It is here because the rest of this
-    // method reads the preference directly in eight other places, and the one
-    // that actually attaches media should not be the exception - a notification
-    // that reaches the notifier without having passed the modifiers would
-    // otherwise put the image itself in the shade.
-    final attachmentUri = content.allowsRichActions && !usePrivatePreviews
+    // `NotificationModifierHideContent` already removes media when private
+    // previews are on. This renderer gate additionally honours the independent
+    // "Show images" preference and protects direct notifier callers.
+    final attachmentUri = content.allowsRichActions && allowsMediaPreview
         ? await _messageAttachmentUri(content.attachmentPresentation)
         : null;
     var message = Message(

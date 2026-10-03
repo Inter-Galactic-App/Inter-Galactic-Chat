@@ -8,6 +8,7 @@ import 'package:intergalactic/client/bug_report/pending_native_call_crash_guard.
 import 'package:intergalactic/client/client.dart';
 import 'package:intergalactic/client/components/voip/call_health.dart';
 import 'package:intergalactic/client/components/voip/call_session_event_gate.dart';
+import 'package:intergalactic/client/components/voip/stream_lifecycle_cue.dart';
 import 'package:intergalactic/client/components/voip/screen_share_adaptive_fallback.dart';
 import 'package:intergalactic/client/components/voip/screen_share_quality_profile.dart';
 import 'package:intergalactic/client/components/voip/share_session/share_session.dart';
@@ -24,13 +25,16 @@ import 'package:intergalactic/client/components/voip/android_screencapture_sourc
 import 'package:intergalactic/client/components/voip/audio/ios_call_audio_session.dart';
 import 'package:intergalactic/client/components/voip/audio/noise_suppression/noise_suppression_capture_profile.dart';
 import 'package:intergalactic/client/components/voip/audio/noise_suppression/noise_suppression_service.dart';
+import 'package:intergalactic/client/components/voip/microphone_capture_liveness.dart';
 import 'package:intergalactic/client/components/voip/ios_broadcast_control.dart';
 import 'package:intergalactic/client/components/voip/webrtc_default_devices.dart';
 import 'package:intergalactic/client/matrix/components/voip_room/livekit_microphone_sender_gate.dart';
+import 'package:intergalactic/client/matrix/components/voip_room/voip_phantom_stream_prune.dart';
 import 'package:intergalactic/client/matrix/components/voip_room/livekit_room_teardown_barrier.dart';
 import 'package:intergalactic/client/matrix/components/voip_room/matrix_livekit_receiver_probe.dart';
 import 'package:intergalactic/client/matrix/components/voip_room/receiver_probe_credential_handoff.dart';
 import 'package:intergalactic/client/matrix/components/voip_room/matrix_livekit_voip_stream.dart';
+import 'package:intergalactic/client/matrix/components/voip_room/stream_viewer_presence.dart';
 import 'package:intergalactic/client/matrix/components/voip_room/matrix_voip_room_component.dart';
 import 'package:intergalactic/client/matrix/matrix_room.dart';
 import 'package:intergalactic/config/build_config.dart';
@@ -45,6 +49,41 @@ import 'package:http/http.dart' as http;
 import 'package:logger/logger.dart' as native_logger;
 import 'package:matrix/matrix_api_lite.dart';
 import 'package:livekit_client/livekit_client.dart' as lk;
+
+@visibleForTesting
+Future<bool> recreateStalledMicrophonePublication({
+  required lk.LocalParticipant participant,
+  required String stalledPublicationSid,
+  required Future<lk.LocalTrackPublication?> Function() publishFresh,
+  required bool Function() mayPublish,
+  Future<void> Function()? onRemovedWithoutReplacement,
+}) async {
+  if (!mayPublish()) return false;
+  var removedStalled = false;
+  var hasReplacement = false;
+  try {
+    await participant.removePublishedTrack(stalledPublicationSid);
+    removedStalled = true;
+    if (!mayPublish()) return false;
+
+    final replacement = await publishFresh();
+    if (replacement == null) return false;
+    hasReplacement = true;
+    if (mayPublish()) return true;
+
+    try {
+      await participant.removePublishedTrack(replacement.sid);
+    } finally {
+      hasReplacement = false;
+      await replacement.track?.stop();
+    }
+    return false;
+  } finally {
+    if (removedStalled && !hasReplacement) {
+      await onRemovedWithoutReplacement?.call();
+    }
+  }
+}
 
 class _StatsSample {
   const _StatsSample({required this.bytes, required this.timestamp});
@@ -511,6 +550,30 @@ class MatrixLivekitInitialMicrophoneEnableState {
   bool _desiredMicrophoneEnabled = true;
   bool _desiredMuteStopOnMute = true;
   int _generation = 0;
+  final Completer<void> _initialEnableSettled = Completer<void>();
+  String? _initialEnableOutcome;
+
+  /// Completes once the join-time microphone enable has SETTLED - completed,
+  /// completed late after the Windows timeout, rolled back as stale, failed,
+  /// or skipped. The backend runs that enable before the session exists, and
+  /// on Windows it can settle seconds later than the join; anything the
+  /// session wants to do to the join-time publication has to wait for this
+  /// rather than race it (BUG-320).
+  Future<void> get initialEnableSettled => _initialEnableSettled.future;
+
+  bool get initialEnableIsSettled => _initialEnableSettled.isCompleted;
+
+  /// How the join-time enable settled, for the log line that follows it.
+  String? get initialEnableOutcome => _initialEnableOutcome;
+
+  /// Idempotent: the first outcome wins, later calls are ignored.
+  void markInitialEnableSettled({required String outcome}) {
+    if (_initialEnableSettled.isCompleted) {
+      return;
+    }
+    _initialEnableOutcome = outcome;
+    _initialEnableSettled.complete();
+  }
 
   bool get isCallActive => _callActive;
   bool get desiredMicrophoneEnabled => _desiredMicrophoneEnabled;
@@ -525,6 +588,12 @@ class MatrixLivekitInitialMicrophoneEnableState {
         _desiredMicrophoneEnabled &&
         _generation == generation;
   }
+
+  /// Once a profile refresh has disabled the old capture, only call intent
+  /// may prevent its replacement. A newer profile is serialized behind this
+  /// refresh and must not leave the microphone unpublished in the meantime.
+  bool shouldReenableAfterCaptureRefreshRemoval(int generation) =>
+      shouldKeepEnabledForGeneration(generation);
 
   /// The user wants the mic **off** but the publication still says it is live:
   /// the hot-mic leak direction.
@@ -580,6 +649,25 @@ class MatrixLivekitInitialMicrophoneEnableState {
   }
 }
 
+/// The outcomes of ensuring a remote media stream exists for a publication.
+///
+/// Separate from `bool` because the old `bool` answered two questions at once
+/// and they disagree on [notifiedOnly]. See `_ensureRemoteMediaStream`.
+enum _RemoteMediaEnsureOutcome {
+  /// A stream object was created for this publication.
+  streamAdded,
+
+  /// A stream already existed and the delivered track was attached to it.
+  sinkAttached,
+
+  /// A stream already existed, the SDK has delivered no track, and all that
+  /// happened was a change notification. NOT a repair.
+  notifiedOnly,
+
+  /// No stream existed and one was not created.
+  notAdded,
+}
+
 class MatrixLivekitVoipSession implements VoipSession {
   static const _serverAudioLoopbackTokenTimeout = Duration(seconds: 10);
   static const _receiverProbeConnectTimeout = Duration(seconds: 10);
@@ -620,8 +708,28 @@ class MatrixLivekitVoipSession implements VoipSession {
   String? heartbeatDelayId;
   AppLifecycleListener? _lifecycleListener;
   ShareSession? _currentShareSession;
-  lk.LocalTrackPublication<lk.LocalAudioTrack>? _windowsSharedAudioPublication;
-  lk.LocalAudioTrack? _windowsSharedAudioTrack;
+
+  /// Published shared-audio tracks, keyed by share.
+  ///
+  /// Step 2 of the per-share audio plan. These were two single fields, and
+  /// that was half of BUG-301: starting a second share overwrote the
+  /// publication without ever removing the first from the room, so listeners
+  /// went on hearing the first app that was ever shared with audio. Keying
+  /// makes "one publication per share" the container's property rather than a
+  /// rule the publish path has to remember.
+  ///
+  /// The pair is held together so the publication and the track it wraps
+  /// cannot disagree about what is live - the same reason the backend holds a
+  /// session object rather than loose fields.
+  ///
+  /// Exactly one key is in use ([_defaultSharedAudioKey]); the caller does not
+  /// yet register a share per video publication, so this behaves as the two
+  /// fields did.
+  final Map<Object, _WindowsSharedAudioPublication>
+  _windowsSharedAudioPublications = <Object, _WindowsSharedAudioPublication>{};
+
+  /// The single key in use while one share carries audio at a time.
+  static const Object _defaultSharedAudioKey = 'default';
   lk.EventsListener<lk.RoomEvent>? _roomListener;
   StreamSubscription? _noiseSuppressionStatusSub;
   StreamSubscription? _microphoneInputDeviceSub;
@@ -643,6 +751,39 @@ class MatrixLivekitVoipSession implements VoipSession {
   int _gameCaptureFrameWatchdogGeneration = 0;
   Timer? _streamLiveTuningTimer;
   Timer? _inboundAudioEnergyTimer;
+  Timer? _microphoneCaptureLivenessTimer;
+  final MicrophoneCaptureRecoveryGate _microphoneCaptureRecoveryGate =
+      MicrophoneCaptureRecoveryGate();
+
+  /// BUG-325. Watches the native capture hook's frame counter so a
+  /// microphone that publishes and sends nothing is named in the log rather
+  /// than inferred from a user saying nobody could hear them.
+  // The sampler REFRESHES the native status before evaluating. Reading
+  // `NoiseSuppressionService.instance.status` here instead was the whole
+  // defect: that is a cached field with no event channel and no periodic
+  // refresh, so in a call it only moves when the user touches an audio
+  // control, and the probe measured cache refreshes rather than capture.
+  late final MicrophoneCaptureLivenessSampler
+  _microphoneCaptureLivenessSampler = MicrophoneCaptureLivenessSampler(
+    refreshStatus: () async {
+      // observeStatus, NOT refresh. refresh() re-initialises the backend on a
+      // retryable unavailable state, and re-initialisation zeroes
+      // frames_processed - so a probe polling refresh() every 5s could
+      // manufacture the very recovery it then reported, and would drive an
+      // unbounded re-init loop on exactly the unhealthy path this diagnostic
+      // exists for.
+      final status = await NoiseSuppressionService.instance.observeStatus();
+      return (
+        available: status.available,
+        enabled: status.enabled,
+        framesProcessed: status.framesProcessed,
+      );
+    },
+  );
+
+  MicrophoneCaptureLivenessProbe get _microphoneCaptureLivenessProbe =>
+      _microphoneCaptureLivenessSampler.probe;
+  static const _microphoneCaptureLivenessInterval = Duration(seconds: 5);
   bool _inboundAudioEnergyCollectionInFlight = false;
   bool _inboundAudioEnergyCollectionActive = false;
   int? _lastInboundAudioEnergyLogMs;
@@ -658,6 +799,15 @@ class MatrixLivekitVoipSession implements VoipSession {
   Future<void> _localPreviewProbeOperation = Future<void>.value();
   Future<void> _remoteAudioReconciliationOperation = Future<void>.value();
   final Set<String> _activeLocalScreenShareVideoPublicationSids = <String>{};
+  final RemoteStreamLifecycleCueState _remoteStreamCueState =
+      RemoteStreamLifecycleCueState();
+  final LocalStreamLifecycleCueState _localStreamCueState =
+      LocalStreamLifecycleCueState();
+  final StreamViewerPresence _streamViewerPresence = StreamViewerPresence();
+  final Map<Object, Set<String>> _watchedSharesBySurface = {};
+  final Set<String> _watchIntentDestinations = {};
+  Future<void> _watchIntentSend = Future<void>.value();
+  Timer? _streamViewerTimer;
   Future<void> _cameraOperation = Future<void>.value();
   bool _transientCallResourcesDisposed = false;
   bool _ending = false;
@@ -778,6 +928,14 @@ class MatrixLivekitVoipSession implements VoipSession {
            MatrixLivekitInitialMicrophoneEnableState() {
     clientManager?.callManager.onClientSessionStarted(this);
     addInitialStreams();
+    for (final participant in livekitRoom.remoteParticipants.values) {
+      if (participant.getTrackPublicationBySource(
+            lk.TrackSource.screenShareVideo,
+          ) !=
+          null) {
+        _remoteStreamCueState.seedActive(participant.identity);
+      }
+    }
 
     _roomListener = livekitRoom.createListener();
     _roomListener!.on(onTrackPublished);
@@ -796,6 +954,7 @@ class MatrixLivekitVoipSession implements VoipSession {
     _roomListener!.on(onRoomAttemptReconnect);
     _roomListener!.on(onRoomReconnected);
     _roomListener!.on(onRoomDisconnected);
+    _roomListener!.on(onDataReceived);
     unawaited(_queueRemoteMediaReconciliation('initial_snapshot'));
     _noiseSuppressionStatusSub = NoiseSuppressionService
         .instance
@@ -804,6 +963,7 @@ class MatrixLivekitVoipSession implements VoipSession {
     _microphoneInputDeviceSub = preferences.voipDefaultAudioInput.onChanged
         .listen((_) => _handleMicrophoneInputDeviceChanged());
     unawaited(_seedAppliedMicrophoneCaptureDevice());
+    unawaited(_reconcileInitialJoinMicrophoneSender());
 
     _volumeTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
       if (!_notifyVolumeChanged()) {
@@ -841,6 +1001,16 @@ class MatrixLivekitVoipSession implements VoipSession {
       _inboundAudioEnergyInterval,
       (_) => unawaited(_refreshInboundAudioEnergy()),
     );
+    // This probe reads the Windows native capture hook. Other platforms do not
+    // expose the frame counter and must not trigger a capture refresh from it.
+    if (MicrophoneCaptureLivenessPlatformGate.shouldMonitor(
+      isWindows: PlatformUtils.isWindows,
+    )) {
+      _microphoneCaptureLivenessTimer = Timer.periodic(
+        _microphoneCaptureLivenessInterval,
+        (_) => unawaited(_checkMicrophoneCaptureLiveness()),
+      );
+    }
 
     startHeartbeat();
     _refreshCallHealthDiagnostics();
@@ -937,6 +1107,13 @@ class MatrixLivekitVoipSession implements VoipSession {
       _screenShareObservedSizes.remove(stream.streamId);
       _cpuRescueLayerDisabledStreams.remove(stream.streamId);
       unawaited(stream.dispose());
+    }
+    if (removed.any(
+      (stream) =>
+          stream.direction == VoipStreamDirection.outgoing &&
+          stream.type == VoipStreamType.screenshare,
+    )) {
+      _pruneStreamViewers();
     }
   }
 
@@ -1116,6 +1293,19 @@ class MatrixLivekitVoipSession implements VoipSession {
   /// Exposed so tests can drive the same sweep the 10s timer runs without
   /// waiting for wall-clock time.
   @visibleForTesting
+  /// Drives the local-microphone drift reconcile, which is otherwise reachable
+  /// only from the join path and a device change.
+  ///
+  /// Added for the BUG-320 x BUG-322 interaction: the join-time reconcile
+  /// repairs DETACHED senders, and a Push to Talk join deliberately leaves the
+  /// sender detached, so the two had to be exercised together rather than
+  /// reasoned about.
+  @visibleForTesting
+  Future<void> debugReconcileLocalMicrophoneDriftForTesting(
+    lk.LocalTrackPublication publication, {
+    String trigger = 'test',
+  }) => _reconcileLocalMicrophoneMuteDrift(publication, trigger: trigger);
+
   Future<void> debugReconcileRemoteMediaForTesting({String trigger = 'test'}) =>
       _queueRemoteMediaReconciliation(trigger);
 
@@ -1137,10 +1327,27 @@ class MatrixLivekitVoipSession implements VoipSession {
     var publicationCount = 0;
     final liveAudioPublicationSids = <String>{};
     final livePublicationSids = <String>{};
+    // Identity -> the sids that identity is currently publishing, for the
+    // phantom-stream prune below (BUG-321). Only participants present in this
+    // snapshot appear here, so a participant missing mid-reconnect is never a
+    // prune target.
+    final liveSidsByConnectedIdentity = <String, Set<String>>{};
     final participantSnapshot = livekitRoom.remoteParticipants.values.toList(
       growable: false,
     );
     for (final participant in participantSnapshot) {
+      // Presence is what this key means, so it is seeded from the snapshot
+      // rather than from the publication loop below. Filling it only inside
+      // that loop left a still-connected participant who unpublished
+      // EVERYTHING with no key at all, and the prune reads a missing key as
+      // "mid-reconnect, leave them alone" - so it skipped the most complete
+      // form of the dropped-TrackUnpublishedEvent case it exists for. An empty
+      // set says "connected and publishing nothing"; absent still says "not in
+      // this snapshot".
+      liveSidsByConnectedIdentity.putIfAbsent(
+        participant.identity,
+        () => <String>{},
+      );
       final publications = participant.trackPublications.values.toList(
         growable: false,
       );
@@ -1156,6 +1363,9 @@ class MatrixLivekitVoipSession implements VoipSession {
         }
         publicationCount++;
         livePublicationSids.add(publication.sid);
+        (liveSidsByConnectedIdentity[participant.identity] ??= <String>{}).add(
+          publication.sid,
+        );
         if (kind == VoipRemoteMediaKind.microphoneAudio) {
           liveAudioPublicationSids.add(publication.sid);
         }
@@ -1214,6 +1424,11 @@ class MatrixLivekitVoipSession implements VoipSession {
           ),
         );
 
+        // Set by the rebuildStreamOrSink step below, read by the reconciler
+        // after it runs. Declared here so it is false for every other action
+        // rather than carrying a stale value between publications.
+        var rebuildWasIneffective = false;
+
         final result = await VoipRemoteAudioReconciler.repair(
           reconciliation,
           isActive: () => _canProcessLiveKitRoomEvent,
@@ -1227,7 +1442,9 @@ class MatrixLivekitVoipSession implements VoipSession {
               return;
             }
             notifySession =
-                _ensureRemoteMediaStream(participant, publication) ||
+                _ensureRemoteMediaStreamNotifies(
+                  _ensureRemoteMediaStream(participant, publication),
+                ) ||
                 notifySession;
           },
           resubscribe: () async {
@@ -1251,13 +1468,21 @@ class MatrixLivekitVoipSession implements VoipSession {
               return;
             }
             notifySession =
-                _ensureRemoteMediaStream(participant, publication) ||
+                _ensureRemoteMediaStreamNotifies(
+                  _ensureRemoteMediaStream(participant, publication),
+                ) ||
                 notifySession;
           },
           rebuildStreamOrSink: () {
+            final outcome = _ensureRemoteMediaStream(participant, publication);
             notifySession =
-                _ensureRemoteMediaStream(participant, publication) ||
-                notifySession;
+                _ensureRemoteMediaStreamNotifies(outcome) || notifySession;
+            // The one step that can tell it did nothing. Reported rather than
+            // thrown: there is no error here, the SDK simply has not delivered
+            // a track, and calling that a failure would put it in front of the
+            // user as one.
+            rebuildWasIneffective =
+                outcome == _RemoteMediaEnsureOutcome.notifiedOnly;
           },
           removeStream: () {
             _removeLivekitStreamsWhere(
@@ -1282,6 +1507,7 @@ class MatrixLivekitVoipSession implements VoipSession {
             }
             notifySession = true;
           },
+          stepWasIneffective: () => rebuildWasIneffective,
           onError: (error, stackTrace, failedReconciliation) {
             Log.onError(
               error,
@@ -1309,6 +1535,36 @@ class MatrixLivekitVoipSession implements VoipSession {
           continue;
         }
 
+        if (result.ineffective) {
+          // Logged at the same level as an applied repair, deliberately. This
+          // is the line whose ABSENCE made the field failure unreadable: the
+          // reconciler named the fault, named the action, and the action could
+          // not touch the fault. The attach-monitor gates come with it because
+          // the follow-up question is always "so why has it not escalated to
+          // resubscribe yet", and one capture should answer that rather than
+          // leaving three hypotheses.
+          final gates =
+              _remoteMediaAttachMonitor.describeGateState(
+                publication.sid,
+                DateTime.now(),
+              ) ??
+              'no_observation';
+          Log.w(
+            'remote_media_reconciliation event=repair_ineffective '
+            'trigger=$trigger '
+            'kind=${kind.name} '
+            'action=${result.action.name} '
+            'reason=${result.reason} '
+            'detail=stream_exists_without_sink '
+            'has_track=${publication.track != null} '
+            'receive_enabled=${publication.enabled} '
+            'subscription_allowed=${publication.subscriptionAllowed} '
+            '$gates',
+            category: LogCategory.livekit,
+            source: 'remote-media-reconciliation',
+          );
+        }
+
         if (result.repaired) {
           repairCount++;
           Log.i(
@@ -1327,6 +1583,38 @@ class MatrixLivekitVoipSession implements VoipSession {
             notifySession = true;
           }
         }
+      }
+    }
+
+    // Prune phantom incoming streams: a still-connected participant whose old
+    // publication sid vanished under a reconnect republish, whose
+    // TrackUnpublishedEvent this observer never received (BUG-321). Only while
+    // fully connected - a reconnecting snapshot can be incomplete, and the
+    // tight identity-present condition plus this gate keep a transient from
+    // dropping live tiles.
+    if (_roomLifecycle == CallConnectionLifecycle.connected) {
+      final phantomSids = phantomIncomingStreamSidsToPrune(
+        liveSidsByConnectedIdentity: liveSidsByConnectedIdentity,
+        streams: streams.whereType<MatrixLivekitVoipStream>().map(
+          (stream) => PhantomStreamCandidate(
+            sid: stream.publication.sid,
+            participantIdentity: stream.participantIdentity,
+            incoming: stream.direction == VoipStreamDirection.incoming,
+          ),
+        ),
+      );
+      if (phantomSids.isNotEmpty) {
+        Log.i(
+          'remote_media_reconciliation event=phantom_stream_pruned '
+          'trigger=$trigger count=${phantomSids.length} '
+          'sids=${phantomSids.join(',')}',
+          category: LogCategory.livekit,
+          source: 'remote-media-reconciliation',
+        );
+        _removeLivekitStreamsWhere(
+          (stream) => phantomSids.contains(stream.publication.sid),
+        );
+        notifySession = true;
       }
     }
 
@@ -1417,27 +1705,116 @@ class MatrixLivekitVoipSession implements VoipSession {
     );
   }
 
-  bool _ensureRemoteMediaStream(
+  /// One line per session stream for the call diagnostics export (BUG-321).
+  ///
+  /// The export's `Streams: total=... share=...` count is what showed an
+  /// observer holding nine share entries against one live receiver, but a
+  /// count cannot say WHICH entries are stale or whose they are. Each line
+  /// names the sid, the (redacted) owner, the kind and direction, and whether
+  /// that sid is still among a participant's live publications: a phantom
+  /// reads `publication_live=false` while its owner is still connected.
+  List<String> diagnosticsStreamLines() {
+    if (state == VoipState.ended) {
+      return const <String>[];
+    }
+    final liveSids = <String>{};
+    for (final participant in livekitRoom.remoteParticipants.values) {
+      liveSids.addAll(participant.trackPublications.keys);
+    }
+    final local = livekitRoom.localParticipant;
+    if (local != null) {
+      liveSids.addAll(local.trackPublications.keys);
+    }
+    return <String>[
+      for (final stream in streams.whereType<MatrixLivekitVoipStream>())
+        describeSessionStreamForDiagnostics(
+          sid: stream.publication.sid,
+          redactedOwner: _redactedParticipantIdentity(
+            stream.participantIdentity,
+          ),
+          type: stream.type.name,
+          direction: stream.direction.name,
+          publicationLive: liveSids.contains(stream.publication.sid),
+          trackAttached: stream.publication.track != null,
+          ownerConnected:
+              stream.direction == VoipStreamDirection.outgoing ||
+              livekitRoom.remoteParticipants.containsKey(
+                stream.participantIdentity,
+              ),
+        ),
+    ];
+  }
+
+  /// What [_ensureRemoteMediaStream] actually did.
+  ///
+  /// It used to return a bare `bool`, and the two callers read that one value
+  /// as two different answers: the session read it as "notify listeners", and
+  /// the reconciler read it as "the repair worked". Those questions have
+  /// different answers on the [notifiedOnly] path, which is how a repair for a
+  /// missing audio sink could report success while attaching nothing.
+  ///
+  /// Nothing on this side can attach a track the SDK has not delivered, so
+  /// [notifiedOnly] is not a bug to fix here - it is a fact the caller has to
+  /// be able to see.
+  bool _ensureRemoteMediaStreamNotifies(_RemoteMediaEnsureOutcome outcome) {
+    switch (outcome) {
+      case _RemoteMediaEnsureOutcome.sinkAttached:
+      case _RemoteMediaEnsureOutcome.notifiedOnly:
+      case _RemoteMediaEnsureOutcome.streamAdded:
+        return true;
+      case _RemoteMediaEnsureOutcome.notAdded:
+        return false;
+    }
+  }
+
+  _RemoteMediaEnsureOutcome _ensureRemoteMediaStream(
     lk.RemoteParticipant participant,
     lk.RemoteTrackPublication publication,
   ) {
+    // BUG-321 origin, established from a 68-minute capture: an unpublish that
+    // lands while a repair for that publication is in flight is followed by
+    // the repair re-adding the stream, and no further unpublish can arrive
+    // for a publication the SDK has already dropped. Every caller of this
+    // method is a repair callback, so the live-publication check belongs
+    // here.
+    if (!mayBuildStreamForPublication(
+      participantPublicationSids: participant.trackPublications.keys.toSet(),
+      publicationSid: publication.sid,
+    )) {
+      Log.i(
+        'remote_media_reconciliation event=stream_build_skipped '
+        'reason=publication_gone sid=${publication.sid} '
+        'participant=${_redactedParticipantIdentity(participant.identity)}',
+        category: LogCategory.livekit,
+        source: 'remote-media-reconciliation',
+      );
+      return _RemoteMediaEnsureOutcome.notAdded;
+    }
+
     final existingStream = _findLivekitStream(publication);
     if (existingStream != null) {
       final track = publication.track;
       if (track != null) {
         existingStream.onTrackSubscribedEvent(track);
-      } else {
-        existingStream.onStreamUpdatedEvent();
+        return _RemoteMediaEnsureOutcome.sinkAttached;
       }
-      return true;
+      // NOTHING IS REPAIRED HERE. onStreamUpdatedEvent re-applies local
+      // playback volume and notifies listeners; it cannot attach a sink, and
+      // `publication.track` being null is the definition of the condition that
+      // selected this repair. Saying so is the whole point of the enum.
+      existingStream.onStreamUpdatedEvent();
+      return _RemoteMediaEnsureOutcome.notifiedOnly;
     }
 
     final userId = _userIdFromParticipantIdentity(participant.identity);
-    return _addLivekitStream(
+    final added = _addLivekitStream(
       publication,
       userId,
       participantIdentity: participant.identity,
     );
+    return added
+        ? _RemoteMediaEnsureOutcome.streamAdded
+        : _RemoteMediaEnsureOutcome.notAdded;
   }
 
   ScreenShareProfileConfig _screenShareProfile() {
@@ -1926,7 +2303,7 @@ class MatrixLivekitVoipSession implements VoipSession {
         ),
       );
 
-      _windowsSharedAudioPublication = await localParticipant.publishAudioTrack(
+      final publication = await localParticipant.publishAudioTrack(
         localAudioTrack,
         publishOptions: const lk.AudioPublishOptions(
           name: 'screenShareAudio',
@@ -1936,7 +2313,13 @@ class MatrixLivekitVoipSession implements VoipSession {
           audioBitrate: lk.AudioPreset.musicStereo,
         ),
       );
-      _windowsSharedAudioTrack = localAudioTrack;
+      // Recorded as a pair, and only once the publish has returned: a track
+      // stored without its publication is one nothing can unpublish.
+      _windowsSharedAudioPublications[_defaultSharedAudioKey] =
+          _WindowsSharedAudioPublication(
+            publication: publication,
+            track: localAudioTrack,
+          );
       Log.i("Published Windows shared-content audio track");
     } catch (error, stackTrace) {
       Log.onError(
@@ -1963,10 +2346,11 @@ class MatrixLivekitVoipSession implements VoipSession {
   Future<void> _stopWindowsSharedAudioPublication(
     ShareSession? shareSession,
   ) async {
-    final publication = _windowsSharedAudioPublication;
-    final track = _windowsSharedAudioTrack;
-    _windowsSharedAudioPublication = null;
-    _windowsSharedAudioTrack = null;
+    final published = _windowsSharedAudioPublications.remove(
+      _defaultSharedAudioKey,
+    );
+    final publication = published?.publication;
+    final track = published?.track;
 
     if (publication != null) {
       try {
@@ -2157,6 +2541,9 @@ class MatrixLivekitVoipSession implements VoipSession {
 
   void onParticipantDisconnected(lk.ParticipantDisconnectedEvent event) {
     _runLiveKitRoomEvent(() {
+      _remoteStreamCueState.participantLeft(event.participant.identity);
+      _streamViewerPresence.removeParticipant(event.participant.identity);
+      _refreshStreamViewerTimer();
       Log.i(
         'LiveKit remote participant disconnected: '
         'participant=${_redactedParticipantIdentity(event.participant.identity)}',
@@ -2170,6 +2557,191 @@ class MatrixLivekitVoipSession implements VoipSession {
       _notifyStateChanged();
       _refreshCallHealthDiagnostics();
     });
+  }
+
+  void onDataReceived(lk.DataReceivedEvent event) {
+    _runLiveKitRoomEvent(() {
+      final participant = event.participant;
+      final viewerIntent = StreamViewerIntent.decode(event.topic, event.data);
+      if (viewerIntent != null) {
+        if (participant != null) {
+          final changed = _streamViewerPresence.update(
+            participantIdentity: participant.identity,
+            publishedStreamIds: _publishedScreenShareIds,
+            reportedStreamIds: viewerIntent.streamIds,
+            now: DateTime.now(),
+          );
+          if (changed) _notifyStateChanged();
+          _refreshStreamViewerTimer();
+        }
+        return;
+      }
+      final cue = StreamLifecycleCueProtocol.decode(event.topic, event.data);
+      if (participant == null ||
+          cue == null ||
+          !_remoteStreamCueState.shouldPlay(participant.identity, cue)) {
+        return;
+      }
+      _playStreamLifecycleCue(cue);
+    });
+  }
+
+  List<String> get localScreenShareViewerUserIds {
+    return _streamViewerPresence.viewerIdentities
+        .map(_userIdFromParticipantIdentity)
+        .toSet()
+        .toList(growable: false)
+      ..sort();
+  }
+
+  Set<String> get _publishedScreenShareIds => streams
+      .whereType<MatrixLivekitVoipStream>()
+      .where(
+        (stream) =>
+            stream.direction == VoipStreamDirection.outgoing &&
+            stream.type == VoipStreamType.screenshare,
+      )
+      .map((stream) => stream.streamId)
+      .toSet();
+
+  void setVisibleRemoteScreenShares(Object surface, Set<String> streamIds) {
+    if (_ending || _sessionDisposed) return;
+    final previous = _watchedSharesBySurface[surface] ?? const <String>{};
+    if (previous.length == streamIds.length &&
+        previous.containsAll(streamIds)) {
+      return;
+    }
+    if (streamIds.isEmpty) {
+      _watchedSharesBySurface.remove(surface);
+    } else {
+      _watchedSharesBySurface[surface] = Set.of(streamIds);
+    }
+    _queueWatchIntentSnapshot();
+    _refreshStreamViewerTimer();
+  }
+
+  void _queueWatchIntentSnapshot() {
+    _watchIntentSend = _watchIntentSend.catchError((_) {}).then((_) async {
+      if (_ending || _sessionDisposed) return;
+      final participant = livekitRoom.localParticipant;
+      if (participant == null) return;
+      final watchedIds = _watchedSharesBySurface.values
+          .expand((ids) => ids)
+          .toSet();
+      final byDestination = groupWatchedScreenSharesByPublisher(
+        remoteShares: streams
+            .whereType<MatrixLivekitVoipStream>()
+            .where(
+              (stream) =>
+                  stream.direction == VoipStreamDirection.incoming &&
+                  stream.type == VoipStreamType.screenshare,
+            )
+            .map(
+              (stream) => (
+                streamId: stream.streamId,
+                publisherIdentity: stream.participantIdentity,
+              ),
+            ),
+        watchedIds: watchedIds,
+      );
+      final destinations = {..._watchIntentDestinations, ...byDestination.keys};
+      _watchIntentDestinations
+        ..clear()
+        ..addAll(byDestination.keys);
+      await Future.wait(
+        destinations.map((destination) async {
+          try {
+            await participant
+                .publishData(
+                  StreamViewerIntent(
+                    byDestination[destination] ?? const <String>{},
+                  ).encode(),
+                  reliable: true,
+                  destinationIdentities: [destination],
+                  topic: streamViewerIntentTopic,
+                )
+                .timeout(const Duration(seconds: 2));
+          } catch (error, stackTrace) {
+            Log.onError(
+              error,
+              stackTrace,
+              content: 'Failed to update stream viewer intent',
+              category: LogCategory.livekit,
+              source: 'matrix-livekit-session',
+            );
+          }
+        }),
+      );
+    });
+  }
+
+  void _refreshStreamViewerTimer() {
+    if (_ending || _sessionDisposed) {
+      _streamViewerTimer?.cancel();
+      _streamViewerTimer = null;
+      return;
+    }
+    final active =
+        _watchedSharesBySurface.isNotEmpty ||
+        _streamViewerPresence.viewerIdentities.isNotEmpty;
+    if (!active) {
+      _streamViewerTimer?.cancel();
+      _streamViewerTimer = null;
+    } else {
+      _streamViewerTimer ??= Timer.periodic(const Duration(seconds: 15), (_) {
+        if (_watchedSharesBySurface.isNotEmpty) _queueWatchIntentSnapshot();
+        _pruneStreamViewers();
+        _refreshStreamViewerTimer();
+      });
+    }
+  }
+
+  void _pruneStreamViewers() {
+    if (_streamViewerPresence.prune(
+      publishedStreamIds: _publishedScreenShareIds,
+      now: DateTime.now(),
+    )) {
+      _notifyStateChanged();
+    }
+  }
+
+  void _playStreamLifecycleCue(StreamLifecycleCue cue) {
+    final manager = clientManager?.callManager;
+    if (cue == StreamLifecycleCue.start) {
+      manager?.playStreamStartSound();
+    } else {
+      manager?.playStreamEndSound();
+    }
+  }
+
+  Future<void> _announceStreamLifecycleCue(StreamLifecycleCue cue) async {
+    _playStreamLifecycleCue(cue);
+    try {
+      await livekitRoom.localParticipant
+          ?.publishData(
+            StreamLifecycleCueProtocol.encode(cue),
+            reliable: true,
+            topic: StreamLifecycleCueProtocol.topic,
+          )
+          .timeout(const Duration(seconds: 2));
+    } catch (error, stackTrace) {
+      Log.onError(
+        error,
+        stackTrace,
+        content: 'Failed to announce screen-share ${cue.name} cue',
+        category: LogCategory.livekit,
+        source: 'matrix-livekit-session',
+      );
+    }
+  }
+
+  void _announceEndCueIfShareCleared() {
+    if (!_ending &&
+        _localStreamCueState.onShareOperationFinished(
+          shareActive: isSharingScreen,
+        )) {
+      unawaited(_announceStreamLifecycleCue(StreamLifecycleCue.end));
+    }
   }
 
   void onParticipantConnectionQualityUpdated(
@@ -2404,6 +2976,9 @@ class MatrixLivekitVoipSession implements VoipSession {
     final hangUpStartedAt = DateTime.now();
     final stepResults = <String, bool>{};
     _ending = true;
+    _streamViewerTimer?.cancel();
+    _streamViewerTimer = null;
+    _watchedSharesBySurface.clear();
     // Publish the intent the join guard needs. `_ending` is private, so
     // `joinCall()` could only ask `state != ended` and was handed this session
     // back while it was dying. Only the connection-state stream is signalled:
@@ -2503,6 +3078,8 @@ class MatrixLivekitVoipSession implements VoipSession {
       return;
     }
     _sessionDisposed = true;
+    _streamViewerTimer?.cancel();
+    _streamViewerTimer = null;
 
     // Broadcast close() futures only complete once every past subscriber has
     // cancelled after close, so awaiting them can hang dispose forever - the
@@ -2693,6 +3270,200 @@ class MatrixLivekitVoipSession implements VoipSession {
   /// Log sites only. Every non-log use of `event.participant.identity` - the
   /// arguments to `_userIdFromParticipantIdentity` and `_addLivekitStream` -
   /// must keep the real value.
+  /// BUG-325. One tick of the microphone capture-liveness probe.
+  ///
+  /// Reads the native suppression hook's frame counter, which advances once
+  /// per captured frame, and logs the three transitions that matter. The
+  /// stall line carries every stage fact at once so a single capture says
+  /// which stage failed: the publication and its RTP sender (LiveKit's view),
+  /// the media track's own enabled/muted state (the device's view), and the
+  /// native hook's reason and counter (the capture path's view). On the
+  /// tester's machine the first two read healthy while the third reported
+  /// zero frames, and that combination had no log line until now.
+  Future<void> _checkMicrophoneCaptureLiveness() async {
+    if (!MicrophoneCaptureLivenessPlatformGate.shouldMonitor(
+          isWindows: PlatformUtils.isWindows,
+        ) ||
+        !_canProcessLiveKitRoomEvent) {
+      return;
+    }
+    final publication = livekitRoom.localParticipant
+        ?.getTrackPublicationBySource(lk.TrackSource.microphone);
+    final track = publication?.track;
+    final mediaTrack = track is lk.LocalAudioTrack
+        ? track.mediaStreamTrack
+        : null;
+    final trackEnabled = mediaTrack?.enabled ?? false;
+    // The LiveKit half of "capture is expected". The native half - the hook
+    // being installed and counting, which is where `waiting_for_audio` is
+    // reported from - comes from the sampler's own fresh reading, so a stale
+    // `available` cannot answer it.
+    final publicationLive =
+        publication != null &&
+        !publication.muted &&
+        trackEnabled &&
+        _initialMicrophoneEnableState.desiredMicrophoneEnabled;
+
+    final event = await _microphoneCaptureLivenessSampler.sample(
+      publicationLive: publicationLive,
+      now: DateTime.now(),
+      captureDeviceId: _appliedMicrophoneCaptureDeviceId,
+    );
+    if (event == MicrophoneCaptureLivenessEvent.none) {
+      return;
+    }
+    // Re-checked after the await: the refresh is a platform round trip and
+    // the call can end under it.
+    if (!_canProcessLiveKitRoomEvent) {
+      return;
+    }
+    final status = NoiseSuppressionService.instance.status;
+
+    final detail =
+        'microphone_capture_liveness event=${event.name} '
+        'elapsed_ms=${_microphoneCaptureLivenessProbe.lastElapsed.inMilliseconds} '
+        'frames=${status.framesProcessed} '
+        'ns_reason=${status.reason} ns_active=${status.active} '
+        'capture_device=${_redactedCaptureDeviceId(_appliedMicrophoneCaptureDeviceId)} '
+        'publication_sid=${publication?.sid ?? 'none'} '
+        'publication_muted=${publication?.muted} '
+        'sender_attachment=${publication == null ? 'none' : LivekitMicrophoneSenderGate.attachmentOf(publication).name} '
+        'track_enabled=$trackEnabled track_muted=${mediaTrack?.muted}';
+    if (event == MicrophoneCaptureLivenessEvent.stalled) {
+      Log.w(
+        detail,
+        category: LogCategory.livekit,
+        source: 'matrix-livekit-session',
+      );
+      _recoverStalledMicrophoneCapture();
+      return;
+    }
+    Log.i(
+      detail,
+      category: LogCategory.livekit,
+      source: 'matrix-livekit-session',
+    );
+  }
+
+  /// Recreates a microphone capture once when its native frame counter stops
+  /// despite a live local publication.
+  void _recoverStalledMicrophoneCapture() {
+    if (!MicrophoneCaptureLivenessPlatformGate.shouldMonitor(
+      isWindows: PlatformUtils.isWindows,
+    )) {
+      return;
+    }
+    final captureDeviceId = _appliedMicrophoneCaptureDeviceId;
+    final microphoneEnableGeneration = _initialMicrophoneEnableState.generation;
+    if (!_microphoneCaptureRecoveryGate.shouldAttempt(
+      event: MicrophoneCaptureLivenessEvent.stalled,
+      microphoneEnableGeneration: microphoneEnableGeneration,
+      captureDeviceId: captureDeviceId,
+    )) {
+      return;
+    }
+
+    Log.w(
+      'LiveKit microphone capture stalled; scheduling one fresh-track '
+      'recovery: generation=$microphoneEnableGeneration '
+      'capture_device=${_redactedCaptureDeviceId(captureDeviceId)}',
+      category: LogCategory.livekit,
+      source: 'matrix-livekit-session',
+    );
+    final signature = NoiseSuppressionCaptureProfile.captureFrontendSignature(
+      bypassVoiceProcessing: IosCallAudioSession.shouldBypassVoiceProcessing,
+    );
+    _noiseSuppressionCaptureRefresh = _noiseSuppressionCaptureRefresh
+        .catchError((_) {})
+        .then(
+          (_) => _recreateStalledMicrophoneCapture(
+            signature,
+            microphoneEnableGeneration,
+          ),
+        );
+  }
+
+  Future<void> _recreateStalledMicrophoneCapture(
+    String signature,
+    int generation,
+  ) async {
+    if (!_shouldContinueMicrophoneCaptureRefresh(
+      generation: generation,
+      expectedCaptureProfileSignature: signature,
+    )) {
+      return;
+    }
+
+    final participant = livekitRoom.localParticipant;
+    final publication = participant?.getTrackPublicationBySource(
+      lk.TrackSource.microphone,
+    );
+    if (participant == null || publication == null || publication.muted) {
+      return;
+    }
+
+    try {
+      final options = await _currentMicrophoneCaptureOptions();
+      bool mayPublish() =>
+          _shouldContinueMicrophoneCaptureRefresh(
+            generation: generation,
+            expectedCaptureProfileSignature: signature,
+          ) &&
+          !_ending &&
+          state != VoipState.ended;
+      if (!mayPublish() ||
+          participant
+                  .getTrackPublicationBySource(lk.TrackSource.microphone)
+                  ?.sid !=
+              publication.sid) {
+        return;
+      }
+
+      final recreated = await recreateStalledMicrophonePublication(
+        participant: participant,
+        stalledPublicationSid: publication.sid,
+        mayPublish: mayPublish,
+        publishFresh: () => participant.setMicrophoneEnabled(
+          true,
+          audioCaptureOptions: options,
+        ),
+        onRemovedWithoutReplacement:
+            _restoreMicrophoneAfterAbandonedCaptureRefresh,
+      );
+      if (!recreated) return;
+
+      _microphoneCaptureProfileSignature = signature;
+      _appliedMicrophoneCaptureDeviceId = options.deviceId;
+      NoiseSuppressionService.instance.scheduleHealthRefresh();
+      await _reconcileMicrophoneSenderAfterCaptureRefresh(participant);
+      _notifyStateChanged();
+      Log.i(
+        'LiveKit microphone fresh-track recovery completed: '
+        'capture_device=${_redactedCaptureDeviceId(options.deviceId)}',
+        category: LogCategory.livekit,
+        source: 'matrix-livekit-session',
+      );
+    } catch (error, stackTrace) {
+      Log.onError(
+        error,
+        stackTrace,
+        content: 'Failed to recreate stalled LiveKit microphone capture',
+        category: LogCategory.livekit,
+        source: 'matrix-livekit-session',
+      );
+    }
+  }
+
+  /// A capture device id is not an identity, but a device LABEL can carry a
+  /// person's name, and the id is stable enough to correlate captures. Hashed
+  /// like every other identifier in this log.
+  static String _redactedCaptureDeviceId(String? deviceId) {
+    if (deviceId == null || deviceId.isEmpty) {
+      return 'default';
+    }
+    return sha256.convert(utf8.encode(deviceId)).toString().substring(0, 12);
+  }
+
   static String _redactedParticipantIdentity(String? identity) {
     if (identity == null || identity.isEmpty) {
       return 'none';
@@ -2737,6 +3508,9 @@ class MatrixLivekitVoipSession implements VoipSession {
       _inboundAudioEnergyTimer?.cancel();
       _inboundAudioEnergyTimer = null;
       _inboundAudioEnergyCollectionActive = false;
+      _microphoneCaptureLivenessTimer?.cancel();
+      _microphoneCaptureLivenessTimer = null;
+      _microphoneCaptureLivenessProbe.reset();
       _lastInboundAudioEnergyLogMs = null;
       _callHealthDiagnosticsRefreshTimer?.cancel();
       _callHealthDiagnosticsRefreshTimer = null;
@@ -3570,6 +4344,69 @@ class MatrixLivekitVoipSession implements VoipSession {
     unawaited(_refreshMicrophoneCaptureDeviceIfChanged());
   }
 
+  /// How long to wait for the join-time enable to settle before reconciling
+  /// anyway. Every settle path marks the state, so this only fires if one is
+  /// missed; it mirrors the join's own enable timeouts.
+  static const _initialJoinSenderReconcileFallback = Duration(seconds: 15);
+
+  /// BUG-320. Reconciles the join-time microphone publication's RTP sender
+  /// once, AFTER the join enable has settled.
+  ///
+  /// On Windows `sender.replaceTrack(null)` is invisible to LiveKit and
+  /// `skipStopForTrackMute()` is true, so the join can leave the publication
+  /// with its sender detached while `muted` reads false: the UI shows a live
+  /// mic and nobody hears the user. `_reconcileLocalMicrophoneMuteDrift`
+  /// repairs exactly that state, but it ran only on `room_reconnected` and
+  /// after a capture refresh - never on the join itself - so a fresh join
+  /// stayed silent until a device change or a restart. Sequenced on
+  /// `initialEnableSettled` rather than run from the constructor: the backend
+  /// enable can settle seconds after the join on Windows, and reconciling
+  /// underneath it would race the very publication it is checking.
+  ///
+  /// The attachment line is logged whether or not drift is found, so a device
+  /// capture establishes the join-time state instead of inferring it.
+  Future<void> _reconcileInitialJoinMicrophoneSender() async {
+    try {
+      await _initialMicrophoneEnableState.initialEnableSettled.timeout(
+        _initialJoinSenderReconcileFallback,
+      );
+    } on TimeoutException {
+      Log.w(
+        'initial_join_microphone_sender event=settle_timeout '
+        'waited_ms=${_initialJoinSenderReconcileFallback.inMilliseconds}',
+        category: LogCategory.livekit,
+        source: 'matrix-livekit-session',
+      );
+    }
+    if (!_canProcessLiveKitRoomEvent) {
+      return;
+    }
+    final publication = livekitRoom.localParticipant
+        ?.getTrackPublicationBySource(lk.TrackSource.microphone);
+    if (publication == null) {
+      Log.i(
+        'initial_join_microphone_sender event=no_publication '
+        'enable_outcome=${_initialMicrophoneEnableState.initialEnableOutcome ?? 'unsettled'}',
+        category: LogCategory.livekit,
+        source: 'matrix-livekit-session',
+      );
+      return;
+    }
+    Log.i(
+      'initial_join_microphone_sender event=checked '
+      'enable_outcome=${_initialMicrophoneEnableState.initialEnableOutcome ?? 'unsettled'} '
+      'sender_attachment=${LivekitMicrophoneSenderGate.attachmentOf(publication).name} '
+      'publication_muted=${publication.muted} '
+      'desired_enabled=${_initialMicrophoneEnableState.desiredMicrophoneEnabled}',
+      category: LogCategory.livekit,
+      source: 'matrix-livekit-session',
+    );
+    await _reconcileLocalMicrophoneMuteDrift(
+      publication,
+      trigger: 'initial_join',
+    );
+  }
+
   /// Records the device the join-time microphone enable used.
   ///
   /// That enable runs in `MatrixLivekitBackend` before this session exists, so
@@ -3619,14 +4456,25 @@ class MatrixLivekitVoipSession implements VoipSession {
       return;
     }
 
-    if (deviceId == _appliedMicrophoneCaptureDeviceId) {
+    final deviceChanged = deviceId != _appliedMicrophoneCaptureDeviceId;
+    final publication = livekitRoom.localParticipant
+        ?.getTrackPublicationBySource(lk.TrackSource.microphone);
+    final senderDetached =
+        PlatformUtils.isWindows &&
+        publication != null &&
+        LivekitMicrophoneSenderGate.isDetached(publication);
+    if (!LivekitMicrophoneSenderGate.shouldRepublishForDeviceChange(
+      deviceChanged: deviceChanged,
+      senderDetached: senderDetached,
+    )) {
       return;
     }
 
     Log.i(
       'LiveKit microphone input device changed mid-call; republishing: '
       'applied_device=${_appliedMicrophoneCaptureDeviceId == null ? 'default' : 'selected'} '
-      'requested_device=${deviceId == null ? 'default' : 'selected'}',
+      'requested_device=${deviceId == null ? 'default' : 'selected'} '
+      'device_changed=$deviceChanged sender_detached=$senderDetached',
       category: LogCategory.livekit,
       source: 'matrix-livekit-session',
     );
@@ -3688,13 +4536,11 @@ class MatrixLivekitVoipSession implements VoipSession {
       );
       await localParticipant.setMicrophoneEnabled(false);
       microphoneDisabled = true;
-      if (!_shouldContinueMicrophoneCaptureRefresh(
-        generation: generation,
-        expectedCaptureProfileSignature: expectedCaptureProfileSignature,
-      )) {
-        // This branch used to `return` with the microphone still disabled and
-        // no rollback. The self-heal could not recover it either: the retry
-        // bails on `isMuted`, which is the very state this bail created.
+      if (!_initialMicrophoneEnableState
+          .shouldReenableAfterCaptureRefreshRemoval(generation)) {
+        // A current profile token is deliberately not part of this decision.
+        // Another profile change is queued behind this operation; abandoning
+        // here would leave the user's still-active microphone unpublished.
         return;
       }
       await localParticipant.setMicrophoneEnabled(
@@ -4653,14 +5499,22 @@ class MatrixLivekitVoipSession implements VoipSession {
 
   @override
   Future<void> setScreenShare(ScreenCaptureSource source) async {
+    final wasSharing = isSharingScreen;
     final requestedProfile = _screenShareProfile();
     final nativeCrashGuard = await PendingNativeCallCrashGuard.recordAction(
       source: 'matrix-livekit-native-call-action-screen-share-start',
       actionKind: 'LiveKit screen share start',
     );
     try {
-      return await _setScreenShareWithProfile(source, requestedProfile);
+      await _setScreenShareWithProfile(source, requestedProfile);
+      if (!wasSharing &&
+          _localStreamCueState.onDeliberateStart(
+            shareActive: isSharingScreen,
+          )) {
+        unawaited(_announceStreamLifecycleCue(StreamLifecycleCue.start));
+      }
     } finally {
+      _announceEndCueIfShareCleared();
       await nativeCrashGuard?.clear();
     }
   }
@@ -5268,12 +6122,16 @@ class MatrixLivekitVoipSession implements VoipSession {
 
     // Starting a share while one is already running used to overwrite this
     // field and nothing else, which orphaned the outgoing share twice over:
-    // its native capture kept running, and because
-    // _windowsSharedAudioPublication/_windowsSharedAudioTrack are single
-    // fields, _publishWindowsSharedAudio below overwrote its publication
-    // without ever removing it from the room. Listeners went on hearing the
-    // FIRST app that was ever shared with audio, no matter what was targeted
-    // afterwards.
+    // its native capture kept running, and because the shared-audio
+    // publication and track were single fields, _publishWindowsSharedAudio
+    // below overwrote its publication without ever removing it from the room.
+    // Listeners went on hearing the FIRST app that was ever shared with audio,
+    // no matter what was targeted afterwards.
+    //
+    // Those fields are now keyed, but that is not what closes this: one key is
+    // still in use, so a second share would still overwrite the entry. The
+    // teardown below is what closes it, and it stays load-bearing until the
+    // caller registers a key per share.
     //
     // Torn down here, before the new share publishes over those fields, and in
     // the same order stopScreenshare() uses: unpublish, then stop the session.
@@ -5376,6 +6234,32 @@ class MatrixLivekitVoipSession implements VoipSession {
   @override
   Future<void> setCamera(MediaDeviceInfo? device) {
     return _queueCameraOperation(() => _setCamera(device));
+  }
+
+  Future<void> flipCamera() {
+    return _queueCameraOperation(() async {
+      if ((!PlatformUtils.isAndroid && !PlatformUtils.isIOS) ||
+          state.isFinishing ||
+          !isCameraEnabled) {
+        return;
+      }
+
+      for (final publication in _localCameraPublications()) {
+        final track = publication.track;
+        if (publication.muted || track == null || !track.isActive) {
+          continue;
+        }
+        final options = track.currentOptions;
+        if (options is! lk.CameraCaptureOptions) {
+          return;
+        }
+        await track.setCameraPosition(options.cameraPosition.switched());
+        if (!_ending && !state.isFinishing) {
+          _notifyStateChanged();
+        }
+        return;
+      }
+    });
   }
 
   Future<void> _setCamera(MediaDeviceInfo? device) async {
@@ -5519,6 +6403,7 @@ class MatrixLivekitVoipSession implements VoipSession {
     }
 
     _resetScreenShareState();
+    _announceEndCueIfShareCleared();
 
     if (PlatformUtils.isAndroid) {
       try {
@@ -5744,6 +6629,7 @@ class MatrixLivekitVoipSession implements VoipSession {
       );
       return false;
     } finally {
+      _announceEndCueIfShareCleared();
       _screenShareCaptureRefreshInFlight = false;
     }
   }
@@ -6046,6 +6932,7 @@ class MatrixLivekitVoipSession implements VoipSession {
         content: 'Failed to apply stream live tuning config',
       );
     } finally {
+      _announceEndCueIfShareCleared();
       _screenShareCaptureRefreshInFlight = false;
     }
     return notes;
@@ -6383,26 +7270,34 @@ class MatrixLivekitVoipSession implements VoipSession {
       return;
     }
 
-    // The wedged track is already published; stop it before the fallback
-    // republish so the retry does not add a second screen-share video track.
-    await _stopLocalScreenShareVideoPublications(
-      reason: 'game-capture zero-frame watchdog fallback',
+    await runScreenShareFallbackWithCueReconciliation(
+      fallback: () async {
+        // The wedged track is already published; stop it before the fallback
+        // republish so the retry does not add a second screen-share video track.
+        await _stopLocalScreenShareVideoPublications(
+          reason: 'game-capture zero-frame watchdog fallback',
+        );
+        // Stopping is an async gap: the user may have stopped the share, the
+        // call may be ending, or a newer share may have started (all bump the
+        // watchdog generation). Never resurrect a stopped or superseded share.
+        if (!active()) {
+          Log.i(
+            'Game-capture zero-frame fallback skipped after publications '
+            'stopped; the share was stopped or superseded during teardown '
+            'sourceIdHash=$sourceIdHash.',
+            category: LogCategory.livekit,
+            source: 'screen-share-publish',
+          );
+          return;
+        }
+        await retryFallback(reason: 'game_capture_zero_frames_after_publish');
+      },
+      cueState: _localStreamCueState,
+      shareActive: () =>
+          _ending || _localScreenShareVideoPublications().isNotEmpty,
+      announceEnd: () =>
+          unawaited(_announceStreamLifecycleCue(StreamLifecycleCue.end)),
     );
-    // Stopping is an async gap: the user may have stopped the share, the call
-    // may be ending, or a newer share may have started (all bump the watchdog
-    // generation). Re-check before republishing so the fallback never
-    // resurrects a screen share the user already stopped.
-    if (!active()) {
-      Log.i(
-        'Game-capture zero-frame fallback skipped after publications stopped; '
-        'the share was stopped or superseded during teardown '
-        'sourceIdHash=$sourceIdHash.',
-        category: LogCategory.livekit,
-        source: 'screen-share-publish',
-      );
-      return;
-    }
-    await retryFallback(reason: 'game_capture_zero_frames_after_publish');
   }
 
   void _rememberScreenSharePublish(
@@ -8626,4 +9521,20 @@ class MatrixLivekitVoipSession implements VoipSession {
     await livekitRoom.disconnect();
     Log.i("Disconnected livekit room");
   }
+}
+
+/// One share's published shared-audio track.
+///
+/// The publication and the track it wraps are held together so neither can be
+/// recorded without the other: a track with no publication is one nothing can
+/// unpublish, and a publication with no track leaves the capture running after
+/// the room has stopped carrying it.
+class _WindowsSharedAudioPublication {
+  const _WindowsSharedAudioPublication({
+    required this.publication,
+    required this.track,
+  });
+
+  final lk.LocalTrackPublication<lk.LocalAudioTrack> publication;
+  final lk.LocalAudioTrack track;
 }

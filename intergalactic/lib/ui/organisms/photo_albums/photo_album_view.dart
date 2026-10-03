@@ -1132,8 +1132,8 @@ class _IconAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
+    return tiamat.Tooltip(
+      text: tooltip,
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: Colors.black.withValues(alpha: 0.62),

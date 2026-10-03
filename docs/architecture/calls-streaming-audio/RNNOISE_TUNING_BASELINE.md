@@ -1,9 +1,8 @@
 # RNNoise Tuning Baseline
 
-Status: AUDIO-owned microphone noise-suppression rollback baseline
+Status: Microphone noise-suppression rollback baseline
 Date: 2026-07-03
-Owner: AUDIO for RNNoise behavior; DOCUMENTATION for structure
-Last reviewed: 2026-07-03 by AUDIO
+Last reviewed: 2026-07-03
 
 This file records the desktop RNNoise behavior so the app has a clear rollback
 target while Enhanced DeepFilterNet is the app-facing Windows baseline.

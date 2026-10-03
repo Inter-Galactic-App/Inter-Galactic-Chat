@@ -162,3 +162,7 @@ tasks.matching { it.name == "compileReleaseJavaWithJavac" }.configureEach {
         }
     }
 }
+
+// Upstream media_kit_libs_android_video verifies its four downloaded native
+// jars with MD5 only. Add the SHA-256 comparison against the recorded digests.
+apply from: "${rootProject.projectDir}/media_kit_jar_digests.gradle"

@@ -1,6 +1,6 @@
 # Provenance of packaged licence texts
 
-`intergalactic/assets/licenses/` holds eighteen licence documents rendered by
+`intergalactic/assets/licenses/` holds nineteen licence documents rendered by
 the native in-app licence page. This record identifies each shipped text, its
 byte identity, and the component it covers. The listed hashes describe the
 tracked files; a final distribution still requires package-level verification.
@@ -23,6 +23,7 @@ tracked files; a final distribution still requires package-level verification.
 | `dart-jni-BSD-3-Clause.txt` | 1,503 | `08a004aa8956c3cf3b24f7f69c966247233953e18e6afaa61191ea47b7eb70f6` | Dart JNI, `libdartjni.so` from `jni` 1.0.0 (Android only) |
 | `kissfft-BSD-3-Clause.txt` | 1,475 | `ddd1400f963747b305bfa39e21206e58805a1c650451e2ee5ce81ed86bc0b1ab` | KISS FFT statically linked into `libnoise.so` from `io.livekit:noise` 2.0.0 (Android only) |
 | `rust-crates-NOTICE.txt` | 210,367 | `777f715ed4322654ecbd0a266c245d744e7587f1e030d52f03378547636296c2` | 59 Rust crates and the Rust standard library on supported native platforms |
+| `deepfilternet-libdf-rust-crates-NOTICE.txt` | 393,212 | `47d95db86aa1030964635319f4d17e3a1550e4aa7376642c06e8f2342f31bfc3` | 109 DeepFilterNet libDF Rust package/version pairs and Rust standard library on Windows and Android |
 | `webrtc-sdk-android-137.7151.04-NOTICES.txt` | 788,358 | `d1f9382c6878ac024155fd6d44a5977329108bb8b0a01cea40e4a2f1d7de252e` | WebRTC-SDK `v137.7151.04` Android `libjingle_peerconnection_so.so` notice packet |
 | `libyuv-BSD-3-Clause.txt` | 1,506 | `2b2cc1180c7e6988328ad2033b04b80117419db9c4c584918bbb3cfec7e9364f` | CameraX image-processing JNI payload (Android only) |
 
@@ -30,8 +31,11 @@ tracked files; a final distribution still requires package-level verification.
 
 The component-specific receipts under this directory record the corresponding
 published source or package metadata. Most table entries are verbatim upstream
-licence files. `rust-crates-NOTICE.txt` is an exception: it is composed by
-`tools/release/generate_rust_crate_notice.py` from the measured crate roster.
+licence files. `rust-crates-NOTICE.txt` and
+`deepfilternet-libdf-rust-crates-NOTICE.txt` are exceptions: they are composed
+from their measured crate rosters by their respective generators. The latter
+reads only the tracked DeepFilterNet feature-roster capture and the tracked
+Rust-standard-library evidence, not a mutable Cargo registry.
 The WebRTC-SDK notice packet is a verbatim upstream packet preserved at
 `android-native-payloads/webrtc-sdk-android-137.7151.04-WEBRTC.md`.
 

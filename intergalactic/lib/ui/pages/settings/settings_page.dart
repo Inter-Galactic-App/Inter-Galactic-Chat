@@ -14,6 +14,7 @@ class SettingsPage extends StatefulWidget {
     required this.settings,
     this.buttons,
     this.initialTabId,
+    this.initialTabInline = false,
     this.accountClientManager,
     this.initialSelectedAccount,
     this.contextAccount,
@@ -22,6 +23,7 @@ class SettingsPage extends StatefulWidget {
   final List<SettingsCategory> settings;
   final List<SettingsButton>? buttons;
   final String? initialTabId;
+  final bool initialTabInline;
   final ClientManager? accountClientManager;
   final Client? initialSelectedAccount;
   final Client? contextAccount;
@@ -107,6 +109,7 @@ class _SettingsPageState extends State<SettingsPage> {
         settings: widget.settings,
         buttons: widget.buttons,
         initialTabId: widget.initialTabId,
+        initialTabInline: widget.initialTabInline,
       );
     }
 

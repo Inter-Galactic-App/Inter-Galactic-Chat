@@ -63,15 +63,33 @@ count_sites() {
   # house component and must not be counted, so an allow-everything dot pattern
   # would be wrong here.
   local alias_pattern=""
+  local alias_names=""
   local alias
   while IFS= read -r alias; do
     [[ -z "$alias" ]] && continue
     alias_pattern="$alias_pattern|(^|[^A-Za-z0-9_.])${alias}\.Tooltip\("
+    alias_names+="$alias"$'\n'
   done < <(grep -rhoE "import 'package:flutter/material\.dart' as [A-Za-z_][A-Za-z0-9_]*" "${roots[@]}" 2>/dev/null              | awk '{print $NF}' | sort -u)
 
   local pattern="(^|[^A-Za-z0-9_.])Tooltip\(${alias_pattern}"
 
-  grep -rnE "$pattern" --include='*.dart' "${roots[@]}" 2>/dev/null     | awk -F: -v excl="$exclude_file" '
+  # Files where a BARE `Tooltip(` is the HOUSE component, not Material: they
+  # import tiamat unaliased, so `Tooltip` resolves to ours. Counting those as
+  # Material is not a harmless over-count - it books migrated code as debt and
+  # tells whoever converts the rest that two more sites remain when they do
+  # not. `editable_label.dart` was miscounted this way from the day the gate
+  # landed. Only the two libraries that actually export `Tooltip` qualify; an
+  # unaliased `package:tiamat/atoms/avatar.dart` next to an aliased tiamat
+  # import does NOT make a bare Tooltip ours.
+  local house_bare=""
+  house_bare="$(grep -rlE "^import 'package:tiamat/(tiamat|atoms/tooltip)\.dart';" --include='*.dart' "${roots[@]}" 2>/dev/null | sed 's|^\./||' | sort -u || true)"
+
+  grep -rnE "$pattern" --include='*.dart' "${roots[@]}" 2>/dev/null     | awk -F: -v excl="$exclude_file" -v house="$house_bare" -v aliases="$alias_names" '
+        BEGIN {
+          n = split(house, h, "\n")
+          for (i = 1; i <= n; i++) if (h[i] != "") house_bare[h[i]] = 1
+          alias_count = split(aliases, material_aliases, "\n")
+        }
         {
           file = $1
           sub(/^\.\//, "", file)
@@ -81,6 +99,17 @@ count_sites() {
           sub(/^[^:]*:[^:]*:/, "", line)
           gsub(/^[ 	]+/, "", line)
           if (line ~ /^(\/\/|\/\*|\*)/) next
+          # An aliased Material match is Material even if this file also
+          # imports the house Tooltip unaliased.
+          aliased_material = 0
+          for (i = 1; i <= alias_count; i++) {
+            alias = material_aliases[i]
+            if (alias != "" && line ~ ("(^|[^A-Za-z0-9_.])" alias "[.]Tooltip[(]")) {
+              aliased_material = 1
+              break
+            }
+          }
+          if (!aliased_material && (file in house_bare)) next
           count[file]++
         }
         END { for (f in count) print count[f], f }

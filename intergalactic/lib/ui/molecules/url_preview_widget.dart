@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:intergalactic/client/components/url_preview/url_preview_component.dart';
 import 'package:intergalactic/client/components/url_preview/url_preview_utils.dart';
+import 'package:intergalactic/debug/log.dart';
 import 'package:intergalactic/ui/accessibility/paused_animated_image.dart';
 import 'package:intergalactic/ui/atoms/shimmer_loading.dart';
 import 'package:flutter/material.dart';
@@ -36,6 +37,15 @@ class _UrlPreviewWidgetState extends State<UrlPreviewWidget> {
   static const double _defaultImageHeight = 132;
   static const double _minImageHeight = 96;
   static const double _maxImageHeight = 320;
+
+  /// Thumbnail geometry for a bubble preview on a wide window.
+  ///
+  /// The plain card already switches from a hero image to a thumbnail beside
+  /// the text above [_mobileBreakpoint]; the bubble card never did, so on
+  /// desktop it kept a full-width image and towered over the message it
+  /// belonged to. These are the plain card's proportions scaled to the bubble's
+  /// narrower 360 cap - roughly a third of the card's width, as there.
+  static const double _bubbleImageWidth = 116;
   double titleWidth = 0;
   double bodyWidth1 = 0;
   double bodyWidth2 = 0;
@@ -126,28 +136,77 @@ class _UrlPreviewWidgetState extends State<UrlPreviewWidget> {
                           padding: const EdgeInsets.all(12),
                           child: buildLoadingDisplay(),
                         )
-                      : Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (data.image != null) messagePreviewImage(data),
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(
-                                13,
-                                10,
-                                13,
-                                12,
-                              ),
-                              child: body(context, data),
-                            ),
-                          ],
-                        ),
+                      : messagePreviewContent(context, data),
                 ),
               ),
             ),
           ),
         ),
         alignment: widget.alignRight ? Alignment.topRight : Alignment.topLeft,
+      ),
+    );
+  }
+
+  /// Hero image above the text on narrow windows, thumbnail beside it on wide
+  /// ones - the same switch the plain preview card makes, at the same
+  /// breakpoint, so the two cards stay recognisably the same component.
+  Widget messagePreviewContent(BuildContext context, UrlPreviewData data) {
+    final compact = MediaQuery.sizeOf(context).width >= _mobileBreakpoint;
+    if (compact && data.image != null) {
+      return IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            messagePreviewThumbnail(data),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 13, 12),
+                child: body(context, data),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (data.image != null) messagePreviewImage(data),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(13, 10, 13, 12),
+          child: body(context, data),
+        ),
+      ],
+    );
+  }
+
+  /// The wide-window thumbnail is the preview bubble's left edge, rather than
+  /// an independently sized image. Stretching it to the row height keeps its
+  /// top and bottom flush with the clipped bubble when preview text is longer
+  /// than the source image's natural thumbnail height.
+  Widget messagePreviewThumbnail(UrlPreviewData data) {
+    final image = data.image;
+    if (image == null) {
+      return const SizedBox.shrink();
+    }
+
+    return SizedBox(
+      width: _bubbleImageWidth,
+      child: ColoredBox(
+        color: Theme.of(context).colorScheme.surfaceContainerLowest,
+        child: PausedAnimatedImage(
+          image: image,
+          filterQuality: FilterQuality.medium,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            _reportImageError(error, stackTrace);
+            return ColoredBox(
+              color: Theme.of(context).colorScheme.surfaceContainerLowest,
+            );
+          },
+        ),
       ),
     );
   }
@@ -165,7 +224,15 @@ class _UrlPreviewWidgetState extends State<UrlPreviewWidget> {
             data.imageHeight != null &&
             data.imageWidth! > 0 &&
             data.imageHeight! > 0)
-        ? (data.imageWidth! / data.imageHeight!).clamp(0.75, 2.2)
+        // REVIEW, 2026-09-11 (queue row "URL preview: blank TikTok and
+        // Instagram cards..."): 0.75 forced a genuine 9:16 (0.5625) portrait
+        // thumbnail to render near-square, cropping most of it via
+        // BoxFit.cover below. Widened to match imageMobile's clamp (0.5)
+        // just below in this file, which already handles the same 9:16
+        // content correctly. This is only half the aspect-ratio fix - the
+        // other half is the service carrying oEmbed's thumbnail dimensions
+        // through at all, which is SERVER's side of this row.
+        ? (data.imageWidth! / data.imageHeight!).clamp(0.5, 2.2)
         : 16.0 / 9.0;
 
     return AspectRatio(
@@ -520,6 +587,42 @@ class _UrlPreviewWidgetState extends State<UrlPreviewWidget> {
     }
 
     _reportedImageErrorKey = key;
+    // WHERE THE FAILURE IS FIRST SEEN, and until 2026-09-12 the only place it
+    // was seen at all that logged nothing. The component's own line fires
+    // later, and only once a refresh has already cleared its three early
+    // returns, so a capture could not distinguish 'no image ever failed' from
+    // 'one failed and the refresh never started'. The 2026-09-11 capture is
+    // exactly that shape: 87 resolved lines, zero refresh lines, and four
+    // undiagnosed 'Could not getPixels' decode errors.
+    //
+    // host= matches the resolved line's field so one preview can be followed
+    // end to end; image_kind distinguishes a homeserver mxc from a
+    // third-party CDN, which decides whose failure it is.
+    Log.d(
+      'URL preview image error host=${_safeHost(widget.data?.uri)} '
+      'image_kind=${_imageKind(widget.data)} '
+      'image_host=${_safeHost(widget.data?.imageUri)} '
+      'error=${error.runtimeType}',
+      category: LogCategory.media,
+      source: 'url-preview',
+    );
     widget.onImageError?.call(error, stackTrace);
+  }
+
+  static String _safeHost(Uri? uri) {
+    final host = uri?.host;
+    return host == null || host.isEmpty ? 'unknown' : host.toLowerCase();
+  }
+
+  /// Whether the failed image came from the homeserver or a third party.
+  ///
+  /// Read from the URI actually being loaded rather than from any preference,
+  /// because a preference says what was permitted, not what was attempted.
+  static String _imageKind(UrlPreviewData? data) {
+    final uri = data?.imageUri;
+    if (uri == null) {
+      return data?.image == null ? 'none' : 'provider';
+    }
+    return uri.scheme == 'mxc' ? 'mxc' : 'third_party';
   }
 }

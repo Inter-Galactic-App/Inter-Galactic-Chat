@@ -1,4 +1,10 @@
 {
+  "notificationAttachmentSentImage": "사진을 보냈습니다",
+  "notificationAttachmentSentVideo": "동영상을 보냈습니다",
+  "notificationAttachmentSentAudio": "음성 메시지를 보냈습니다",
+  "notificationAttachmentSentFile": "파일을 보냈습니다",
+  "notificationAttachmentSharedLocation": "위치를 공유했습니다",
+  "notificationAttachmentSentSticker": "스티커를 보냈습니다",
   "labelRoomsList": "방",
   "@labelRoomsList": {
     "description": "Header label for the list of rooms",

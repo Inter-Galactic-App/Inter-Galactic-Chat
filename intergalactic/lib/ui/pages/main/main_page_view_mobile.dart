@@ -14,6 +14,7 @@ import 'package:intergalactic/ui/molecules/direct_message_list.dart';
 import 'package:intergalactic/ui/molecules/favorite_rooms_list.dart';
 import 'package:intergalactic/ui/molecules/overlapping_panels.dart';
 import 'package:intergalactic/ui/molecules/space_viewer.dart';
+import 'package:intergalactic/ui/onboarding/tutorial_anchor.dart';
 import 'package:intergalactic/ui/organisms/activity/local_activity_panel.dart';
 import 'package:intergalactic/ui/organisms/background_task_view/background_task_view_container.dart';
 import 'package:intergalactic/ui/organisms/home_screen/home_screen.dart';
@@ -66,6 +67,9 @@ class _MainPageViewMobileState extends State<MainPageViewMobile> {
   bool hasLocalActivity = activityService.currentActivity != null;
   double height = -1;
   StreamSubscription<UserActivity?>? localActivitySubscription;
+  StreamSubscription? _openThreadSubscription;
+  StreamSubscription? _closeThreadSubscription;
+  StreamSubscription? _focusTimelineSubscription;
   Timer? _threadRevealTimer;
 
   String get directMessagesListHeaderMobile => Intl.message(
@@ -92,14 +96,14 @@ class _MainPageViewMobileState extends State<MainPageViewMobile> {
   void initState() {
     panelsKey = GlobalKey<OverlappingPanelsState>();
     shouldMainIgnoreInput = widget.state.forceCallRoomSideRailVisible;
-    EventBus.openThread.stream.listen((event) {
+    _openThreadSubscription = EventBus.openThread.stream.listen((event) {
       revealThreadPanel();
     });
-    EventBus.closeThread.stream.listen((event) {
+    _closeThreadSubscription = EventBus.closeThread.stream.listen((event) {
       panelsKey.currentState?.reveal(RevealSide.main);
     });
 
-    EventBus.focusTimeline.stream.listen((event) {
+    _focusTimelineSubscription = EventBus.focusTimeline.stream.listen((event) {
       panelsKey.currentState?.reveal(RevealSide.main);
     });
 
@@ -119,6 +123,9 @@ class _MainPageViewMobileState extends State<MainPageViewMobile> {
   void dispose() {
     _threadRevealTimer?.cancel();
     localActivitySubscription?.cancel();
+    _openThreadSubscription?.cancel();
+    _closeThreadSubscription?.cancel();
+    _focusTimelineSubscription?.cancel();
     super.dispose();
   }
 
@@ -193,7 +200,7 @@ class _MainPageViewMobileState extends State<MainPageViewMobile> {
           key: panelsKey,
           initialSide: widget.state.forceCallRoomSideRailVisible
               ? RevealSide.right
-              : RevealSide.main,
+              : widget.state.initialMobileRevealSide ?? RevealSide.main,
           onSideChange: (side) {
             if (side != RevealSide.main) {
               FocusManager.instance.primaryFocus?.unfocus();
@@ -292,17 +299,20 @@ class _MainPageViewMobileState extends State<MainPageViewMobile> {
               ),
             ),
             Expanded(
-              child: RoomSidePanel(
-                key: ValueKey(
-                  "room-side-panel-${widget.state.currentRoom!.localId}",
+              child: TutorialAnchor(
+                id: TutorialAnchorIds.roomSidePanel,
+                child: RoomSidePanel(
+                  key: ValueKey(
+                    "room-side-panel-${widget.state.currentRoom!.localId}",
+                  ),
+                  state: widget.state,
+                  initialState: _initialRoomSidePanelState(widget.state),
+                  initialThreadId: widget.state.initialSidePanelThreadId,
+                  forceNicknamesButton:
+                      widget.state.initialSidePanelState == 'defaultView',
+                  forceDecryptQuickAction:
+                      widget.state.forceRoomDecryptQuickAction,
                 ),
-                state: widget.state,
-                initialState: _initialRoomSidePanelState(widget.state),
-                initialThreadId: widget.state.initialSidePanelThreadId,
-                forceNicknamesButton:
-                    widget.state.initialSidePanelState == 'defaultView',
-                forceDecryptQuickAction:
-                    widget.state.forceRoomDecryptQuickAction,
               ),
             ),
           ],
@@ -386,37 +396,42 @@ class _MainPageViewMobileState extends State<MainPageViewMobile> {
                           top: true,
                           child: Padding(
                             padding: const EdgeInsets.fromLTRB(0, 8, 0, 0),
-                            child: SideNavigationBar(
-                              currentUser: widget.state.getCurrentUser(),
-                              filterClient: widget.state.filterClient,
-                              onSpaceSelected: (space) {
-                                widget.state.selectSpace(space);
-                              },
-                              clearSpaceSelection: () {
-                                widget.state.clearSpaceSelection();
-                              },
-                              onHomeSelected: () {
-                                widget.state.selectHome();
-                              },
-                              onFavoritesSelected: () {
-                                widget.state.selectFavorites();
-                              },
-                              favoritesSelected:
-                                  widget.state.currentView ==
-                                  MainPageSubView.favorites,
-                              onDirectMessageSelected: (room) {
-                                widget.state.selectHome();
-                                widget.state.selectRoom(room);
-                                panelsKey.currentState?.reveal(RevealSide.main);
-                              },
-                              extraEntryBuilders: [
-                                (width) {
-                                  return SidebarCallsList(
-                                    widget.state.clientManager.callManager,
-                                    width,
+                            child: TutorialAnchor(
+                              id: TutorialAnchorIds.spaceRail,
+                              child: SideNavigationBar(
+                                currentUser: widget.state.getCurrentUser(),
+                                filterClient: widget.state.filterClient,
+                                onSpaceSelected: (space) {
+                                  widget.state.selectSpace(space);
+                                },
+                                clearSpaceSelection: () {
+                                  widget.state.clearSpaceSelection();
+                                },
+                                onHomeSelected: () {
+                                  widget.state.selectHome();
+                                },
+                                onFavoritesSelected: () {
+                                  widget.state.selectFavorites();
+                                },
+                                favoritesSelected:
+                                    widget.state.currentView ==
+                                    MainPageSubView.favorites,
+                                onDirectMessageSelected: (room) {
+                                  widget.state.selectHome();
+                                  widget.state.selectRoom(room);
+                                  panelsKey.currentState?.reveal(
+                                    RevealSide.main,
                                   );
                                 },
-                              ],
+                                extraEntryBuilders: [
+                                  (width) {
+                                    return SidebarCallsList(
+                                      widget.state.clientManager.callManager,
+                                      width,
+                                    );
+                                  },
+                                ],
+                              ),
                             ),
                           ),
                         ),
@@ -469,11 +484,14 @@ class _MainPageViewMobileState extends State<MainPageViewMobile> {
                         LocalActivityPanel(
                           userPanelHeight: 68,
                           service: widget.state.tutorialActivityService,
-                          child: MainPageViewDesktop.currentUserPanel(
-                            widget.state,
-                            context,
-                            height: 68,
-                            avatarRadius: 20,
+                          child: TutorialAnchor(
+                            id: TutorialAnchorIds.accountPanel,
+                            child: MainPageViewDesktop.currentUserPanel(
+                              widget.state,
+                              context,
+                              height: 68,
+                              avatarRadius: 20,
+                            ),
                           ),
                         ),
                       ],
@@ -794,52 +812,55 @@ class _MainPageViewMobileState extends State<MainPageViewMobile> {
 
   Widget directMessagesView() {
     return mobileSidePanel(
-      child: Tile.surfaceContainer(
-        caulkClipTopLeft: true,
-        caulkPadRight: true,
-        caulkClipTopRight: true,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(0, 0, 6, 0),
-          child: ScaledSafeArea(
-            top: false,
-            bottom: false,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.start,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 12, 8, 8),
-                      child: Text(
-                        directMessagesListHeaderMobile,
-                        style: mobilePanelHeadingStyle(context),
+      child: TutorialAnchor(
+        id: TutorialAnchorIds.roomList,
+        child: Tile.surfaceContainer(
+          caulkClipTopLeft: true,
+          caulkPadRight: true,
+          caulkClipTopRight: true,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(0, 0, 6, 0),
+            child: ScaledSafeArea(
+              top: false,
+              bottom: false,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 12, 8, 8),
+                        child: Text(
+                          directMessagesListHeaderMobile,
+                          style: mobilePanelHeadingStyle(context),
+                        ),
                       ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(8, 12, 12, 8),
-                      child: tiamat.IconButton(
-                        size: 18,
-                        icon: Icons.add,
-                        onPressed: widget.state.searchUserToDm,
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(8, 12, 12, 8),
+                        child: tiamat.IconButton(
+                          size: 18,
+                          icon: Icons.add,
+                          onPressed: widget.state.searchUserToDm,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                Flexible(
-                  child: DirectMessageList(
-                    filterClient: widget.state.filterClient,
-                    directMessages: widget.state.clientManager.directMessages,
-                    onSelected: (room) {
-                      setState(() {
-                        selectRoom(room);
-                      });
-                    },
+                    ],
                   ),
-                ),
-              ],
+                  Flexible(
+                    child: DirectMessageList(
+                      filterClient: widget.state.filterClient,
+                      directMessages: widget.state.clientManager.directMessages,
+                      onSelected: (room) {
+                        setState(() {
+                          selectRoom(room);
+                        });
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -849,34 +870,38 @@ class _MainPageViewMobileState extends State<MainPageViewMobile> {
 
   Widget spaceRoomSelector(BuildContext newContext) {
     return mobileSidePanel(
-      child: Tile.surfaceContainer(
-        caulkClipTopLeft: true,
-        caulkPadRight: true,
-        caulkClipTopRight: true,
-        child: Column(
-          children: [
-            SpaceHeader(
-              widget.state.currentSpace!,
-              backgroundColor: material.Theme.of(
-                context,
-              ).colorScheme.surfaceContainerLow,
-              onTap: clearSelectedRoom,
-            ),
-            Expanded(
-              child: SpaceViewer(
+      child: TutorialAnchor(
+        id: TutorialAnchorIds.roomList,
+        child: Tile.surfaceContainer(
+          caulkClipTopLeft: true,
+          caulkPadRight: true,
+          caulkClipTopRight: true,
+          child: Column(
+            children: [
+              SpaceHeader(
                 widget.state.currentSpace!,
-                key: ValueKey(
-                  "space-view-key-${widget.state.currentSpace!.localId}",
-                ),
-                onRoomSelected: (room, {bypassSpecialRoomType = false}) async {
-                  selectRoom(
-                    room,
-                    bypassSpecialRoomType: bypassSpecialRoomType,
-                  );
-                },
+                backgroundColor: material.Theme.of(
+                  context,
+                ).colorScheme.surfaceContainerLow,
+                onTap: clearSelectedRoom,
               ),
-            ),
-          ],
+              Expanded(
+                child: SpaceViewer(
+                  widget.state.currentSpace!,
+                  key: ValueKey(
+                    "space-view-key-${widget.state.currentSpace!.localId}",
+                  ),
+                  onRoomSelected:
+                      (room, {bypassSpecialRoomType = false}) async {
+                        selectRoom(
+                          room,
+                          bypassSpecialRoomType: bypassSpecialRoomType,
+                        );
+                      },
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -884,21 +909,24 @@ class _MainPageViewMobileState extends State<MainPageViewMobile> {
 
   Widget favoritesNavigationView() {
     return mobileSidePanel(
-      child: Tile.surfaceContainer(
-        caulkClipTopLeft: true,
-        caulkPadRight: true,
-        caulkClipTopRight: true,
-        child: FavoriteRoomsList(
-          clientManager: widget.state.clientManager,
-          filterClient: widget.state.filterClient,
-          onRoomSelected: (room, {bool bypassSpecialRoomType = false}) {
-            selectRoom(room, bypassSpecialRoomType: bypassSpecialRoomType);
-          },
-          showHeader: true,
-          layout: FavoriteRoomsListLayout.mobileSidebar,
-          roomIndicatorTrailingInset: 14,
-          header: favoritesListHeaderMobile,
-          emptyMessage: favoritesEmptyStateMobile,
+      child: TutorialAnchor(
+        id: TutorialAnchorIds.roomList,
+        child: Tile.surfaceContainer(
+          caulkClipTopLeft: true,
+          caulkPadRight: true,
+          caulkClipTopRight: true,
+          child: FavoriteRoomsList(
+            clientManager: widget.state.clientManager,
+            filterClient: widget.state.filterClient,
+            onRoomSelected: (room, {bool bypassSpecialRoomType = false}) {
+              selectRoom(room, bypassSpecialRoomType: bypassSpecialRoomType);
+            },
+            showHeader: true,
+            layout: FavoriteRoomsListLayout.mobileSidebar,
+            roomIndicatorTrailingInset: 14,
+            header: favoritesListHeaderMobile,
+            emptyMessage: favoritesEmptyStateMobile,
+          ),
         ),
       ),
     );

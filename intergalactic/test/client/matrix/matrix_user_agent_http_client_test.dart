@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -22,6 +23,16 @@ class _FailingClient extends http.BaseClient {
   }
 }
 
+class _ZoneCapturingClient extends http.BaseClient {
+  String? operation;
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    operation = Zone.current[Log.matrixNetworkOperationZoneKey] as String?;
+    throw const SocketException('Failed host lookup');
+  }
+}
+
 http.Request _get(String url) => http.Request('GET', Uri.parse(url));
 
 void main() {
@@ -29,6 +40,21 @@ void main() {
       'https://matrix.ourgalaxy.space/_matrix/client/v3/sync?since=s123';
 
   group('MatrixUserAgentHttpClient failure attribution', () {
+    test(
+      'runs the inner request in its fixed redacted endpoint zone',
+      () async {
+        final inner = _ZoneCapturingClient();
+        final client = MatrixUserAgentHttpClient(inner);
+
+        await expectLater(
+          client.send(_get(syncUrl)),
+          throwsA(isA<SocketException>()),
+        );
+
+        expect(inner.operation, Log.matrixHttpSyncOperation);
+      },
+    );
+
     test('rethrows the original error object untouched', () async {
       final failure = const SocketException(
         "Failed host lookup: 'matrix.ourgalaxy.space'",
@@ -150,4 +176,82 @@ void main() {
       );
     });
   });
+
+  group('MatrixUserAgentHttpClient.resolverOutcome', () {
+    test('classifies Windows NODATA without retaining endpoint text', () {
+      expect(
+        MatrixUserAgentHttpClient.resolverOutcome(
+          SocketException(
+            'Failed host lookup: example.invalid',
+            osError: const OSError('NODATA', 11004),
+          ),
+        ),
+        'nodata',
+      );
+    });
+
+    test('does not label unrelated failures as resolver NODATA', () {
+      expect(
+        MatrixUserAgentHttpClient.resolverOutcome(StateError('expected')),
+        'not_socket',
+      );
+    });
+  });
+
+  test('adds bounded redacted context to a startup NODATA failure', () async {
+    Log.beginStartupTelemetry();
+    Log.recordStartupPhase('accounts');
+    final client = MatrixUserAgentHttpClient(
+      _FailingClient(
+        SocketException(
+          "Failed host lookup: 'matrix.ourgalaxy.space'",
+          osError: const OSError('NODATA', 11004),
+        ),
+      ),
+    );
+
+    Log.log.clear();
+    await expectLater(
+      client.send(_get(syncUrl)),
+      throwsA(isA<SocketException>()),
+    );
+
+    final content = Log.log
+        .singleWhere((entry) => entry.source == 'matrix-http')
+        .content;
+    expect(content, contains('startup_phase=accounts'));
+    expect(content, contains('resolver_outcome=nodata'));
+    expect(content, isNot(contains('matrix.ourgalaxy.space')));
+  });
+
+  test(
+    'records one redacted startup dispatch per method and endpoint',
+    () async {
+      Log.beginStartupTelemetry();
+      Log.recordStartupPhase('accounts');
+      final client = MatrixUserAgentHttpClient(
+        _FailingClient(const SocketException('Failed host lookup')),
+      );
+
+      Log.log.clear();
+      for (var attempt = 0; attempt < 3; attempt++) {
+        await expectLater(
+          client.send(_get(syncUrl)),
+          throwsA(isA<SocketException>()),
+        );
+      }
+
+      final dispatched = Log.log
+          .where((entry) => entry.source == 'matrix-http-dispatch')
+          .toList();
+      expect(dispatched, hasLength(1));
+      expect(dispatched.single.content, contains('request_path=sync'));
+      expect(dispatched.single.content, contains('method=GET'));
+      expect(dispatched.single.content, contains('startup_phase=accounts'));
+      expect(
+        dispatched.single.content,
+        isNot(contains('matrix.ourgalaxy.space')),
+      );
+    },
+  );
 }

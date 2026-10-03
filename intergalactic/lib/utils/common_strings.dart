@@ -7,6 +7,13 @@ class CommonStrings {
     desc: "Generic prompt to reply to a message",
   );
 
+  static String get promptForwardMessage => Intl.message(
+    "Forward",
+    name: "promptForwardMessage",
+    desc:
+        "Prompt to forward a message to another room. Used both on the timeline menu entry that starts the flow and on the button that confirms the chosen destinations",
+  );
+
   static String get promptAddReaction => Intl.message(
     "Add Reaction",
     name: "promptAddReaction",
@@ -168,6 +175,13 @@ class CommonStrings {
     "Back",
     desc: "Prompt text to go backwards, probably for navigation",
     name: "promptBack",
+  );
+
+  static String get promptForward => Intl.message(
+    "Forward",
+    desc:
+        "Prompt text to go forwards, probably for navigation. This is the counterpart of promptBack and is NOT about forwarding a message - see promptForwardMessage for that",
+    name: "promptForward",
   );
 
   static String get promptSearch => Intl.message(

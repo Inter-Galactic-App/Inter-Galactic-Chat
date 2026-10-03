@@ -50,6 +50,7 @@ import 'package:intergalactic/config/platform_utils.dart';
 import 'package:intergalactic/config/preferences.dart';
 import 'package:intergalactic/debug/log.dart';
 import 'package:intergalactic/main.dart';
+import 'package:intergalactic/ui/accessibility/accessibility_scope.dart';
 import 'package:intergalactic/ui/motion/inter_galactic_motion.dart';
 import 'package:intergalactic/ui/onboarding/tutorial_anchor.dart';
 import 'package:intergalactic/ui/organisms/call_view/call_diagnostics_path_labels.dart';
@@ -83,6 +84,29 @@ const double _callControlRowHorizontalPadding = 8;
 const double _callControlRowVerticalPadding = 6;
 const double _defaultCallControlSpacing = 8;
 const double _desktopCallControlSpacing = 12;
+const String streamTestParticipantImpactWarning =
+    'Running a stream test changes the live screen share for everyone in this '
+    'call. Start only when participants are ready.';
+
+@visibleForTesting
+bool shouldFlipLocalCameraOnDoubleTap({
+  required bool mobilePlatform,
+  required bool mobileLayout,
+  required bool localTile,
+  required VoipStreamType streamType,
+  required bool videoHidden,
+  required bool cameraEnabled,
+  required bool livekitSession,
+}) {
+  return mobilePlatform &&
+      mobileLayout &&
+      localTile &&
+      streamType == VoipStreamType.video &&
+      !videoHidden &&
+      cameraEnabled &&
+      livekitSession;
+}
+
 // Some mobile controls include TutorialAnchor padding around a 48px button.
 const double _mobileCallControlButtonExtent = 56;
 const EdgeInsets _mobileCallControlDockSafeAreaMargin = EdgeInsets.fromLTRB(
@@ -91,6 +115,14 @@ const EdgeInsets _mobileCallControlDockSafeAreaMargin = EdgeInsets.fromLTRB(
   10,
   10,
 );
+
+@visibleForTesting
+bool shouldReportScreenShareViewer({
+  required bool isScreenShare,
+  required bool isIncoming,
+  required bool isVideoHidden,
+  required bool isPoppedOut,
+}) => isScreenShare && isIncoming && (!isVideoHidden || isPoppedOut);
 
 class _CallControlsVisibility extends StatelessWidget {
   const _CallControlsVisibility({
@@ -152,6 +184,44 @@ Future<void> _setCallViewReceivePriority(
       source: 'call-view-receive-priority',
     );
   }
+}
+
+@visibleForTesting
+Widget buildStreamTestParticipantImpactWarning(BuildContext context) {
+  final theme = Theme.of(context);
+  final tokens = AccessibilityScope.tokensOf(context);
+
+  return Semantics(
+    container: true,
+    label: 'Shared call impact. $streamTestParticipantImpactWarning',
+    child: ExcludeSemantics(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: tokens.warning),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.groups_2_outlined, color: tokens.warning),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  streamTestParticipantImpactWarning,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 @visibleForTesting
@@ -716,6 +786,84 @@ bool _shouldApplyVisibilityMute({
   required bool locallyMuted,
 }) {
   return shouldMute && (!mutedByVisibility || !locallyMuted);
+}
+
+const _desktopCallTileAspectRatio = 16.0 / 9.0;
+
+double _callTileAspectRatio({
+  required bool mobile,
+  required bool isScreenshare,
+}) {
+  return mobile && !isScreenshare ? 1.0 : _desktopCallTileAspectRatio;
+}
+
+@visibleForTesting
+double debugCallTileAspectRatioForTesting({
+  required bool mobile,
+  required bool isScreenshare,
+}) => _callTileAspectRatio(mobile: mobile, isScreenshare: isScreenshare);
+
+class _CallGridMetrics {
+  const _CallGridMetrics({
+    required this.columns,
+    required this.tileWidth,
+    required this.tileHeight,
+  });
+
+  final int columns;
+  final double tileWidth;
+  final double tileHeight;
+}
+
+_CallGridMetrics _callGridMetrics({
+  required int itemCount,
+  required double maxWidth,
+  required double maxHeight,
+  required double spacing,
+}) {
+  var columns = 1;
+  var bestScore = double.infinity;
+  for (var candidate = 1; candidate <= itemCount; candidate++) {
+    final rows = (itemCount / candidate).ceil();
+    final width = (maxWidth - (candidate - 1) * spacing) / candidate;
+    final height = (maxHeight - (rows - 1) * spacing) / rows;
+    if (width <= 0 || height <= 0) continue;
+    final score = (width / height - _desktopCallTileAspectRatio).abs();
+    if (score < bestScore) {
+      bestScore = score;
+      columns = candidate;
+    }
+  }
+
+  final rows = (itemCount / columns).ceil();
+  final widthLimit = max(0.0, (maxWidth - (columns - 1) * spacing) / columns);
+  final heightLimit = max(0.0, (maxHeight - (rows - 1) * spacing) / rows);
+  final tileWidth = min(widthLimit, heightLimit * _desktopCallTileAspectRatio);
+  return _CallGridMetrics(
+    columns: columns,
+    tileWidth: tileWidth,
+    tileHeight: tileWidth / _desktopCallTileAspectRatio,
+  );
+}
+
+@visibleForTesting
+({int columns, double width, double height}) debugCallGridMetricsForTesting({
+  required int itemCount,
+  required double maxWidth,
+  required double maxHeight,
+  double spacing = 12,
+}) {
+  final metrics = _callGridMetrics(
+    itemCount: itemCount,
+    maxWidth: maxWidth,
+    maxHeight: maxHeight,
+    spacing: spacing,
+  );
+  return (
+    columns: metrics.columns,
+    width: metrics.tileWidth,
+    height: metrics.tileHeight,
+  );
 }
 
 class _FocusedCallRailMetrics {
@@ -1293,8 +1441,8 @@ class _CallSignalStrengthIndicator extends StatelessWidget {
         '${participant.label}: ${participant.connectionStatusLabel}';
     const heights = <double>[5, 8, 11, 14];
 
-    return Tooltip(
-      message: tooltip,
+    return tiamat.Tooltip(
+      text: tooltip,
       child: Semantics(
         label: 'Connection signal for ${participant.label}',
         value: participant.connectionStatusLabel,
@@ -1858,6 +2006,7 @@ class CallView extends StatefulWidget {
 }
 
 class _CallViewState extends State<CallView> {
+  bool _mobileCameraFlipInProgress = false;
   static const List<WindowsScreenCaptureBackendMode?>
   _streamTestWindowsCaptureBackendCompareModes = [
     null,
@@ -1899,6 +2048,9 @@ class _CallViewState extends State<CallView> {
     previewDuration: _localScreensharePreviewDuration,
   );
   final Set<String> _restoredScreenshareAudioVolumeKeys = {};
+  final Object _streamViewerSurface = Object();
+  late final AppLifecycleListener _streamViewerLifecycleListener;
+  bool _streamViewerSurfaceActive = true;
   bool _streamTestRunning = false;
   String? _streamTestProgressLabel;
   StreamTestRunResult? _lastStreamTestResult;
@@ -2000,6 +2152,11 @@ class _CallViewState extends State<CallView> {
   List<_CallTileData>? _pendingMediaControlTiles;
   _CallTileData? _pendingMediaControlFocusedTile;
   bool _mediaControlPassScheduled = false;
+  MatrixLivekitVoipSession? _pendingStreamViewerSession;
+  Set<String>? _pendingStreamViewerIds;
+  MatrixLivekitVoipSession? _lastReportedStreamViewerSession;
+  Set<String>? _lastReportedStreamViewerIds;
+  bool _streamViewerIntentScheduled = false;
 
   CallParticipantAudioOverrides get _participantAudioVolumeOverrides =>
       CallParticipantAudioOverridesStore.forSession(widget.currentSession);
@@ -2007,6 +2164,28 @@ class _CallViewState extends State<CallView> {
   @override
   void initState() {
     super.initState();
+    final initialLifecycle = WidgetsBinding.instance.lifecycleState;
+    _streamViewerSurfaceActive =
+        initialLifecycle != AppLifecycleState.hidden &&
+        initialLifecycle != AppLifecycleState.paused &&
+        initialLifecycle != AppLifecycleState.detached;
+    _streamViewerLifecycleListener = AppLifecycleListener(
+      onStateChange: (state) {
+        final active =
+            state != AppLifecycleState.hidden &&
+            state != AppLifecycleState.paused &&
+            state != AppLifecycleState.detached;
+        if (_streamViewerSurfaceActive == active) return;
+        _streamViewerSurfaceActive = active;
+        if (!active && widget.currentSession is MatrixLivekitVoipSession) {
+          (widget.currentSession as MatrixLivekitVoipSession)
+              .setVisibleRemoteScreenShares(_streamViewerSurface, const {});
+          _lastReportedStreamViewerIds = const {};
+        } else if (mounted) {
+          setState(() {});
+        }
+      },
+    );
     _bindPersistedLocalState();
     _diagnosticsOverlayVisible =
         preferences.callStreamStatsOverlayVisible.value;
@@ -2069,6 +2248,14 @@ class _CallViewState extends State<CallView> {
     if (identical(oldWidget.currentSession, widget.currentSession)) {
       return;
     }
+    if (oldWidget.currentSession is MatrixLivekitVoipSession) {
+      (oldWidget.currentSession as MatrixLivekitVoipSession)
+          .setVisibleRemoteScreenShares(_streamViewerSurface, const {});
+    }
+    _pendingStreamViewerSession = null;
+    _pendingStreamViewerIds = null;
+    _lastReportedStreamViewerSession = null;
+    _lastReportedStreamViewerIds = null;
 
     // Every call site builds `CallView` positionally with no key, so leaving
     // and rejoining the same room hands this element a *different* session
@@ -2176,6 +2363,11 @@ class _CallViewState extends State<CallView> {
 
   @override
   void dispose() {
+    _streamViewerLifecycleListener.dispose();
+    if (widget.currentSession is MatrixLivekitVoipSession) {
+      (widget.currentSession as MatrixLivekitVoipSession)
+          .setVisibleRemoteScreenShares(_streamViewerSurface, const {});
+    }
     final pendingSubscriptions = <StreamSubscription?>[
       sub,
       _diagnosticsSub,
@@ -3141,22 +3333,24 @@ class _CallViewState extends State<CallView> {
     required Widget child,
   }) {
     if (!widget.transparentBackground) {
-      return Tooltip(
-        message: message,
+      return tiamat.Tooltip(
+        text: message,
         excludeFromSemantics: true,
         child: child,
       );
     }
 
-    return Tooltip(
-      message: message,
+    // Over a transparent (video) background the app surface has nothing to
+    // contrast against, so this keeps the dark treatment through the atom's
+    // escape hatches. ONE visual difference from the Material version it
+    // replaces: the hairline white border is gone - just_the_tooltip paints
+    // its own surface and takes a borderRadius but no border, so the atom
+    // cannot express it.
+    return tiamat.Tooltip(
+      text: message,
       excludeFromSemantics: true,
-      decoration: BoxDecoration(
-        color: Colors.black.withAlpha(220),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.white.withAlpha(40)),
-      ),
-      textStyle: const TextStyle(color: Colors.white),
+      backgroundColor: Colors.black.withAlpha(220),
+      textColor: Colors.white,
       child: child,
     );
   }
@@ -4489,8 +4683,82 @@ class _CallViewState extends State<CallView> {
     );
   }
 
+  void _scheduleStreamViewerIntent(List<_CallTileData> tiles) {
+    final session = widget.currentSession;
+    if (session is! MatrixLivekitVoipSession) return;
+    final watchedIds = !_streamViewerSurfaceActive
+        ? <String>{}
+        : <String>{
+            for (final tile in tiles)
+              if (shouldReportScreenShareViewer(
+                isScreenShare: tile.isScreenshare,
+                isIncoming:
+                    tile.primaryStream.direction ==
+                    VoipStreamDirection.incoming,
+                isVideoHidden: _isTileVideoHidden(tile),
+                isPoppedOut: false,
+              ))
+                tile.primaryStream.streamId,
+            for (final stream in session.streams)
+              if (BuildConfig.DESKTOP &&
+                  shouldReportScreenShareViewer(
+                    isScreenShare: stream.type == VoipStreamType.screenshare,
+                    isIncoming:
+                        stream.direction == VoipStreamDirection.incoming,
+                    isVideoHidden: true,
+                    isPoppedOut: callPopoutController.isStreamPoppedOut(
+                      session.sessionId,
+                      _tileIdForStream(stream),
+                    ),
+                  ))
+                stream.streamId,
+          };
+    final lastIds = _lastReportedStreamViewerIds;
+    if (!_streamViewerIntentScheduled &&
+        identical(_lastReportedStreamViewerSession, session) &&
+        lastIds != null &&
+        lastIds.length == watchedIds.length &&
+        lastIds.containsAll(watchedIds)) {
+      return;
+    }
+    _pendingStreamViewerSession = session;
+    _pendingStreamViewerIds = watchedIds;
+    if (_streamViewerIntentScheduled) return;
+    _streamViewerIntentScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _streamViewerIntentScheduled = false;
+      final pendingSession = _pendingStreamViewerSession;
+      final pendingIds = _pendingStreamViewerIds;
+      _pendingStreamViewerSession = null;
+      _pendingStreamViewerIds = null;
+      if (!mounted ||
+          pendingSession == null ||
+          pendingIds == null ||
+          !identical(widget.currentSession, pendingSession)) {
+        return;
+      }
+      final visibleIds = _streamViewerSurfaceActive
+          ? pendingIds
+          : const <String>{};
+      final reportedIds = _lastReportedStreamViewerIds;
+      if (identical(_lastReportedStreamViewerSession, pendingSession) &&
+          reportedIds != null &&
+          reportedIds.length == visibleIds.length &&
+          reportedIds.containsAll(visibleIds)) {
+        return;
+      }
+      pendingSession.setVisibleRemoteScreenShares(
+        _streamViewerSurface,
+        visibleIds,
+      );
+      _lastReportedStreamViewerSession = pendingSession;
+      _lastReportedStreamViewerIds = Set.of(visibleIds);
+    });
+  }
+
   Widget callConnectedView() {
     final tiles = buildVisibleTiles();
+    _scheduleStreamViewerIntent(tiles);
     final hasPoppedStreams = callPopoutController.hasPoppedStreams(
       widget.currentSession.sessionId,
     );
@@ -4648,10 +4916,15 @@ class _CallViewState extends State<CallView> {
             (tile) => tile.tileId == focusedTileId && !_isTileVideoHidden(tile),
           );
     if (tiles.length == 1) {
-      return _buildCallTile(
-        tiles.first,
-        key: ValueKey("call_pip_single_${tiles.first.tileId}"),
-        focused: true,
+      return Center(
+        child: AspectRatio(
+          aspectRatio: _desktopCallTileAspectRatio,
+          child: _buildCallTile(
+            tiles.first,
+            key: ValueKey("call_pip_single_${tiles.first.tileId}"),
+            focused: true,
+          ),
+        ),
       );
     }
 
@@ -4659,11 +4932,16 @@ class _CallViewState extends State<CallView> {
       return Stack(
         fit: StackFit.expand,
         children: [
-          _buildCallTile(
-            explicitFocusedTile,
-            key: ValueKey("call_pip_focused_${explicitFocusedTile.tileId}"),
-            focused: true,
-            onTap: showEqualLayout,
+          Center(
+            child: AspectRatio(
+              aspectRatio: _desktopCallTileAspectRatio,
+              child: _buildCallTile(
+                explicitFocusedTile,
+                key: ValueKey("call_pip_focused_${explicitFocusedTile.tileId}"),
+                focused: true,
+                onTap: showEqualLayout,
+              ),
+            ),
           ),
           if (secondaryTiles.isNotEmpty)
             Positioned(
@@ -4680,11 +4958,16 @@ class _CallViewState extends State<CallView> {
         children: [
           for (final tile in tiles) ...[
             Expanded(
-              child: _buildCallTile(
-                tile,
-                key: ValueKey("call_pip_pair_${tile.tileId}"),
-                focused: false,
-                onTap: () => focusTile(tile),
+              child: Center(
+                child: AspectRatio(
+                  aspectRatio: _desktopCallTileAspectRatio,
+                  child: _buildCallTile(
+                    tile,
+                    key: ValueKey("call_pip_pair_${tile.tileId}"),
+                    focused: false,
+                    onTap: () => focusTile(tile),
+                  ),
+                ),
               ),
             ),
             if (!identical(tile, tiles.last)) const SizedBox(width: 6),
@@ -4710,11 +4993,16 @@ class _CallViewState extends State<CallView> {
           ),
           itemBuilder: (context, index) {
             final tile = visibleTiles[index];
-            return _buildCallTile(
-              tile,
-              key: ValueKey("call_pip_grid_${tile.tileId}"),
-              focused: false,
-              onTap: () => focusTile(tile),
+            return Center(
+              child: AspectRatio(
+                aspectRatio: _desktopCallTileAspectRatio,
+                child: _buildCallTile(
+                  tile,
+                  key: ValueKey("call_pip_grid_${tile.tileId}"),
+                  focused: false,
+                  onTap: () => focusTile(tile),
+                ),
+              ),
             );
           },
         ),
@@ -6776,6 +7064,8 @@ class _CallViewState extends State<CallView> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        buildStreamTestParticipantImpactWarning(context),
+                        const SizedBox(height: 12),
                         for (final profile in allPresets)
                           CheckboxListTile(
                             value: selectedKeys.contains(profile.storageKey),
@@ -7412,6 +7702,8 @@ class _CallViewState extends State<CallView> {
           'audio=${streamCounts[VoipStreamType.audio] ?? 0} '
           'cam=${streamCounts[VoipStreamType.video] ?? 0} '
           'share=${streamCounts[VoipStreamType.screenshare] ?? 0}',
+      // BUG-321: the count alone could not say which entries were stale.
+      if (livekitSession != null) ...livekitSession.diagnosticsStreamLines(),
       'Local participant audio overrides: '
           'participants=${_participantAudioVolumeOverrides.length} '
           'muted=$participantAudioMutedOverrideCount',
@@ -7916,31 +8208,55 @@ class _CallViewState extends State<CallView> {
 
     return LayoutBuilder(
       builder: (context, innerConstraints) {
-        return GridView.builder(
-          padding: EdgeInsets.zero,
-          physics: tiles.length > 4
-              ? const BouncingScrollPhysics()
-              : const NeverScrollableScrollPhysics(),
-          itemCount: tiles.length,
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: columns,
-            mainAxisSpacing: spacing,
-            crossAxisSpacing: spacing,
-            childAspectRatio: _mobileCompactGridAspectRatio(
-              columns,
-              tiles.length,
-              innerConstraints,
+        final availableWidth = max(
+          0.0,
+          innerConstraints.maxWidth - (columns - 1) * spacing,
+        );
+        final tileWidth = availableWidth / columns;
+        return SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: innerConstraints.maxHeight),
+            child: Center(
+              child: SizedBox(
+                width: tileWidth * columns + (columns - 1) * spacing,
+                child: Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: spacing,
+                  runSpacing: spacing,
+                  children: [
+                    for (final tile in tiles)
+                      SizedBox(
+                        width: tiles.length == 1
+                            ? min(
+                                innerConstraints.maxWidth,
+                                innerConstraints.maxHeight *
+                                    _callTileAspectRatio(
+                                      mobile: true,
+                                      isScreenshare: tile.isScreenshare,
+                                    ),
+                              )
+                            : tile.isScreenshare
+                            ? innerConstraints.maxWidth
+                            : tileWidth,
+                        child: AspectRatio(
+                          aspectRatio: _callTileAspectRatio(
+                            mobile: true,
+                            isScreenshare: tile.isScreenshare,
+                          ),
+                          child: _buildCallTile(
+                            tile,
+                            key: ValueKey("call_mobile_grid_${tile.tileId}"),
+                            focused: false,
+                            onTap: () => focusTile(tile),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ),
           ),
-          itemBuilder: (context, index) {
-            final tile = tiles[index];
-            return _buildCallTile(
-              tile,
-              key: ValueKey("call_mobile_grid_${tile.tileId}"),
-              focused: false,
-              onTap: () => focusTile(tile),
-            );
-          },
         );
       },
     );
@@ -7951,7 +8267,6 @@ class _CallViewState extends State<CallView> {
     BoxConstraints constraints,
   ) {
     final tileHeight = _mobileParticipantStripHeight(constraints);
-    const aspectRatio = 4.0 / 3.0;
     const spacing = 8.0;
 
     return SizedBox(
@@ -7964,7 +8279,12 @@ class _CallViewState extends State<CallView> {
         itemBuilder: (context, index) {
           final tile = tiles[index];
           return SizedBox(
-            width: tileHeight * aspectRatio,
+            width:
+                tileHeight *
+                _callTileAspectRatio(
+                  mobile: true,
+                  isScreenshare: tile.isScreenshare,
+                ),
             height: tileHeight,
             child: _buildCallTile(
               tile,
@@ -7987,6 +8307,25 @@ class _CallViewState extends State<CallView> {
     return _buildVoipStreamTile(tile, key: key, focused: focused, onTap: onTap);
   }
 
+  Future<void> _flipLocalCameraFromTile(
+    MatrixLivekitVoipSession session,
+  ) async {
+    if (_mobileCameraFlipInProgress ||
+        !identical(widget.currentSession, session)) {
+      return;
+    }
+    _mobileCameraFlipInProgress = true;
+    try {
+      await _runCallViewControlAction(
+        session.flipCamera,
+        controlLabel: 'switch mobile camera from local tile',
+        onFailure: () => _showControlFailureSnack('Could not switch camera.'),
+      );
+    } finally {
+      _mobileCameraFlipInProgress = false;
+    }
+  }
+
   Widget _buildVoipStreamTile(
     _CallTileData tile, {
     required Key key,
@@ -7994,8 +8333,20 @@ class _CallViewState extends State<CallView> {
     VoidCallback? onTap,
   }) {
     final remote = !isLocalTile(tile);
+    final cameraSession = widget.currentSession is MatrixLivekitVoipSession
+        ? widget.currentSession as MatrixLivekitVoipSession
+        : null;
     final localScreenshare = !remote && tile.isScreenshare;
     final isVideoHidden = _isTileVideoHidden(tile);
+    final canFlipCamera = shouldFlipLocalCameraOnDoubleTap(
+      mobilePlatform: PlatformUtils.isAndroid || PlatformUtils.isIOS,
+      mobileLayout: Layout.mobile,
+      localTile: !remote,
+      streamType: tile.primaryStream.type,
+      videoHidden: isVideoHidden,
+      cameraEnabled: widget.currentSession.isCameraEnabled,
+      livekitSession: cameraSession != null,
+    );
     final localPreviewWasAutoPaused =
         localScreenshare &&
         _autoHiddenLocalScreenshareStreamIds.contains(tile.tileId);
@@ -8021,6 +8372,11 @@ class _CallViewState extends State<CallView> {
           ? Theme.of(context).colorScheme.primary.withAlpha(180)
           : null,
       onTap: onTap,
+      onDoubleTap: canFlipCamera
+          ? () {
+              unawaited(_flipLocalCameraFromTile(cameraSession!));
+            }
+          : null,
       gameActivity: _gameActivityForTile(tile),
       gameActivityPresenceText: _gameActivityPresenceTextForTile(tile),
       onPopout: BuildConfig.DESKTOP && widget.showSessionPopoutButton
@@ -8195,29 +8551,6 @@ class _CallViewState extends State<CallView> {
     return 2;
   }
 
-  double _mobileCompactGridAspectRatio(
-    int columns,
-    int itemCount,
-    BoxConstraints constraints,
-  ) {
-    if (itemCount <= 1 &&
-        constraints.maxWidth.isFinite &&
-        constraints.maxHeight.isFinite &&
-        constraints.maxHeight > 0) {
-      return (constraints.maxWidth / constraints.maxHeight)
-          .clamp(0.5, 1.8)
-          .toDouble();
-    }
-
-    if (columns <= 1) {
-      return 16.0 / 9.0;
-    }
-
-    return constraints.maxWidth.isFinite && constraints.maxWidth < 360
-        ? 0.82
-        : 1.0;
-  }
-
   double _mobileParticipantStripHeight(BoxConstraints constraints) {
     const defaultHeight = 86.0;
     if (!constraints.maxHeight.isFinite) {
@@ -8232,15 +8565,21 @@ class _CallViewState extends State<CallView> {
       duration: const Duration(milliseconds: 220),
       switchInCurve: Curves.easeOutCubic,
       switchOutCurve: Curves.easeInCubic,
-      child: SizedBox.expand(
+      child: Center(
         key: ValueKey("focused_call_tile_${tile.tileId}"),
-        child: Padding(
-          padding: const EdgeInsets.all(4),
-          child: _buildVoipStreamTile(
-            tile,
-            key: ValueKey("call_stage_${tile.tileId}"),
-            focused: true,
-            onTap: tileCount > 1 ? showEqualLayout : null,
+        child: AspectRatio(
+          aspectRatio: _callTileAspectRatio(
+            mobile: Layout.mobile,
+            isScreenshare: tile.isScreenshare,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(4),
+            child: _buildVoipStreamTile(
+              tile,
+              key: ValueKey("call_stage_${tile.tileId}"),
+              focused: true,
+              onTap: tileCount > 1 ? showEqualLayout : null,
+            ),
           ),
         ),
       ),
@@ -8263,36 +8602,37 @@ class _CallViewState extends State<CallView> {
             padding: _callTileAreaPadding(outerConstraints),
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final spacing = Layout.mobile ? 8.0 : 12.0;
-                final columns = calculateBestGridColumns(
+                const spacing = 12.0;
+                final metrics = _callGridMetrics(
                   itemCount: tiles.length,
                   maxWidth: constraints.maxWidth,
                   maxHeight: constraints.maxHeight,
+                  spacing: spacing,
                 );
-
-                return GridView.builder(
-                  padding: EdgeInsets.zero,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: tiles.length,
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: columns,
-                    mainAxisSpacing: spacing,
-                    crossAxisSpacing: spacing,
-                    childAspectRatio: calculateGridAspectRatio(
-                      columns,
-                      tiles.length,
-                      constraints,
+                return Center(
+                  child: SizedBox(
+                    width:
+                        metrics.tileWidth * metrics.columns +
+                        spacing * (metrics.columns - 1),
+                    child: Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: spacing,
+                      runSpacing: spacing,
+                      children: [
+                        for (final tile in tiles)
+                          SizedBox(
+                            width: metrics.tileWidth,
+                            height: metrics.tileHeight,
+                            child: _buildVoipStreamTile(
+                              tile,
+                              key: ValueKey("call_grid_${tile.tileId}"),
+                              focused: false,
+                              onTap: () => focusTile(tile),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
-                  itemBuilder: (context, index) {
-                    final tile = tiles[index];
-                    return _buildVoipStreamTile(
-                      tile,
-                      key: ValueKey("call_grid_${tile.tileId}"),
-                      focused: false,
-                      onTap: () => focusTile(tile),
-                    );
-                  },
                 );
               },
             ),
@@ -8510,49 +8850,6 @@ class _CallViewState extends State<CallView> {
       focusedTileId = tile.tileId;
       showEqualTileLayout = false;
     });
-  }
-
-  int calculateBestGridColumns({
-    required int itemCount,
-    required double maxWidth,
-    required double maxHeight,
-  }) {
-    const targetAspect = 16.0 / 9.0;
-    var bestColumns = 1;
-    var bestScore = double.infinity;
-
-    for (var columns = 1; columns <= itemCount; columns++) {
-      final rows = (itemCount / columns).ceil();
-      final tileWidth = maxWidth / columns;
-      final tileHeight = maxHeight / rows;
-      if (tileHeight <= 0) continue;
-      final aspect = tileWidth / tileHeight;
-      final score = (aspect - targetAspect).abs();
-
-      if (score < bestScore) {
-        bestScore = score;
-        bestColumns = columns;
-      }
-    }
-
-    return bestColumns;
-  }
-
-  double calculateGridAspectRatio(
-    int columns,
-    int itemCount,
-    BoxConstraints constraints,
-  ) {
-    final rows = (itemCount / columns).ceil();
-    final spacing = Layout.mobile ? 8.0 : 12.0;
-    final width = (constraints.maxWidth - ((columns - 1) * spacing)) / columns;
-    final height = (constraints.maxHeight - ((rows - 1) * spacing)) / rows;
-
-    if (height <= 0) {
-      return 16 / 9;
-    }
-
-    return width / height;
   }
 
   void showEqualLayout() {

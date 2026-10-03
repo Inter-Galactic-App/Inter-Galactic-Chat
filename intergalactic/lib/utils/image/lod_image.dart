@@ -1,28 +1,24 @@
 import 'dart:async';
 import 'dart:ui';
 
-import 'package:intergalactic/utils/image_utils.dart';
 import 'package:intergalactic/utils/mime.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_blurhash/flutter_blurhash.dart';
 
-enum LODImageType {
-  blurhash,
-  thumbnail,
-  fullres,
-}
+enum LODImageType { blurhash, thumbnail, fullres }
 
 class LODImageProvider extends ImageProvider<String> {
-  LODImageProvider(
-      {this.blurhash,
-      this.loadThumbnail,
-      this.loadFullRes,
-      this.thumbnailHeight,
-      required this.id,
-      this.fullResHeight,
-      this.autoLoadFullRes = true});
+  LODImageProvider({
+    this.blurhash,
+    this.loadThumbnail,
+    this.loadFullRes,
+    this.thumbnailHeight,
+    required this.id,
+    this.fullResHeight,
+    this.autoLoadFullRes = true,
+  });
   String id;
   String? blurhash;
   String? get mimeType => completer?.mimeType;
@@ -51,8 +47,12 @@ class LODImageProvider extends ImageProvider<String> {
   }
 
   @override
-  void resolveStreamForKey(ImageConfiguration configuration, ImageStream stream,
-      String key, ImageErrorListener handleError) {
+  void resolveStreamForKey(
+    ImageConfiguration configuration,
+    ImageStream stream,
+    String key,
+    ImageErrorListener handleError,
+  ) {
     super.resolveStreamForKey(configuration, stream, key, handleError);
 
     completer = stream.completer as LODImageCompleter;
@@ -61,24 +61,29 @@ class LODImageProvider extends ImageProvider<String> {
   @override
   ImageStreamCompleter loadImage(String key, ImageDecoderCallback decode) {
     completer = LODImageCompleter(
-        blurhash: blurhash,
-        loadThumbnail: loadThumbnail,
-        loadFullRes: loadFullRes,
-        callback: decode,
-        onLODChanged: () {
-          _lodChangedController.add(null);
-        },
-        hasCachedFullres: hasCachedFullres,
-        hasCachedThumbnail: hasCachedThumbnail,
-        thumbnailHeight: thumbnailHeight,
-        fullResHeight: fullResHeight,
-        autoLoadFullres: autoLoadFullRes);
+      blurhash: blurhash,
+      loadThumbnail: loadThumbnail,
+      loadFullRes: loadFullRes,
+      callback: decode,
+      onLODChanged: () {
+        _lodChangedController.add(null);
+      },
+      hasCachedFullres: hasCachedFullres,
+      hasCachedThumbnail: hasCachedThumbnail,
+      thumbnailHeight: thumbnailHeight,
+      fullResHeight: fullResHeight,
+      autoLoadFullres: autoLoadFullRes,
+    );
     return completer!;
   }
 
   Future<void> fetchThumbnail() async {
     if (completer == null) {
-      ImageUtils.imageProviderToImage(this);
+      // Only the side effect is wanted: resolving through the image cache
+      // creates the completer. The first frame itself is not awaited here,
+      // and now that imageProviderToImage can complete with an error, an
+      // unawaited call to it would surface that error nowhere.
+      resolve(const ImageConfiguration());
     }
 
     await completer?.fetchThumbnail();
@@ -86,7 +91,7 @@ class LODImageProvider extends ImageProvider<String> {
 
   Future<void> fetchFullRes() async {
     if (completer == null) {
-      ImageUtils.imageProviderToImage(this);
+      resolve(const ImageConfiguration());
     }
 
     await completer?.fetchFullRes();
@@ -120,17 +125,18 @@ class LODImageCompleter extends ImageStreamCompleter {
   Future? thumbnailLoading = null;
   int _codecGeneration = 0;
 
-  LODImageCompleter(
-      {this.blurhash,
-      required this.callback,
-      this.loadThumbnail,
-      this.loadFullRes,
-      this.hasCachedFullres,
-      this.hasCachedThumbnail,
-      this.thumbnailHeight,
-      this.onLODChanged,
-      this.fullResHeight,
-      this.autoLoadFullres = true}) {
+  LODImageCompleter({
+    this.blurhash,
+    required this.callback,
+    this.loadThumbnail,
+    this.loadFullRes,
+    this.hasCachedFullres,
+    this.hasCachedThumbnail,
+    this.thumbnailHeight,
+    this.onLODChanged,
+    this.fullResHeight,
+    this.autoLoadFullres = true,
+  }) {
     unawaited(loadImages());
   }
 
@@ -169,19 +175,18 @@ class LODImageCompleter extends ImageStreamCompleter {
     try {
       return await probe();
     } catch (error, stackTrace) {
-      _reportLoadError(
-        context,
-        error,
-        stackTrace,
-      );
+      _reportLoadError(context, error, stackTrace);
       return false;
     }
   }
 
   Future<void> _loadBlurhash() async {
     try {
-      var image =
-          await blurHashDecodeImage(blurHash: blurhash!, width: 10, height: 10);
+      var image = await blurHashDecodeImage(
+        blurHash: blurhash!,
+        width: 10,
+        height: 10,
+      );
 
       if (currentlyLoadedImage == null) {
         currentlyLoadedImage = LODImageType.blurhash;
@@ -190,11 +195,7 @@ class LODImageCompleter extends ImageStreamCompleter {
 
       onLODChanged?.call();
     } catch (error, stackTrace) {
-      _reportLoadError(
-        'while loading a LOD image blurhash',
-        error,
-        stackTrace,
-      );
+      _reportLoadError('while loading a LOD image blurhash', error, stackTrace);
     }
   }
 
@@ -287,11 +288,7 @@ class LODImageCompleter extends ImageStreamCompleter {
     }
   }
 
-  void _reportLoadError(
-    String context,
-    Object error,
-    StackTrace stackTrace,
-  ) {
+  void _reportLoadError(String context, Object error, StackTrace stackTrace) {
     reportError(
       context: ErrorDescription(context),
       exception: error,
@@ -332,11 +329,13 @@ class LODImageCompleter extends ImageStreamCompleter {
 
       _nextFrame = nextFrame;
 
-      _emitFrame(ImageInfo(
-        image: _nextFrame!.image.clone(),
-        scale: _scale,
-        debugLabel: debugLabel,
-      ));
+      _emitFrame(
+        ImageInfo(
+          image: _nextFrame!.image.clone(),
+          scale: _scale,
+          debugLabel: debugLabel,
+        ),
+      );
 
       if (codec.frameCount == 1) {
         _nextFrame!.image.dispose();
@@ -383,11 +382,13 @@ class LODImageCompleter extends ImageStreamCompleter {
       return;
     }
     if (_isFirstFrame() || _hasFrameDurationPassed(timestamp)) {
-      _emitFrame(ImageInfo(
-        image: nextFrame.image.clone(),
-        scale: _scale,
-        debugLabel: debugLabel,
-      ));
+      _emitFrame(
+        ImageInfo(
+          image: nextFrame.image.clone(),
+          scale: _scale,
+          debugLabel: debugLabel,
+        ),
+      );
       _shownTimestamp = timestamp;
       _frameDuration = nextFrame.duration;
       nextFrame.image.dispose();

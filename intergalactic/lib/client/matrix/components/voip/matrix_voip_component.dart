@@ -4,10 +4,12 @@ import 'dart:async';
 
 import 'package:intergalactic/client/bug_report/pending_native_call_crash_guard.dart';
 import 'package:intergalactic/client/components/component.dart';
+import 'package:intergalactic/client/components/voip/client_close_call_teardown.dart';
 import 'package:intergalactic/client/components/voip/audio/ios_call_audio_session.dart';
 import 'package:intergalactic/client/components/voip/voip_component.dart';
 import 'package:intergalactic/client/components/voip/voip_session.dart';
 import 'package:intergalactic/client/components/voip/webrtc_default_devices.dart';
+import 'package:intergalactic/client/matrix/components/voip/direct_call_session_owner.dart';
 import 'package:intergalactic/client/matrix/components/voip/direct_call_session_signal_emitter.dart';
 import 'package:intergalactic/client/matrix/components/voip/matrix_voip_session.dart';
 import 'package:intergalactic/client/matrix/matrix_client.dart';
@@ -24,6 +26,9 @@ import 'package:webrtc_interface/src/mediadevices.dart';
 import 'package:webrtc_interface/src/rtc_peerconnection.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart' as webrtc;
 
+typedef DirectCallSessionFactory =
+    DirectCallSession Function(mx.CallSession session, MatrixClient client);
+
 class MatrixVoipComponent
     implements
         VoipComponent<MatrixClient>,
@@ -36,6 +41,9 @@ class MatrixVoipComponent
   MatrixClient client;
 
   final DirectCallSessionSignalEmitter _sessionSignalEmitter;
+  final DirectCallSessionFactory _sessionFactory;
+  final DirectCallSessionOwner<DirectCallSession> _sessionOwner =
+      DirectCallSessionOwner();
 
   @override
   Stream<VoipSession> get onSessionStarted =>
@@ -57,9 +65,29 @@ class MatrixVoipComponent
   MatrixVoipComponent(
     this.client, {
     DirectCallSessionSignalEmitter? sessionSignalEmitter,
+    @visibleForTesting mx.VoIP? voip,
+    @visibleForTesting DirectCallSessionFactory? sessionFactory,
+    this.hangUpBoundOnClose = clientCloseHangUpBound,
   }) : _sessionSignalEmitter =
-           sessionSignalEmitter ?? DirectCallSessionSignalEmitter() {
-    voip = mx.VoIP(client.getMatrixClient(), this);
+           sessionSignalEmitter ?? DirectCallSessionSignalEmitter(),
+       _sessionFactory = sessionFactory ?? MatrixVoipSession.new {
+    this.voip = voip ?? mx.VoIP(client.getMatrixClient(), this);
+  }
+
+  /// How long [dispose] waits for this client's direct calls to hang up.
+  ///
+  /// [clientCloseHangUpBound] in production; a parameter only so a test can
+  /// prove the bound fires without waiting the full five seconds.
+  final Duration hangUpBoundOnClose;
+
+  String _sessionOwnerKey(mx.CallSession session) =>
+      '${session.room.id}/${session.callId}';
+
+  DirectCallSession _startSession(mx.CallSession session) {
+    return _sessionOwner.start(
+      _sessionOwnerKey(session),
+      () => _sessionFactory(session, client),
+    );
   }
 
   @override
@@ -74,7 +102,7 @@ class MatrixVoipComponent
 
     return voip.calls.values
         .where((element) => element.room.id == roomId && element.pc != null)
-        .map((e) => MatrixVoipSession(e, client))
+        .map(_startSession)
         .toList();
   }
 
@@ -197,13 +225,17 @@ class MatrixVoipComponent
 
   @override
   Future<void> handleCallEnded(mx.CallSession session) async {
-    if (!_sessionSignalEmitter.canNotifySessionEnded) {
-      return;
-    }
-
-    _sessionSignalEmitter.notifySessionEnded(
-      MatrixVoipSession(session, client),
+    final wrappedSession = _sessionOwner.end(
+      _sessionOwnerKey(session),
+      () => _sessionFactory(session, client),
     );
+    try {
+      if (_sessionSignalEmitter.canNotifySessionEnded) {
+        _sessionSignalEmitter.notifySessionEnded(wrappedSession);
+      }
+    } finally {
+      await wrappedSession.dispose();
+    }
   }
 
   @override
@@ -215,9 +247,7 @@ class MatrixVoipComponent
       return;
     }
 
-    _sessionSignalEmitter.notifySessionStarted(
-      MatrixVoipSession(session, client),
-    );
+    _sessionSignalEmitter.notifySessionStarted(_startSession(session));
   }
 
   @override
@@ -293,8 +323,31 @@ class MatrixVoipComponent
   @override
   Future<void> registerListeners(mx.CallSession session) async {}
 
+  /// Hangs up every direct call this client still holds, in any live state -
+  /// ringing either way, connecting, or connected.
+  ///
+  /// Client close calls this first, while the client can still send the
+  /// hang-ups. [dispose] calls it again for any other path that disposes this
+  /// component; a call already ended is skipped, so the second pass is free.
+  Future<void> hangUpCalls() {
+    final live = voip.calls.values
+        .where((call) => !call.callHasEnded)
+        .toList(growable: false);
+    return hangUpBeforeClientClose(
+      [
+        for (final call in live)
+          () => call.hangup(reason: mx.CallErrorCode.userHangup),
+      ],
+      context: 'direct calls',
+      bound: hangUpBoundOnClose,
+    );
+  }
+
   @override
   Future<void> dispose() async {
+    // Calls before the emitter: a hang-up reports its end through it.
+    await hangUpCalls();
+    await _sessionOwner.dispose((session) => session.dispose());
     await _sessionSignalEmitter.dispose();
   }
 }

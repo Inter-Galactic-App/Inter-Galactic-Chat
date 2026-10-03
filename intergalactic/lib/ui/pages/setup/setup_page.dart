@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:intergalactic/config/build_config.dart';
+import 'package:intergalactic/debug/log.dart';
 import 'package:intergalactic/ui/atoms/scaled_safe_area.dart';
 import 'package:intergalactic/ui/pages/setup/setup_menu.dart';
 import 'package:intergalactic/utils/common_strings.dart';
@@ -17,11 +20,25 @@ class SetupPage extends StatefulWidget {
 class _SetupPageState extends State<SetupPage> {
   int currentMenuIndex = 0;
   late SetupMenu currentMenu;
+  StreamSubscription<SetupMenuState>? _menuStateSubscription;
+  SetupMenuState _menuState = SetupMenuState.canProgress;
+  bool _isSubmitting = false;
 
   @override
   void initState() {
     super.initState();
     currentMenu = widget.menus[currentMenuIndex];
+    _listenToCurrentMenu();
+  }
+
+  void _listenToCurrentMenu() {
+    _menuStateSubscription?.cancel();
+    _menuState = currentMenu.state;
+    _menuStateSubscription = currentMenu.onStateChanged.listen((state) {
+      if (mounted) {
+        setState(() => _menuState = state);
+      }
+    });
   }
 
   @override
@@ -60,7 +77,12 @@ class _SetupPageState extends State<SetupPage> {
                                   alignment: Alignment.centerRight,
                                   child: tiamat.Button(
                                     text: CommonStrings.promptNext,
-                                    onTap: goNextMenu,
+                                    onTap:
+                                        _isSubmitting ||
+                                            _menuState ==
+                                                SetupMenuState.cannotProgress
+                                        ? null
+                                        : goNextMenu,
                                   ),
                                 ),
                               ),
@@ -90,12 +112,32 @@ class _SetupPageState extends State<SetupPage> {
     );
   }
 
-  void goNextMenu() {
-    currentMenu.submit();
-    var newIndex = currentMenuIndex + 1;
-    setState(() {
-      currentMenuIndex = newIndex;
-    });
+  Future<void> goNextMenu() async {
+    if (_isSubmitting || _menuState == SetupMenuState.cannotProgress) {
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    try {
+      await currentMenu.submit();
+    } catch (error, stackTrace) {
+      // This runs fire-and-forget from onTap, so an escaping error only
+      // reaches the zone handler: the page would stay put with nothing said.
+      // Stay on this menu instead - a menu that refused to submit has not
+      // produced the state the next one depends on.
+      Log.onError(error, stackTrace, content: 'Setup menu submit failed');
+      return;
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    final newIndex = currentMenuIndex + 1;
 
     if (newIndex >= widget.menus.length) {
       Navigator.pop(context);
@@ -103,7 +145,14 @@ class _SetupPageState extends State<SetupPage> {
       setState(() {
         currentMenuIndex = newIndex;
         currentMenu = widget.menus[currentMenuIndex];
+        _listenToCurrentMenu();
       });
     }
+  }
+
+  @override
+  void dispose() {
+    _menuStateSubscription?.cancel();
+    super.dispose();
   }
 }

@@ -1,6 +1,8 @@
 import 'package:intergalactic/client/components/account_switch_prefix/account_switch_prefix.dart';
 import 'package:intergalactic/client/components/push_notification/notification_manager.dart';
 import 'package:intergalactic/client/room.dart';
+import 'package:intergalactic/client/matrix/matrix_room.dart';
+import 'package:intergalactic/client/matrix/matrix_room_migration.dart';
 import 'package:intergalactic/client/timeline_events/timeline_event.dart';
 import 'package:intergalactic/client/timeline_events/timeline_event_message.dart';
 import 'package:intergalactic/config/build_config.dart';
@@ -9,6 +11,7 @@ import 'package:intergalactic/config/platform_utils.dart';
 import 'package:intergalactic/main.dart';
 import 'package:intergalactic/ui/molecules/message_input.dart';
 import 'package:intergalactic/ui/molecules/room_timeline_widget/room_timeline_widget.dart';
+import 'package:intergalactic/ui/molecules/room_migration_notice.dart';
 import 'package:intergalactic/ui/molecules/typing_indicators_widget.dart';
 import 'package:intergalactic/ui/onboarding/tutorial_anchor.dart';
 import 'package:intergalactic/ui/organisms/chat/chat.dart';
@@ -64,7 +67,10 @@ class ChatView extends StatelessWidget {
           Positioned.fill(
             child: Stack(
               fit: StackFit.expand,
-              children: [timeline(context), const ParticlePlayer()],
+              children: [
+                timelineWithMigrationNotice(context),
+                const ParticlePlayer(),
+              ],
             ),
           ),
           Positioned(left: 0, right: 0, bottom: 0, child: input()),
@@ -81,12 +87,40 @@ class ChatView extends StatelessWidget {
             Expanded(
               child: Stack(
                 fit: StackFit.expand,
-                children: [timeline(context), const ParticlePlayer()],
+                children: [
+                  timelineWithMigrationNotice(context),
+                  const ParticlePlayer(),
+                ],
               ),
             ),
             input(),
           ],
         ),
+      ],
+    );
+  }
+
+  Widget timelineWithMigrationNotice(BuildContext context) {
+    final room = state.room;
+    final matrixRoom = room is MatrixRoom ? room : null;
+    final predecessorId = matrixRoom == null
+        ? null
+        : matrixRoomMigrationPredecessorId(matrixRoom);
+    final timelineWidget = timeline(context);
+    if (!shouldShowRoomMigrationNotice(
+      developerMode: preferences.developerMode.value,
+      predecessorRoomId: predecessorId,
+    )) {
+      return timelineWidget;
+    }
+
+    return Column(
+      children: [
+        RoomMigrationNotice(
+          onOpenHistory: () =>
+              EventBus.openRoom.add((predecessorId!, room.client.identifier)),
+        ),
+        Expanded(child: timelineWidget),
       ],
     );
   }
@@ -237,6 +271,13 @@ class ChatView extends StatelessWidget {
           client: state.room.client,
           room: state.room,
           isRoomE2EE: state.room.isE2EE,
+          draftCacheKey: composerDraftCacheKey(
+            clientId: state.room.client.identifier,
+            roomId: state.room.identifier,
+            threadId: state.threadId,
+            isInteraction: state.interactionType != null,
+            hasInboundShareDraft: state.widget.inboundShareDraft != null,
+          ),
           focusKeyboard: state.onFocusMessageInput.stream,
           attachments: state.attachments,
           interactionType: state.interactionType,

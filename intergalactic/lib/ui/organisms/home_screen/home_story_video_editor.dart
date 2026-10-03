@@ -96,116 +96,116 @@ class _HomeStoryVideoEditorPageState extends State<_HomeStoryVideoEditorPage> {
   _OverlayGestureStart? _gestureStart;
   String? _error;
 
-  String get done => Intl.message(
+  String get homeStoryVideoEditorDone => Intl.message(
     'Done',
     name: 'homeStoryVideoEditorDone',
     desc: 'Button text for applying story video editor changes',
   );
 
-  String get prepare => Intl.message(
+  String get homeStoryVideoEditorPrepare => Intl.message(
     'Prepare',
     name: 'homeStoryVideoEditorPrepare',
     desc:
         'Button text for preparing a selected story video segment before editing',
   );
 
-  String get text => Intl.message(
+  String get homeStoryVideoEditorText => Intl.message(
     'Text',
     name: 'homeStoryVideoEditorText',
     desc: 'Tooltip for adding text to a story video',
   );
 
-  String get emoji => Intl.message(
+  String get homeStoryVideoEditorEmoji => Intl.message(
     'Emoji',
     name: 'homeStoryVideoEditorEmoji',
     desc: 'Tooltip for adding emoji to a story video',
   );
 
-  String get sticker => Intl.message(
+  String get homeStoryVideoEditorSticker => Intl.message(
     'Sticker',
     name: 'homeStoryVideoEditorSticker',
     desc: 'Tooltip for adding a sticker to a story video',
   );
 
-  String get delete => Intl.message(
+  String get homeStoryVideoEditorDelete => Intl.message(
     'Delete',
     name: 'homeStoryVideoEditorDelete',
     desc: 'Tooltip for deleting a selected story video overlay',
   );
 
-  String get editSelectedText => Intl.message(
+  String get homeStoryVideoEditorEditSelectedText => Intl.message(
     'Edit text',
     name: 'homeStoryVideoEditorEditSelectedText',
     desc: 'Tooltip for editing a selected story video text overlay',
   );
 
-  String get previousOverlay => Intl.message(
+  String get homeStoryVideoEditorPreviousOverlay => Intl.message(
     'Previous overlay',
     name: 'homeStoryVideoEditorPreviousOverlay',
     desc: 'Tooltip for selecting the previous story video overlay',
   );
 
-  String get nextOverlay => Intl.message(
+  String get homeStoryVideoEditorNextOverlay => Intl.message(
     'Next overlay',
     name: 'homeStoryVideoEditorNextOverlay',
     desc: 'Tooltip for selecting the next story video overlay',
   );
 
-  String get moveOverlayUp => Intl.message(
+  String get homeStoryVideoEditorMoveOverlayUp => Intl.message(
     'Move up',
     name: 'homeStoryVideoEditorMoveOverlayUp',
     desc: 'Tooltip for moving a selected story video overlay up',
   );
 
-  String get moveOverlayDown => Intl.message(
+  String get homeStoryVideoEditorMoveOverlayDown => Intl.message(
     'Move down',
     name: 'homeStoryVideoEditorMoveOverlayDown',
     desc: 'Tooltip for moving a selected story video overlay down',
   );
 
-  String get moveOverlayLeft => Intl.message(
+  String get homeStoryVideoEditorMoveOverlayLeft => Intl.message(
     'Move left',
     name: 'homeStoryVideoEditorMoveOverlayLeft',
     desc: 'Tooltip for moving a selected story video overlay left',
   );
 
-  String get moveOverlayRight => Intl.message(
+  String get homeStoryVideoEditorMoveOverlayRight => Intl.message(
     'Move right',
     name: 'homeStoryVideoEditorMoveOverlayRight',
     desc: 'Tooltip for moving a selected story video overlay right',
   );
 
-  String get smaller => Intl.message(
+  String get homeStoryVideoEditorSmaller => Intl.message(
     'Smaller',
     name: 'homeStoryVideoEditorSmaller',
     desc: 'Tooltip for reducing a selected story video overlay size',
   );
 
-  String get larger => Intl.message(
+  String get homeStoryVideoEditorLarger => Intl.message(
     'Larger',
     name: 'homeStoryVideoEditorLarger',
     desc: 'Tooltip for increasing a selected story video overlay size',
   );
 
-  String get rotateLeft => Intl.message(
+  String get homeStoryVideoEditorRotateLeft => Intl.message(
     'Rotate left',
     name: 'homeStoryVideoEditorRotateLeft',
     desc: 'Tooltip for rotating a selected story video overlay left',
   );
 
-  String get rotateRight => Intl.message(
+  String get homeStoryVideoEditorRotateRight => Intl.message(
     'Rotate right',
     name: 'homeStoryVideoEditorRotateRight',
     desc: 'Tooltip for rotating a selected story video overlay right',
   );
 
-  String get fitVideo => Intl.message(
+  String get homeStoryVideoEditorFit => Intl.message(
     'Fit',
     name: 'homeStoryVideoEditorFit',
     desc: 'Tooltip for fitting the full story video inside the frame',
   );
 
-  String get fillVideo => Intl.message(
+  String get homeStoryVideoEditorFill => Intl.message(
     'Fill',
     name: 'homeStoryVideoEditorFill',
     desc: 'Tooltip for filling the story frame with cropped video',
@@ -215,44 +215,44 @@ class _HomeStoryVideoEditorPageState extends State<_HomeStoryVideoEditorPage> {
   /// with existing translations behind it, and renaming it would orphan them.
   /// Only the Dart member is renamed, because "range" stopped meaning anything
   /// here when the trim range was removed.
-  String get videoTooLong => Intl.message(
+  String get homeStoryVideoEditorInvalidRange => Intl.message(
     'Story videos must be 30 seconds or shorter.',
     name: 'homeStoryVideoEditorInvalidRange',
     desc: 'Validation shown when a story video is longer than the limit',
   );
 
-  String get sourceTooLarge => Intl.message(
+  String get homeStoryVideoEditorSourceTooLarge => Intl.message(
     'That video is too large to post. Choose a shorter or smaller recording.',
     name: 'homeStoryVideoEditorSourceTooLarge',
     desc: 'Validation shown when a story video file exceeds the size limit',
   );
 
-  String get prepareBeforeEditing => Intl.message(
+  String get homeStoryVideoEditorPrepareBeforeEditing => Intl.message(
     'Choose the canvas shape, then Prepare before adding text, emoji, stickers, or backgrounds.',
     name: 'homeStoryVideoEditorPrepareBeforeEditing',
     desc:
         'State text shown when a story video must be prepared before overlay editing',
   );
 
-  String get backgroundColor => Intl.message(
+  String get homeStoryVideoEditorBackgroundColor => Intl.message(
     'Background',
     name: 'homeStoryVideoEditorBackgroundColor',
     desc: 'Tooltip for changing the story video background color',
   );
 
-  String get noStickers => Intl.message(
+  String get homeStoryVideoEditorNoStickers => Intl.message(
     'No account stickers available.',
     name: 'homeStoryVideoEditorNoStickers',
     desc: 'Message shown when no account/global sticker packs are available',
   );
 
-  String get stickerError => Intl.message(
+  String get homeStoryVideoEditorStickerError => Intl.message(
     'That sticker could not be added.',
     name: 'homeStoryVideoEditorStickerError',
     desc: 'Error shown when a story video sticker cannot be resolved',
   );
 
-  String get textDialogTitle => Intl.message(
+  String get homeStoryVideoEditorTextDialogTitle => Intl.message(
     'Story Text',
     name: 'homeStoryVideoEditorTextDialogTitle',
     desc: 'Title for editing story video text',
@@ -306,7 +306,11 @@ class _HomeStoryVideoEditorPageState extends State<_HomeStoryVideoEditorPage> {
                   const Spacer(),
                   TextButton(
                     onPressed: _canFinish ? _finish : null,
-                    child: Text(isPrepareStage ? prepare : done),
+                    child: Text(
+                      isPrepareStage
+                          ? homeStoryVideoEditorPrepare
+                          : homeStoryVideoEditorDone,
+                    ),
                   ),
                 ],
               ),
@@ -373,7 +377,7 @@ class _HomeStoryVideoEditorPageState extends State<_HomeStoryVideoEditorPage> {
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            prepareBeforeEditing,
+                            homeStoryVideoEditorPrepareBeforeEditing,
                             style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(color: Colors.white),
                           ),
@@ -479,13 +483,13 @@ class _HomeStoryVideoEditorPageState extends State<_HomeStoryVideoEditorPage> {
           children: [
             if (isPrepareStage) ...[
               _ToolbarButton(
-                tooltip: fitVideo,
+                tooltip: homeStoryVideoEditorFit,
                 icon: Icons.fit_screen,
                 selected: _draft.fitMode == StoryVideoFitMode.fit,
                 onPressed: () => _setFitMode(StoryVideoFitMode.fit),
               ),
               _ToolbarButton(
-                tooltip: fillVideo,
+                tooltip: homeStoryVideoEditorFill,
                 icon: Icons.crop,
                 selected: _draft.fitMode == StoryVideoFitMode.fill,
                 onPressed: () => _setFitMode(StoryVideoFitMode.fill),
@@ -493,34 +497,34 @@ class _HomeStoryVideoEditorPageState extends State<_HomeStoryVideoEditorPage> {
             ] else ...[
               if (_draft.overlays.isNotEmpty && canEditOverlays) ...[
                 _ToolbarButton(
-                  tooltip: previousOverlay,
+                  tooltip: homeStoryVideoEditorPreviousOverlay,
                   icon: Icons.skip_previous,
                   onPressed: () => _selectAdjacentOverlay(-1),
                 ),
                 _ToolbarButton(
-                  tooltip: nextOverlay,
+                  tooltip: homeStoryVideoEditorNextOverlay,
                   icon: Icons.skip_next,
                   onPressed: () => _selectAdjacentOverlay(1),
                 ),
                 const SizedBox(width: 8),
               ],
               _ToolbarButton(
-                tooltip: text,
+                tooltip: homeStoryVideoEditorText,
                 icon: Icons.text_fields,
                 onPressed: canEditOverlays ? _addTextOverlay : null,
               ),
               _ToolbarButton(
-                tooltip: emoji,
+                tooltip: homeStoryVideoEditorEmoji,
                 icon: Icons.emoji_emotions_outlined,
                 onPressed: canEditOverlays ? _addEmojiOverlay : null,
               ),
               _ToolbarButton(
-                tooltip: sticker,
+                tooltip: homeStoryVideoEditorSticker,
                 icon: Icons.sticky_note_2_outlined,
                 onPressed: canEditOverlays ? _addStickerOverlay : null,
               ),
               _ToolbarButton(
-                tooltip: backgroundColor,
+                tooltip: homeStoryVideoEditorBackgroundColor,
                 icon: Icons.palette_outlined,
                 selected:
                     _draft.backgroundMode != StoryBackgroundMode.solid ||
@@ -533,37 +537,37 @@ class _HomeStoryVideoEditorPageState extends State<_HomeStoryVideoEditorPage> {
               const SizedBox(width: 8),
               if (selected is StoryTextOverlay) ...[
                 _ToolbarButton(
-                  tooltip: editSelectedText,
+                  tooltip: homeStoryVideoEditorEditSelectedText,
                   icon: Icons.edit,
                   onPressed: () => _editTextOverlay(selected),
                 ),
                 const SizedBox(width: 4),
               ],
               _ToolbarButton(
-                tooltip: smaller,
+                tooltip: homeStoryVideoEditorSmaller,
                 icon: Icons.remove_circle_outline,
                 onPressed: () => _scaleSelectedOverlay(selected, 0.9),
               ),
               _ToolbarButton(
-                tooltip: larger,
+                tooltip: homeStoryVideoEditorLarger,
                 icon: Icons.add_circle_outline,
                 onPressed: () => _scaleSelectedOverlay(selected, 1.1),
               ),
               _ToolbarButton(
-                tooltip: rotateLeft,
+                tooltip: homeStoryVideoEditorRotateLeft,
                 icon: Icons.rotate_left,
                 onPressed: () =>
                     _rotateSelectedOverlay(selected, -math.pi / 18),
               ),
               _ToolbarButton(
-                tooltip: rotateRight,
+                tooltip: homeStoryVideoEditorRotateRight,
                 icon: Icons.rotate_right,
                 onPressed: () => _rotateSelectedOverlay(selected, math.pi / 18),
               ),
               const SizedBox(width: 4),
               ..._buildSelectedOverlayMoveButtons(selected),
               _ToolbarButton(
-                tooltip: delete,
+                tooltip: homeStoryVideoEditorDelete,
                 icon: Icons.delete_outline,
                 foregroundColor: Theme.of(context).colorScheme.error,
                 onPressed: () => _removeOverlay(selected.id),
@@ -578,7 +582,7 @@ class _HomeStoryVideoEditorPageState extends State<_HomeStoryVideoEditorPage> {
   List<Widget> _buildSelectedOverlayMoveButtons(StoryOverlay overlay) {
     return [
       _ToolbarButton(
-        tooltip: moveOverlayLeft,
+        tooltip: homeStoryVideoEditorMoveOverlayLeft,
         icon: Icons.keyboard_arrow_left,
         onPressed: () => _moveSelectedOverlay(
           overlay,
@@ -586,7 +590,7 @@ class _HomeStoryVideoEditorPageState extends State<_HomeStoryVideoEditorPage> {
         ),
       ),
       _ToolbarButton(
-        tooltip: moveOverlayUp,
+        tooltip: homeStoryVideoEditorMoveOverlayUp,
         icon: Icons.keyboard_arrow_up,
         onPressed: () => _moveSelectedOverlay(
           overlay,
@@ -594,7 +598,7 @@ class _HomeStoryVideoEditorPageState extends State<_HomeStoryVideoEditorPage> {
         ),
       ),
       _ToolbarButton(
-        tooltip: moveOverlayDown,
+        tooltip: homeStoryVideoEditorMoveOverlayDown,
         icon: Icons.keyboard_arrow_down,
         onPressed: () => _moveSelectedOverlay(
           overlay,
@@ -602,7 +606,7 @@ class _HomeStoryVideoEditorPageState extends State<_HomeStoryVideoEditorPage> {
         ),
       ),
       _ToolbarButton(
-        tooltip: moveOverlayRight,
+        tooltip: homeStoryVideoEditorMoveOverlayRight,
         icon: Icons.keyboard_arrow_right,
         onPressed: () => _moveSelectedOverlay(
           overlay,
@@ -615,7 +619,7 @@ class _HomeStoryVideoEditorPageState extends State<_HomeStoryVideoEditorPage> {
   String? get _validationMessage {
     if (_draft.selectedDuration <= Duration.zero ||
         _draft.selectedDuration > storyMaxVideoDuration) {
-      return videoTooLong;
+      return homeStoryVideoEditorInvalidRange;
     }
     return null;
   }
@@ -658,7 +662,7 @@ class _HomeStoryVideoEditorPageState extends State<_HomeStoryVideoEditorPage> {
     setState(() => _error = null);
     final upload = _draft.toUpload();
     if (!upload.hasValidSelection) {
-      setState(() => _error = videoTooLong);
+      setState(() => _error = homeStoryVideoEditorInvalidRange);
       return;
     }
 
@@ -673,8 +677,8 @@ class _HomeStoryVideoEditorPageState extends State<_HomeStoryVideoEditorPage> {
     if (_sourceIsUnusable) {
       setState(
         () => _error = _draft.duration > storyMaxVideoDuration
-            ? videoTooLong
-            : sourceTooLarge,
+            ? homeStoryVideoEditorInvalidRange
+            : homeStoryVideoEditorSourceTooLarge,
       );
       return;
     }
@@ -690,7 +694,8 @@ class _HomeStoryVideoEditorPageState extends State<_HomeStoryVideoEditorPage> {
   Future<void> _addTextOverlay() async {
     final edit = await showDialog<_StoryTextEdit>(
       context: context,
-      builder: (context) => _StoryTextDialog(title: textDialogTitle),
+      builder: (context) =>
+          _StoryTextDialog(title: homeStoryVideoEditorTextDialogTitle),
     );
     if (!mounted || edit == null || edit.text.trim().isEmpty) {
       return;
@@ -735,7 +740,7 @@ class _HomeStoryVideoEditorPageState extends State<_HomeStoryVideoEditorPage> {
   Future<void> _addStickerOverlay() async {
     final packs = _accountStickerPacks();
     if (packs.isEmpty) {
-      setState(() => _error = noStickers);
+      setState(() => _error = homeStoryVideoEditorNoStickers);
       return;
     }
     final emoticon = await showModalBottomSheet<Emoticon>(
@@ -752,7 +757,8 @@ class _HomeStoryVideoEditorPageState extends State<_HomeStoryVideoEditorPage> {
           packButtonSize: 44,
           showSearchBar: false,
           mobileStyle: MediaQuery.sizeOf(context).width < 620,
-          onEmoticonPressed: (sticker) => Navigator.of(context).pop(sticker),
+          onEmoticonPressed: (homeStoryVideoEditorSticker) =>
+              Navigator.of(context).pop(homeStoryVideoEditorSticker),
         ),
       ),
     );
@@ -763,7 +769,7 @@ class _HomeStoryVideoEditorPageState extends State<_HomeStoryVideoEditorPage> {
     final image = emoticon.image;
     final mediaUri = Uri.tryParse(emoticon.key);
     if (image == null || mediaUri?.scheme != 'mxc') {
-      setState(() => _error = stickerError);
+      setState(() => _error = homeStoryVideoEditorStickerError);
       return;
     }
 
@@ -823,7 +829,7 @@ class _HomeStoryVideoEditorPageState extends State<_HomeStoryVideoEditorPage> {
     final edit = await showDialog<_StoryTextEdit>(
       context: context,
       builder: (context) => _StoryTextDialog(
-        title: textDialogTitle,
+        title: homeStoryVideoEditorTextDialogTitle,
         initialText: overlay.text,
         initialColor: overlay.color,
         initialBold: overlay.isBold,
@@ -1296,13 +1302,13 @@ class _StoryVideoBackgroundSheet extends StatelessWidget {
   final Color selectedGradientColor;
   final StoryBackgroundMode selectedMode;
 
-  String get solidColors => Intl.message(
+  String get homeStoryVideoEditorSolidBackgrounds => Intl.message(
     'Solid',
     name: 'homeStoryVideoEditorSolidBackgrounds',
     desc: 'Label for solid story video background color choices',
   );
 
-  String get gradients => Intl.message(
+  String get homeStoryVideoEditorGradientBackgrounds => Intl.message(
     'Gradient',
     name: 'homeStoryVideoEditorGradientBackgrounds',
     desc: 'Label for gradient story video background choices',
@@ -1317,7 +1323,10 @@ class _StoryVideoBackgroundSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(solidColors, style: Theme.of(context).textTheme.labelLarge),
+            Text(
+              homeStoryVideoEditorSolidBackgrounds,
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
             const SizedBox(height: 10),
             Wrap(
               alignment: WrapAlignment.center,
@@ -1343,7 +1352,10 @@ class _StoryVideoBackgroundSheet extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 18),
-            Text(gradients, style: Theme.of(context).textTheme.labelLarge),
+            Text(
+              homeStoryVideoEditorGradientBackgrounds,
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
             const SizedBox(height: 10),
             Wrap(
               alignment: WrapAlignment.center,

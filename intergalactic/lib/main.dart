@@ -7,6 +7,8 @@ export 'package:intergalactic/config/app_globals.dart' show preferences;
 
 import 'package:intergalactic/cache/file_cache.dart';
 import 'package:intergalactic/client/client_manager.dart';
+import 'package:intergalactic/client/matrix/database/app_group/drift_database_location.dart';
+import 'package:intergalactic/client/matrix/matrix_client.dart';
 import 'package:intergalactic/client/components/activity/publishers/matrix_activity_presence_publisher.dart';
 import 'package:intergalactic/client/components/inbound_share/android_inbound_share_bridge.dart';
 import 'package:intergalactic/client/components/inbound_share/android_inbound_share_intake.dart';
@@ -31,6 +33,7 @@ import 'package:intergalactic/client/components/activity/sources/steam/steam_act
 import 'package:intergalactic/client/components/component.dart';
 import 'package:intergalactic/client/components/push_notification/android/unified_push_notifier.dart';
 import 'package:intergalactic/client/components/push_notification/notification_manager.dart';
+import 'package:intergalactic/client/components/push_notification/ios/notification_policy_snapshot.dart';
 import 'package:intergalactic/client/components/voip/audio/ios_call_audio_session.dart';
 import 'package:intergalactic/client/components/soundboard/soundboard_playback_service.dart';
 import 'package:intergalactic/client/components/push_notification/web/web_app_badge_manager.dart';
@@ -51,6 +54,7 @@ import 'package:intergalactic/config/global_config.dart';
 import 'package:intergalactic/config/integration_defaults.dart';
 import 'package:intergalactic/config/layout_config.dart';
 import 'package:intergalactic/config/platform_utils.dart';
+import 'package:intergalactic/config/preferences/preference.dart';
 import 'package:intergalactic/config/subplatforms/subplatforms.dart';
 import 'package:intergalactic/debug/l10n_debug_lookup.dart';
 import 'package:intergalactic/debug/log.dart';
@@ -79,6 +83,8 @@ import 'package:intergalactic/utils/android_intent_helper.dart';
 import 'package:intergalactic/utils/app_icon/app_icon_manager.dart';
 import 'package:intergalactic/utils/custom_uri.dart';
 import 'package:intergalactic/utils/background_tasks/background_task_manager.dart';
+import 'package:intergalactic/utils/database/database_release_trigger.dart';
+import 'package:intergalactic/utils/database/releasable_connection.dart';
 import 'package:intergalactic/utils/call_popout_controller.dart';
 import 'package:intergalactic/utils/database/database_server.dart';
 import 'package:intergalactic/utils/emoji/unicode_emoji.dart';
@@ -309,6 +315,7 @@ void main(List<String> args) {
   runZonedGuarded<Future<void>>(
     () async {
       Log.prefix = "main";
+      Log.beginStartupTelemetry();
       ensureBindingInit();
       await Log.initialize(options: diagnosticsOptions);
       MatrixE2eeDiagnostics.installSdkLogBridge();
@@ -372,6 +379,7 @@ void _runExternalLivekitReceiverProbe(List<String> args) {
 
 Future<void> appMain() async {
   Log.prefix = "main";
+  Log.recordStartupPhase(StartupPhase.preparing.name);
   try {
     if (BuildConfig.WEB) {
       var info = await DeviceInfoPlugin().deviceInfo;
@@ -385,10 +393,8 @@ Future<void> appMain() async {
     configureLivekitConnectivityVetoGuard();
 
     if (PlatformUtils.isLinux || PlatformUtils.isWindows) {
-      if (await SingleInstance.tryConnectToMainInstance(commandLineArgs)) {
+      if (await SingleInstance.startOrConnectToMainInstance(commandLineArgs)) {
         exitApplication(0);
-      } else {
-        SingleInstance.becomeMainInstance();
       }
     }
 
@@ -504,14 +510,19 @@ Future<void> initNecessary({
   ValueChanged<StartupPhase>? onStartupPhase,
   ValueChanged<ThemeData>? onStartupThemeReady,
 }) async {
-  onStartupPhase?.call(StartupPhase.preferences);
+  _reportStartupPhase(StartupPhase.preferences, onStartupPhase);
   initSqfliteFfi();
+  // NSE Phase C: every write to a watched notification preference rewrites
+  // the policy snapshot the extension reads, before the write returns. The
+  // hook is a no-op off iOS. Installed before init so nothing is missed.
+  Preference.afterWrite = NotificationPolicySnapshot.onPreferenceWritten;
+  Preference.afterClear = NotificationPolicySnapshot.onPreferencesCleared;
   await preferences.init();
   if (onStartupThemeReady != null) {
     onStartupThemeReady(await preferences.resolveTheme());
   }
   await IosCallAudioSession.configureStartupVoiceProcessing();
-  onStartupPhase?.call(StartupPhase.localServices);
+  _reportStartupPhase(StartupPhase.localServices, onStartupPhase);
   await initActivityService();
   await NoiseSuppressionService.instance.init(
     enabled: preferences.voipNoiseSuppressionEnabled.value,
@@ -526,7 +537,7 @@ Future<void> initNecessary({
     ),
   );
   await dmLockController.init(preferences);
-  onStartupPhase?.call(StartupPhase.storage);
+  _reportStartupPhase(StartupPhase.storage, onStartupPhase);
   await initDatabaseServer();
 
   fileCache = FileCache.getFileCacheInstance();
@@ -536,10 +547,23 @@ Future<void> initNecessary({
     GlobalConfig.init(),
   ]);
 
-  onStartupPhase?.call(StartupPhase.accounts);
+  _reportStartupPhase(StartupPhase.accounts, onStartupPhase);
+  // NSE Phase B: resolve where the account databases live BEFORE any client
+  // opens one. On iOS this runs the App Group migration for every account
+  // directory on disk; on every other platform it returns at once.
+  await DriftDatabaseLocation.prepare();
   clientManager = await ClientManager.init();
+  // B3: this launch has read from the resolved location. The launch after a
+  // confirmed one deletes the app-private copy.
+  await DriftDatabaseLocation.confirmLaunchRead();
+  // Phase C: the snapshot exists for every launch with an account, and is
+  // gone when there is none.
+  await NotificationPolicySnapshot.onAccountsChanged(
+    clientCount: clientManager!.clients.length,
+  );
   _initializeActivityConnectionAlerts();
-  onStartupPhase?.call(StartupPhase.appServices);
+  _attachDatabaseReleaseTrigger(clientManager!);
+  _reportStartupPhase(StartupPhase.appServices, onStartupPhase);
   soundboardPlaybackService.configure(clientManager!.callManager);
   activityService.refreshSettings();
   clientManager!.onClientAdded.stream.listen((_) {
@@ -558,6 +582,62 @@ Future<void> initNecessary({
   MatrixSessionLifecycleWatcher().init();
 
   NeedsPostLoginInit.doPostLoginInit();
+}
+
+void _reportStartupPhase(
+  StartupPhase phase,
+  ValueChanged<StartupPhase>? callback,
+) {
+  Log.recordStartupPhase(phase.name);
+  callback?.call(phase);
+}
+
+/// B5: release the account databases before suspension and re-establish them
+/// on resume. See `DatabaseReleaseTrigger` for the condition and the order.
+///
+/// "Live background execution" is any call session, in any state short of
+/// gone: Flutter reports `paused` while a call runs under the audio background
+/// mode, and releasing then would close the database under the call.
+DatabaseReleaseTrigger? _databaseReleaseTrigger;
+
+void _attachDatabaseReleaseTrigger(ClientManager manager) {
+  if (_databaseReleaseTrigger != null) {
+    return;
+  }
+
+  // iOS only, and deliberately so. The mechanism is platform-neutral, but
+  // the reason for it is not: 0xdead10cc is an iOS termination, and iOS is
+  // the platform where the process is frozen shortly after `paused`. On
+  // Android `paused` fires on every app switch while the process keeps
+  // running, so this trigger would stop foreground sync and drop the
+  // database on every backgrounding - a cost paid for a failure Android does
+  // not have, on the platform that backgrounds most often. Desktop never
+  // reports `paused` at all. The trigger itself keeps no conditional; the
+  // decision lives here, where the other platform decisions are.
+  if (!PlatformUtils.isIOS) {
+    return;
+  }
+
+  List<MatrixClient> matrixClients() =>
+      manager.clients.whereType<MatrixClient>().toList(growable: false);
+
+  final trigger = DatabaseReleaseTrigger(
+    databases: () => ReleasableConnection.live,
+    suspendSync: () async {
+      for (final client in matrixClients()) {
+        await client.suspendSyncForDatabaseRelease();
+      }
+    },
+    resumeSync: () {
+      for (final client in matrixClients()) {
+        client.resumeSyncAfterDatabaseRelease();
+      }
+    },
+    hasLiveBackgroundExecution: () =>
+        manager.callManager.currentSessions.isNotEmpty,
+  );
+  _databaseReleaseTrigger = trigger;
+  trigger.attach();
 }
 
 void _initializeActivityConnectionAlerts() {
@@ -796,7 +876,7 @@ Future<bool> _dispatchAndroidInboundShare(dynamic intent) async {
 String _androidInboundShareStreamHash(List<Uri> streams) {
   if (streams.isEmpty) return 'none';
   return sha256
-      .convert(utf8.encode(streams.map((uri) => uri.toString()).join(' ')))
+      .convert(utf8.encode(streams.map((uri) => uri.toString()).join('\u0000')))
       .toString()
       .substring(0, 12);
 }

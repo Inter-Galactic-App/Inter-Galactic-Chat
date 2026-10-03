@@ -83,6 +83,44 @@ void main() {
     expect(find.byIcon(Icons.photo), findsNothing);
   });
 
+  testWidgets('sidebar banner keeps its image provider through rebuilds', (
+    tester,
+  ) async {
+    await globals.preferences.favoritesBannerImageData.set(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL7WQAAAABJRU5ErkJggg==',
+    );
+    final clientManager = ClientManager();
+    addTearDown(clientManager.close);
+    late StateSetter rebuild;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StatefulBuilder(
+          builder: (context, setState) {
+            rebuild = setState;
+            return Scaffold(
+              body: SizedBox(
+                width: 240,
+                child: FavoriteRoomsList(
+                  clientManager: clientManager,
+                  showHeader: true,
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final firstProvider = tester.widget<Image>(find.byType(Image)).image;
+    rebuild(() {});
+    await tester.pump();
+    final secondProvider = tester.widget<Image>(find.byType(Image)).image;
+
+    expect(identical(firstProvider, secondProvider), isTrue);
+  });
+
   testWidgets('summary layout can be forced on narrow mobile surfaces', (
     tester,
   ) async {

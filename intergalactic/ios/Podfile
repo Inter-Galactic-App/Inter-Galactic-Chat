@@ -32,6 +32,11 @@ require File.expand_path(
   flutter_root,
 )
 
+# The notification extension calls an ABI absent from hosted 0.5.0. Never
+# install pods against a hosted or merely name-matched wrapper tree.
+e8_gate = File.join(__dir__, 'scripts', 'verify_e8_patched_source.sh')
+raise 'E8 iOS patched-source gate failed' unless system('/bin/sh', e8_gate)
+
 flutter_ios_podfile_setup
 
 def patch_flutter_webrtc_ios_broadcast_socket_connection
@@ -361,6 +366,16 @@ target 'Runner' do
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 
   target 'InterGalactic Broadcast Extension' do
+    inherit! :search_paths
+  end
+
+  # Notification Service Extension. Search paths only, deliberately NOT a
+  # dependency on the flutter_vodozemac pod: that podspec carries
+  # `s.dependency 'Flutter'`, and Flutter.framework is not extension-API-safe,
+  # so an APPLICATION_EXTENSION_API_ONLY target must not link it. The extension
+  # reaches vodozemac's C ABI through the header search path plus an explicit
+  # -force_load of the archive the Runner pod build already produces.
+  target 'InterGalactic Notification Extension' do
     inherit! :search_paths
   end
 end

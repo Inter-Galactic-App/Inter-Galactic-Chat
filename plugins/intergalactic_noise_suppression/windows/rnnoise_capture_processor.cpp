@@ -193,6 +193,27 @@ constexpr double kDryFallbackLowVadDeltaFloor = 0.08;
 constexpr double kDeepFilterNetSpeechProtectInputRmsFloor = 0.035;
 constexpr double kDeepFilterNetSpeechProtectInputRmsCeiling = 0.14;
 constexpr double kDeepFilterNetSpeechProtectInputPeakFloor = 0.10;
+// AUDIO's call, 2026-09-10, on the evidence below; owner reviewed the
+// reasoning and agreed. KEPT rather than deleted despite rejecting zero
+// frames on the two real captures measured (loud-onsets and typing-while-talking,
+// 2026-09-05/06; docs/agent-control/audio-handoff.md, "Phase 1 Loud-Speech
+// Guard"). On that material speech is consistently SPIKIER than typing
+// (delta p90 0.120 vs 0.066), the opposite of what these ceilings assume, so
+// the real transient rejection there is done entirely by local_snr>=0 below.
+// That is two captures, not a proof these values never occur - keeping the
+// ceilings preserves a rail for material that has not been measured (a
+// harsher mic, a different model) rather than asserting the values are
+// permanently unreachable. Do not tighten them without new evidence: on the
+// measured material a binding ceiling would reject speech before typing.
+//
+// Update 2026-09-12: the "harsher mic" arrived. On the affected user's live
+// capture (v0.8.2+1006, docs/agent-control/audio-handoff.md "2026-09-12")
+// the delta ceiling IS reached - 53 frames over 0.20 in 10 s, max 0.48, and
+// 53/55 frames on that user's two 2026-09-06 captures - while the crest
+// ceiling still never binds (max 5.45). The values stay; what changed is that
+// a single over-ceiling frame inside an already-protected run no longer drops
+// protection for that frame (see the hold below), because that per-frame
+// drop was one of the two edges of an audible on/off flap.
 constexpr double kDeepFilterNetSpeechProtectInputDeltaCeiling = 0.20;
 constexpr double kDeepFilterNetSpeechProtectCrestCeiling = 8.5;
 constexpr double kDeepFilterNetSpeechProtectLocalSnrFloor = 0.0;
@@ -200,6 +221,25 @@ constexpr double kDeepFilterNetSpeechProtectRatioCeiling = 0.72;
 constexpr double kDeepFilterNetSpeechProtectStrongRatioCeiling = 0.42;
 constexpr float kDeepFilterNetSpeechProtectMinWetMix = 0.58f;
 constexpr float kDeepFilterNetSpeechProtectMaxWetMix = 0.86f;
+// Hysteresis for the loud-speech guard, added 2026-09-12. Before it, the guard
+// was a pure per-frame decision and flapped between full dry mix and off on a
+// 1-3 frame cadence on the affected user's capture (36 flips in 10 s;
+// kWetMixRampSamples is 240, so each flip completes in 5 ms - a 55 dB flutter
+// at 25-50 Hz, on loud input the model was rejecting outright). The flapping
+// term was the rms-ceiling/local_snr disjunction: with the model reporting
+// noise, protection needed input_rms >= 0.14, and that input sat at
+// 0.07-0.19. A fixed hold alone only slowed the flap, because the input stays
+// below the ceiling for long stretches and the hold expires with nothing to
+// re-engage it. So: engage at the ceiling, stay engaged down to a release
+// threshold 3 dB below it, and keep a short hold only to bridge brief dips
+// and single over-delta frames. Measured on the gate's own per-frame
+// decisions (replay, same input, both rules): 129 -> 104 engage/release
+// transitions in 10 s, of which 22 -> 11 fall where the model has rejected
+// the input outright (the audible case), runs of <= 3 frames 52 -> 33, and
+// every remaining release is the input going quiet, the model passing the
+// content, or the level falling well below the release threshold.
+constexpr double kDeepFilterNetSpeechProtectInputRmsRelease = 0.10;
+constexpr int kDeepFilterNetSpeechProtectHoldFrames = 5;
 constexpr double kDeepFilterNetTransientInputRmsFloor = 0.0008;
 constexpr double kDeepFilterNetTransientInputRmsCeiling = 0.075;
 constexpr double kDeepFilterNetTransientInputPeakFloor = 0.024;
@@ -209,6 +249,16 @@ constexpr double kDeepFilterNetTransientOutputPeakFloor = 0.012;
 constexpr double kDeepFilterNetTransientOutputDeltaFloor = 0.004;
 constexpr double kDeepFilterNetTransientSpeechRmsFloor = 0.030;
 constexpr double kDeepFilterNetTransientSpeechPeakFloor = 0.095;
+// Same values, same call (AUDIO, 2026-09-10, owner-reviewed), same evidence
+// boundary as kDeepFilterNetSpeechProtectInputDeltaCeiling / ...CrestCeiling
+// above: KEPT rather than tightened. Here they gate loud_speech_shape, the "leave this
+// alone, it is speech" exclusion in the click guard, so being unreachable on
+// the measured material biases the guard toward NOT suppressing - the safe
+// direction, but worth knowing when reading its behaviour as more
+// discriminating than it is. 2026-09-12: the delta ceiling is reachable after
+// all on the affected user's mic (see the note above); on such frames this
+// exclusion does not apply and the click guard may suppress. The guard is off
+// by default (enhancedClickGuard) and was off on that capture.
 constexpr double kDeepFilterNetTransientSpeechDeltaCeiling = 0.20;
 constexpr double kDeepFilterNetTransientSpeechCrestCeiling = 8.5;
 constexpr int kDeepFilterNetTransientWindowRadiusSamples = 48;
@@ -227,8 +277,39 @@ constexpr float kDeepFilterNetTransientSoftCeiling = 0.055f;
 constexpr double kDeepFilterNetHushRecoveryInputRmsFloor = 0.006;
 constexpr double kDeepFilterNetHushRecoveryOutputRmsFloor = 0.0015;
 constexpr double kDeepFilterNetHushRecoveryMinDropRatio = 0.92;
-constexpr float kDeepFilterNetHushRecoveryMaxGain = 2.0f;
+// Raised from 2.0f (+6 dB) to 8.0f (+18 dB) 2026-09-10. The +6 dB figure has
+// no recorded derivation - it was introduced alongside the other Hush
+// recovery floors/ceilings in one batch (app 8a57ee39, "integrate v0.8.0
+// review batch") with no dedicated rationale, and the CHANGE_LOG entry that
+// added this stage describes its purpose only as "bounded... so Hush can be
+// tested without globally quieting speech": a safety bound for early
+// smoke-testing, not a value tuned against pumping. Real-code-path
+// measurement on two real captures (docs/audio/hush-gain-recovery-design.md,
+// "Correction, 2026-09-11") found +18 dB does not reach 0 dB residual loss as
+// first predicted from a standalone simulation: the `recoverable` gate below
+// drops a real fraction of speech frames to no recovery at all, so the
+// measured residual loss on the background-dominant capture is -4.2 dB
+// (peak 0.764), at unchanged background rejection (-42.1 dB). This constant
+// is NOT the anti-pumping mechanism and was never verified to be one - that job
+// belongs to kDeepFilterNetHushRecoveryPeakCeiling below (independent,
+// unchanged) and to the rise-only slew limit on
+// deepfilternet_hush_recovery_gain_ added in the same change (see
+// ApplyDeepFilterNetHushGainRecovery).
+constexpr float kDeepFilterNetHushRecoveryMaxGain = 8.0f;
 constexpr float kDeepFilterNetHushRecoveryPeakCeiling = 0.82f;
+// Per-10ms-frame slew limit on the RISE of the recovery gain only, applied
+// before the existing per-sample ramp (not instead of it): a sudden jump
+// from a low gain to the cap is spread over several frames instead of
+// happening in one, so a quiet-then-loud transition cannot suddenly slam a
+// large gain onto a frame whose own loudness was never involved in choosing
+// that gain. The fall is NOT limited - target_gain for the current frame is
+// already peak-limited (or forced to 1.0 by the `recoverable` gate) using
+// that frame's own hush_peak, and a slew floor on the way down would
+// override that per-frame decision with a stale, too-high gain computed
+// from an earlier, quieter frame. That was a real defect in an earlier
+// version of this function (symmetric slew, floor as well as ceiling):
+// REVIEW caught it in the 2026-09-10 branch review before it shipped.
+constexpr float kDeepFilterNetHushRecoveryMaxGainStepUpDb = 1.5f;
 
 float Clamp01(float value) {
   if (!std::isfinite(value)) {
@@ -803,10 +884,18 @@ void PrewarmDeepFilterNetRuntimes(ProcessorSharedState* shared_state,
     return;
   }
 
+  // Returns a runtime ONLY if it is usable: initialized, sane frame length,
+  // and every warm-up inference succeeded. Anything else returns nullptr and
+  // reports the native reason through `out_reason`, because publishing an
+  // object that cannot process makes the readiness flag lie and turns a
+  // broken model into a silent all-bypass stream.
   const auto load_runtime = [](DeepFilterNetRuntimeModel model,
-                               std::atomic<double>* warmup_ms) {
+                               std::atomic<double>* warmup_ms,
+                               std::atomic<int>* out_reason)
+      -> std::unique_ptr<DeepFilterNetRuntime> {
     const auto started_at = std::chrono::steady_clock::now();
     auto runtime = std::make_unique<DeepFilterNetRuntime>(model);
+    bool usable = false;
     if (runtime->EnsureInitialized(runtime->expected_sample_rate_hz()) &&
         runtime->frame_length() > 0) {
       // The first inference call carries lazy graph-optimization cost well
@@ -817,11 +906,15 @@ void PrewarmDeepFilterNetRuntimes(ProcessorSharedState* shared_state,
           static_cast<size_t>(runtime->frame_length()), 0.0f);
       std::vector<float> discard;
       float local_snr = 0.0f;
-      for (int i = 0; i < runtime->lookahead_frames() + 1; ++i) {
+      usable = true;
+      for (int i = 0; i < runtime->output_delay_frames() + 1; ++i) {
         if (!runtime->ProcessFrame(silence, &discard, &local_snr)) {
+          usable = false;
           break;
         }
       }
+      // A warm-up that ran but left the runtime unready is still unusable.
+      usable = usable && runtime->ready();
     }
     const double elapsed_ms =
         std::chrono::duration<double, std::milli>(
@@ -829,6 +922,13 @@ void PrewarmDeepFilterNetRuntimes(ProcessorSharedState* shared_state,
             .count();
     if (warmup_ms != nullptr && std::isfinite(elapsed_ms)) {
       warmup_ms->store(elapsed_ms);
+    }
+    if (out_reason != nullptr) {
+      out_reason->store(runtime->reason());
+    }
+    if (!usable) {
+      runtime->Reset();
+      return nullptr;
     }
     return runtime;
   };
@@ -844,13 +944,17 @@ void PrewarmDeepFilterNetRuntimes(ProcessorSharedState* shared_state,
   std::unique_ptr<DeepFilterNetRuntime> deepfilternet_runtime;
   std::unique_ptr<DeepFilterNetRuntime> hush_runtime;
   if (load_deepfilternet) {
+    shared_state->prewarm_deepfilternet_attempted.store(true);
     deepfilternet_runtime =
         load_runtime(DeepFilterNetRuntimeModel::kDeepFilterNet,
-                     &shared_state->deepfilternet_warmup_ms);
+                     &shared_state->deepfilternet_warmup_ms,
+                     &shared_state->prewarmed_deepfilternet_reason);
   }
   if (load_hush) {
+    shared_state->prewarm_hush_attempted.store(true);
     hush_runtime = load_runtime(DeepFilterNetRuntimeModel::kHush,
-                                &shared_state->deepfilternet_hush_warmup_ms);
+                                &shared_state->deepfilternet_hush_warmup_ms,
+                                &shared_state->prewarmed_hush_reason);
   }
 
   std::lock_guard<std::mutex> lock(shared_state->prewarm_mutex);
@@ -1218,6 +1322,7 @@ void RnnoiseCaptureProcessor::Process(int num_bands,
     if (!deepfilternet_processed) {
       mono_out_normalized_ = mono_in_normalized_;
       deepfilternet_wet_mix_ = 1.0f;
+      deepfilternet_speech_protect_hold_frames_ = 0;
       shared_state_->deepfilternet_last_speech_protect_wet_mix.store(1.0);
       shared_state_->deepfilternet_bypass_frames.fetch_add(1);
       shared_state_->bypass_frames.fetch_add(1);
@@ -1236,18 +1341,18 @@ void RnnoiseCaptureProcessor::Process(int num_bands,
         input_rms <= 0.0 ? 1.0 : output_rms / input_rms;
 
     // Dry-reference alignment: the model output corresponds to the dry frame
-    // from `lookahead_frames()` callbacks ago, so every post-model stage
+    // from `output_delay_frames()` callbacks ago, so every post-model stage
     // blends/compares against that delayed frame instead of the current one.
     // While the history is still filling after a pipeline reset the delayed
     // reference is silence, which matches the model's warm-up output and
     // keeps the guards inactive for those frames.
     int dry_delay_frames = 0;
     if (deepfilternet_processed) {
-      dry_delay_frames = deepfilternet_runtime_->lookahead_frames();
-      const int hush_lookahead_frames =
-          hush_runtime_ ? hush_runtime_->lookahead_frames() : 1;
+      dry_delay_frames = deepfilternet_runtime_->output_delay_frames();
+      const int hush_delay_frames =
+          hush_runtime_ ? hush_runtime_->output_delay_frames() : 1;
       EnsureDryHistoryCapacity(num_frames,
-                               dry_delay_frames + hush_lookahead_frames);
+                               dry_delay_frames + hush_delay_frames);
       CopyDelayedDryFrame(dry_delay_frames,
                           num_frames,
                           &deepfilternet_dry_delayed_);
@@ -1359,10 +1464,10 @@ void RnnoiseCaptureProcessor::Process(int num_bands,
     }
 
     // The dry frame aligned with the CURRENT chain output: one extra frame
-    // late when Hush processed this callback (its own 10 ms lookahead).
+    // late when Hush processed this callback (its own 10 ms output delay).
     const int post_delay_frames = hush_processed_this_frame
         ? dry_delay_frames +
-              (hush_runtime_ ? hush_runtime_->lookahead_frames() : 1)
+              (hush_runtime_ ? hush_runtime_->output_delay_frames() : 1)
         : dry_delay_frames;
     if (deepfilternet_processed) {
       CopyDelayedDryFrame(post_delay_frames,
@@ -2991,7 +3096,12 @@ bool RnnoiseCaptureProcessor::ApplyDeepFilterNetSpeechProtection(
       !std::isfinite(output_rms) ||
       !std::isfinite(output_peak) ||
       !std::isfinite(output_max_delta)) {
+    // An invalid frame abandons the blend; it must also drop the hysteresis,
+    // or the next valid frame re-enters protection through the sustain branch
+    // without ever having satisfied `engage`. Same rule as the prototype V2
+    // guard's speech hold.
     deepfilternet_wet_mix_ = 1.0f;
+    deepfilternet_speech_protect_hold_frames_ = 0;
     shared_state_->deepfilternet_last_speech_protect_wet_mix.store(1.0);
     return false;
   }
@@ -3000,9 +3110,11 @@ bool RnnoiseCaptureProcessor::ApplyDeepFilterNetSpeechProtection(
       input_rms <= 0.0 ? 1.0 : output_rms / input_rms;
   const double input_crest_factor =
       input_rms <= 0.0 ? 0.0 : input_peak / input_rms;
-  const bool speech_shaped_input =
+  const bool loud_input =
       input_rms >= kDeepFilterNetSpeechProtectInputRmsFloor &&
-      input_peak >= kDeepFilterNetSpeechProtectInputPeakFloor &&
+      input_peak >= kDeepFilterNetSpeechProtectInputPeakFloor;
+  const bool speech_shaped_input =
+      loud_input &&
       input_delta <= kDeepFilterNetSpeechProtectInputDeltaCeiling &&
       input_crest_factor <= kDeepFilterNetSpeechProtectCrestCeiling &&
       (local_snr >= kDeepFilterNetSpeechProtectLocalSnrFloor ||
@@ -3014,7 +3126,41 @@ bool RnnoiseCaptureProcessor::ApplyDeepFilterNetSpeechProtection(
       output_max_delta <=
           (std::max)(input_delta * 1.15, input_delta + 0.015);
 
-  if (!speech_shaped_input || !heavily_attenuated) {
+  // With hysteresis enabled, engage on the full per-frame condition. Once
+  // engaged, stay engaged (and keep re-arming the hold) while input is loud,
+  // still heavily attenuated, and either the model agrees it is speech or
+  // the level is above the RELEASE threshold - which sits 3 dB below the
+  // engage ceiling, so an input hovering around the ceiling no longer
+  // toggles the guard every frame. The delta ceiling is not re-checked while
+  // engaged: one sharp frame inside a protected run should not drop the run.
+  // If the sustain shape fails only briefly (a dip, or the input falling
+  // through the release threshold), the hold bridges up to
+  // kDeepFilterNetSpeechProtectHoldFrames frames on the loud + attenuated
+  // core, then releases. Dropping out on `heavily_attenuated` is never
+  // bridged: the moment the model passes the content itself, there is nothing
+  // to protect.
+  const bool engage = speech_shaped_input && heavily_attenuated;
+  const bool hysteresis_enabled =
+      shared_state_->deepfilternet_speech_protect_hysteresis_enabled.load();
+  if (!hysteresis_enabled) {
+    deepfilternet_speech_protect_hold_frames_ = 0;
+  }
+  const bool sustain_shape =
+      loud_input && heavily_attenuated &&
+      input_crest_factor <= kDeepFilterNetSpeechProtectCrestCeiling &&
+      (local_snr >= kDeepFilterNetSpeechProtectLocalSnrFloor ||
+       input_rms >= kDeepFilterNetSpeechProtectInputRmsRelease);
+  if (engage ||
+      (hysteresis_enabled &&
+       deepfilternet_speech_protect_hold_frames_ > 0 && sustain_shape)) {
+    deepfilternet_speech_protect_hold_frames_ =
+        hysteresis_enabled ? kDeepFilterNetSpeechProtectHoldFrames : 0;
+  } else if (hysteresis_enabled &&
+             deepfilternet_speech_protect_hold_frames_ > 0 &&
+             loud_input && heavily_attenuated) {
+    --deepfilternet_speech_protect_hold_frames_;
+  } else {
+    deepfilternet_speech_protect_hold_frames_ = 0;
     const bool release_blend_active = deepfilternet_wet_mix_ < 0.999f;
     RampWetMixWithState(samples, dry, 1.0f, &deepfilternet_wet_mix_);
     shared_state_->deepfilternet_last_speech_protect_wet_mix.store(1.0);
@@ -3506,8 +3652,13 @@ bool RnnoiseCaptureProcessor::ProcessDeepFilterNet(
   }
   if (!deepfilternet_runtime_) {
     shared_state_->deepfilternet_prewarm_pending_frames.fetch_add(1);
+    // Distinguish "the prewarm has not finished yet" from "the prewarm ran
+    // and failed". Both bypass, but only the second is a defect, and a
+    // generic not-initialized hides which one this is.
     shared_state_->deepfilternet_reason.store(
-        kDeepFilterNetRuntimeReasonNotInitialized);
+        shared_state_->prewarm_deepfilternet_attempted.load()
+            ? shared_state_->prewarmed_deepfilternet_reason.load()
+            : kDeepFilterNetRuntimeReasonNotInitialized);
     shared_state_->deepfilternet_runtime_available.store(false);
     shared_state_->deepfilternet_processing_applied.store(false);
     return false;
@@ -3588,8 +3739,11 @@ bool RnnoiseCaptureProcessor::ProcessDeepFilterNetHushSupport(
   }
   if (!hush_runtime_ || !hush_runtime_->ready()) {
     shared_state_->deepfilternet_hush_reason.store(
-        hush_runtime_ ? hush_runtime_->reason()
-                      : kDeepFilterNetRuntimeReasonNotInitialized);
+        hush_runtime_
+            ? hush_runtime_->reason()
+            : (shared_state_->prewarm_hush_attempted.load()
+                   ? shared_state_->prewarmed_hush_reason.load()
+                   : kDeepFilterNetRuntimeReasonNotInitialized));
     shared_state_->deepfilternet_hush_frame_length.store(
         hush_runtime_ ? hush_runtime_->frame_length() : 0);
     shared_state_->deepfilternet_hush_runtime_available.store(false);
@@ -3670,6 +3824,19 @@ bool RnnoiseCaptureProcessor::ApplyDeepFilterNetHushGainRecovery(
       std::isfinite(hush_rms) ? (std::max)(0.0, hush_rms) : 0.0;
   const double safe_hush_peak =
       std::isfinite(hush_peak) ? (std::max)(0.0, hush_peak) : 0.0;
+  const double recovery_peak_ceiling = (std::min)(
+      static_cast<double>(kDeepFilterNetHushRecoveryPeakCeiling),
+      (std::max)(safe_pre_peak, safe_hush_peak));
+  // Recovery never attenuates a frame. When the Hush output is already above
+  // the ceiling, unity is the largest safe recovery gain we can apply here.
+  const float current_frame_peak_safe_gain =
+      safe_hush_peak > 0.0
+          ? (std::max)(1.0f,
+                       (std::min)(
+                           kDeepFilterNetHushRecoveryMaxGain,
+                           static_cast<float>(recovery_peak_ceiling /
+                                              safe_hush_peak)))
+          : kDeepFilterNetHushRecoveryMaxGain;
   float target_gain = 1.0f;
   const bool recoverable =
       safe_pre_rms >= kDeepFilterNetHushRecoveryInputRmsFloor &&
@@ -3677,24 +3844,42 @@ bool RnnoiseCaptureProcessor::ApplyDeepFilterNetHushGainRecovery(
       safe_hush_rms < safe_pre_rms * kDeepFilterNetHushRecoveryMinDropRatio;
   if (recoverable) {
     const double raw_gain = safe_pre_rms / safe_hush_rms;
-    const double peak_ceiling = (std::min)(
-        static_cast<double>(kDeepFilterNetHushRecoveryPeakCeiling),
-        (std::max)(safe_pre_peak, safe_hush_peak));
     const double peak_limited_gain =
-        safe_hush_peak > 0.0 ? peak_ceiling / safe_hush_peak : raw_gain;
+        safe_hush_peak > 0.0 ? recovery_peak_ceiling / safe_hush_peak
+                             : raw_gain;
     target_gain = (std::clamp)(
         static_cast<float>((std::min)(raw_gain, peak_limited_gain)),
         1.0f,
         kDeepFilterNetHushRecoveryMaxGain);
   }
 
-  const float start_gain =
+  const float previous_gain =
       std::isfinite(deepfilternet_hush_recovery_gain_)
           ? deepfilternet_hush_recovery_gain_
           : 1.0f;
+  // The prior frame may have been quiet enough for a much higher recovery
+  // gain. Clamp the ramp origin before applying even its first sample so a
+  // quiet-to-loud transition cannot exceed this frame's peak-safe gain.
+  const float start_gain =
+      (std::min)(previous_gain, current_frame_peak_safe_gain);
+
+  // Slew-limit only the RISE of the TARGET before it becomes the ramp
+  // destination, so a large frame-to-frame swing in the raw gain estimate
+  // cannot reach full value in one 10 ms frame even though the existing
+  // per-sample ramp below would otherwise happily interpolate straight to
+  // it. The fall is never limited: target_gain above is already the
+  // current frame's own peak-limited value (or 1.0f when `recoverable` is
+  // false), so clamping it upward here would apply a stale, too-high gain -
+  // computed from start_gain, an earlier and possibly much quieter frame -
+  // to a frame that was specifically found unsafe to boost that much.
+  const float max_step_up =
+      (std::pow)(10.0f, kDeepFilterNetHushRecoveryMaxGainStepUpDb / 20.0f);
+  const float slew_limited_target =
+      (std::min)(target_gain, start_gain * max_step_up);
+
   const int sample_count = static_cast<int>(samples->size());
   const int ramp_samples = (std::min)(sample_count, kWetMixRampSamples);
-  const bool recovery_active = target_gain > 1.001f;
+  const bool recovery_active = slew_limited_target > 1.001f;
   const bool release_active = start_gain > 1.001f;
   if (recovery_active || release_active) {
     for (int index = 0; index < sample_count; ++index) {
@@ -3710,16 +3895,17 @@ bool RnnoiseCaptureProcessor::ApplyDeepFilterNetHushGainRecovery(
                            static_cast<float>(index + 1) /
                                static_cast<float>(ramp_samples));
       const float gain =
-          start_gain + ((target_gain - start_gain) * progress);
+          start_gain + ((slew_limited_target - start_gain) * progress);
       (*samples)[index] = sample * gain;
     }
   }
 
-  deepfilternet_hush_recovery_gain_ = target_gain;
+  deepfilternet_hush_recovery_gain_ = slew_limited_target;
   if (recovery_active) {
     shared_state_->deepfilternet_hush_recovery_frames.fetch_add(1);
   }
-  shared_state_->deepfilternet_hush_last_recovery_gain.store(target_gain);
+  shared_state_->deepfilternet_hush_last_recovery_gain.store(
+      slew_limited_target);
   shared_state_->deepfilternet_hush_last_input_rms.store(safe_pre_rms);
   shared_state_->deepfilternet_hush_last_output_rms.store(Rms(*samples));
   return recovery_active || release_active;
@@ -3786,6 +3972,7 @@ bool RnnoiseCaptureProcessor::CopyDelayedDryFrame(
 void RnnoiseCaptureProcessor::ResetAudioPipeline() {
   wet_mix_ = 0.0f;
   deepfilternet_wet_mix_ = 1.0f;
+  deepfilternet_speech_protect_hold_frames_ = 0;
   deepfilternet_hush_recovery_gain_ = 1.0f;
   std::fill(deepfilternet_dry_history_.begin(),
             deepfilternet_dry_history_.end(),

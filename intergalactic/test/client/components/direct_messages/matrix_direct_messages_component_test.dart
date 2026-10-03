@@ -93,32 +93,28 @@ void main() {
     test('parses valid private account-data markers', () {
       final markers =
           MatrixDirectMessagesComponent.directRoomMarkersFromContent(const {
-        'v': 1,
-        'rooms': {
-          '!dm:ourgalaxy.space': {'partner': '@friend:ourgalaxy.space'},
-        },
-      });
+            'v': 1,
+            'rooms': {
+              '!dm:ourgalaxy.space': {'partner': '@friend:ourgalaxy.space'},
+            },
+          });
 
-      expect(markers, {
-        '!dm:ourgalaxy.space': '@friend:ourgalaxy.space',
-      });
+      expect(markers, {'!dm:ourgalaxy.space': '@friend:ourgalaxy.space'});
     });
 
     test('ignores malformed marker entries', () {
       final markers =
           MatrixDirectMessagesComponent.directRoomMarkersFromContent(const {
-        'v': 1,
-        'rooms': {
-          '!valid:ourgalaxy.space': {'partner': '@friend:ourgalaxy.space'},
-          '!missing-partner:ourgalaxy.space': {'other': '@friend:server'},
-          '!bad-user:ourgalaxy.space': {'partner': 'friend'},
-          '#alias:ourgalaxy.space': {'partner': '@friend:ourgalaxy.space'},
-        },
-      });
+            'v': 1,
+            'rooms': {
+              '!valid:ourgalaxy.space': {'partner': '@friend:ourgalaxy.space'},
+              '!missing-partner:ourgalaxy.space': {'other': '@friend:server'},
+              '!bad-user:ourgalaxy.space': {'partner': 'friend'},
+              '#alias:ourgalaxy.space': {'partner': '@friend:ourgalaxy.space'},
+            },
+          });
 
-      expect(markers, {
-        '!valid:ourgalaxy.space': '@friend:ourgalaxy.space',
-      });
+      expect(markers, {'!valid:ourgalaxy.space': '@friend:ourgalaxy.space'});
     });
 
     test('serializes markers into versioned account-data content', () {
@@ -131,10 +127,61 @@ void main() {
         {
           'v': 1,
           'rooms': {
-            '!dm:ourgalaxy.space': {
-              'partner': '@friend:ourgalaxy.space',
-            },
+            '!dm:ourgalaxy.space': {'partner': '@friend:ourgalaxy.space'},
           },
+        },
+      );
+    });
+  });
+
+  group('MatrixDirectMessagesComponent explicit group room markers', () {
+    test('parses only valid versioned room identifiers', () {
+      expect(
+        MatrixDirectMessagesComponent.explicitGroupRoomIdsFromContent(const {
+          'v': 1,
+          'rooms': ['!group:ourgalaxy.space', '#alias:ourgalaxy.space', 42],
+        }),
+        {'!group:ourgalaxy.space'},
+      );
+    });
+
+    // The two document-level guards, neither of which the entry-level case
+    // above can reach. A future writer emitting 'v': 2 will mean something
+    // else by these ids, and a server that stored `rooms` as a map is not a
+    // v1 document; both have to read as no markers rather than as markers we
+    // guessed at.
+    test('rejects an unknown version and a malformed rooms value', () {
+      expect(
+        MatrixDirectMessagesComponent.explicitGroupRoomIdsFromContent(const {
+          'v': 2,
+          'rooms': ['!group:ourgalaxy.space'],
+        }),
+        isEmpty,
+      );
+      expect(
+        MatrixDirectMessagesComponent.explicitGroupRoomIdsFromContent(const {
+          'v': 1,
+          'rooms': {'!group:ourgalaxy.space': true},
+        }),
+        isEmpty,
+      );
+      expect(
+        MatrixDirectMessagesComponent.explicitGroupRoomIdsFromContent(null),
+        isEmpty,
+      );
+    });
+
+    test('serializes stable, deduplicated group room markers', () {
+      expect(
+        MatrixDirectMessagesComponent.explicitGroupRoomIdsToContent(const [
+          '!z:ourgalaxy.space',
+          '!a:ourgalaxy.space',
+          '!z:ourgalaxy.space',
+          '#alias:ourgalaxy.space',
+        ]),
+        {
+          'v': 1,
+          'rooms': ['!a:ourgalaxy.space', '!z:ourgalaxy.space'],
         },
       );
     });

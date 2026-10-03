@@ -221,6 +221,56 @@ class FakeLocalParticipant implements lk.LocalParticipant {
 
   void removePublication(String sid) => trackPublications.remove(sid);
 
+  /// Answers [publishAudioTrack]. Left null by default so an unmodelled
+  /// publish still fails loudly, per the barrel's rule.
+  ///
+  /// The handler owns the whole publish, including WHEN the publication
+  /// becomes visible to [getTrackPublicationBySource]: the real
+  /// `publishAudioTrack` calls `addTrackPublication` partway through
+  /// (livekit_client-2.5.4 `participant/local.dart:187`) and then keeps
+  /// awaiting `onPublish`, `applyAudioSpeakerSettings` and `track.start()`,
+  /// so "publication registered, publish still running" is a reachable state
+  /// and a test that wants it calls [addPublication] from inside the handler.
+  Future<lk.LocalTrackPublication<lk.LocalAudioTrack>> Function(
+    lk.LocalAudioTrack track,
+  )?
+  onPublishAudioTrack;
+
+  /// Every `removePublishedTrack` sid in call order.
+  final List<String> removePublishedTrackCalls = <String>[];
+
+  /// When set, [removePublishedTrack] throws it AFTER recording the call, so
+  /// a test can drive a rollback whose unpublish failed.
+  Object? removePublishedTrackError;
+
+  @override
+  Future<lk.LocalTrackPublication<lk.LocalAudioTrack>> publishAudioTrack(
+    lk.LocalAudioTrack track, {
+    lk.AudioPublishOptions? publishOptions,
+  }) {
+    final handler = onPublishAudioTrack;
+    if (handler == null) {
+      throw UnimplementedError(
+        'FakeLocalParticipant($identity).publishAudioTrack was called without '
+        'onPublishAudioTrack being set.',
+      );
+    }
+    return handler(track);
+  }
+
+  @override
+  Future<void> removePublishedTrack(
+    String trackSid, {
+    bool notify = true,
+  }) async {
+    removePublishedTrackCalls.add(trackSid);
+    final error = removePublishedTrackError;
+    if (error != null) {
+      throw error;
+    }
+    trackPublications.remove(trackSid);
+  }
+
   @override
   List<lk.LocalTrackPublication<lk.LocalAudioTrack>>
   get audioTrackPublications => trackPublications.values

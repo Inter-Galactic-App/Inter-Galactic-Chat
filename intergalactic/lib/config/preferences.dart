@@ -30,6 +30,12 @@ class Preferences {
   SharedPreferences? _preferences;
 
   static const String registeredMatrixClients = "registered_matrix_clients";
+  static const String _globalMutePushRuleMigrationPrefix =
+      'global_mute_push_rule_migrated.';
+  static const String _favoriteRoomTagsMigrationPrefix =
+      'favorite_room_tags_migrated.';
+  static const String _favoriteRoomCategoriesMigrationPrefix =
+      'favorite_room_categories_migrated.';
 
   static const String _pushGateway = "push_gateway";
   static const String _iosLastPushReconcileVersion =
@@ -48,6 +54,34 @@ class Preferences {
   static const String _showMediaInNotifications = "show_media_in_notifications";
   static const String _previewUrlInNotifications =
       "preview_urls_in_notification";
+
+  /// Every preference the iOS notification policy snapshot is derived from.
+  ///
+  /// The snapshot is what the Notification Service Extension evaluates before
+  /// it renders anything (S&C C1-C3), and it is only rewritten when one of
+  /// these keys is written. A key missing from this set means the snapshot
+  /// silently stops tracking that preference and the extension then evaluates a
+  /// STALE policy with full confidence - a user switching to private previews
+  /// would keep receiving rendered content. That is the one fail-OPEN path in
+  /// an otherwise fail-closed design, which is why the set is built from the
+  /// key constants themselves rather than restated as literals elsewhere: a
+  /// rename now propagates instead of drifting.
+  ///
+  /// Adding a policy-relevant preference still means adding it here. That part
+  /// cannot be compiler-enforced; `notification_policy_snapshot_test.dart`
+  /// pins the current membership so the addition is at least a deliberate edit.
+  Set<String> get notificationPolicyKeys => {
+    enableNotifications.key,
+    notificationMode.key,
+    _notificationPreviewPrivacyChoiceCompleted,
+    _notificationPreviewPrivacyChoiceValue,
+    _formatNotificationBody,
+    _showMediaInNotifications,
+    _previewUrlInNotifications,
+    _roomNotificationSnoozes,
+    developerMode.key,
+  };
+
   static const String _notificationCompanionShowPreviews =
       "notification_companion_show_previews";
   static const String _fcmKey = "fcm_key";
@@ -63,6 +97,7 @@ class Preferences {
   static const String _syncedCalendarUrls = "synced_calendar_urls";
 
   static const String _topLevelSpaceOrder = "top_level_space_order";
+  static const String _spaceOrderMigrationPrefix = 'space_order_migrated.';
 
   static const String _spaceChildOrder = "space_child_order";
 
@@ -99,6 +134,25 @@ class Preferences {
   static const String _urlPreviewInE2EEChatConsentCompleted =
       "url_preview_in_e2ee_chat_consent_completed";
 
+  // Independent per REVIEW/owner/S&C 2026-09-09: the two settings below gate
+  // the DIRECT third-party fetch fallback specifically, not whether a preview
+  // happens at all. Homeserver/service-proxied previews are now preferred
+  // unconditionally in both room types; direct fetch is only ever attempted
+  // as a fallback when the service result is insufficient, and only when the
+  // user has opted in for THAT room's encryption state. The two states carry
+  // different privacy arguments (an unencrypted room's homeserver already
+  // holds the plaintext URL, so proxying discloses nothing new there; an
+  // encrypted room's homeserver does not, so a direct fetch there discloses
+  // to a CDN what proxying would otherwise disclose to the server operator
+  // instead) - S&C's ruling is that one mechanism cannot be optimal for both,
+  // so the opt-in is not shared between them. Both default false: this is an
+  // opt-in, not a migrated setting, and per the owner there is no existing
+  // population to grandfather.
+  static const String _allowDirectUrlPreviewFallbackInE2EEChat =
+      "allow_direct_url_preview_fallback_e2ee";
+  static const String _allowDirectUrlPreviewFallbackInUnencryptedChat =
+      "allow_direct_url_preview_fallback_unencrypted";
+
   static const String _roomMessageBackgrounds = "room_message_backgrounds";
   static const String _messageBackgroundOpacity = "message_background_opacity";
   static const String _roomMessageBackgroundOpacities =
@@ -120,6 +174,7 @@ class Preferences {
       "custom_navigation_shortcuts";
 
   static const String _matrixDeviceProfiles = "matrix_device_profiles";
+  static const String _recentStickers = "recent_stickers";
   static const String _webSessionBootstrapState = "web_session_bootstrap_state";
   static const String _accountRecoveryPromptDismissals =
       "account_recovery_prompt_dismissals";
@@ -129,9 +184,50 @@ class Preferences {
   Stream get onSettingChanged => onSettingChangedController.stream;
   bool isInit = false;
 
+  bool _cacheRefreshFailed = false;
+
+  /// Whether the last [refreshFromDisk] attempt failed, leaving this isolate's
+  /// cache a snapshot of unknown age.
+  ///
+  /// The background notification isolates refresh before rendering each entry
+  /// precisely because the UI isolate's writes are invisible to them. When
+  /// that read fails the entry is still rendered - dropping it loses the
+  /// message - so the privacy-bearing reads below fail CLOSED while this is
+  /// true. Being wrong in that direction costs a redacted notification;
+  /// being wrong in the other direction puts message content on a lock
+  /// screen after the user has just turned previews off.
+  bool get cacheRefreshFailed => _cacheRefreshFailed;
+
   Future<void> init() async {
-    _preferences = await SharedPreferences.getInstance();
+    final store = await SharedPreferences.getInstance();
+    // The SAME object, not merely a second call. `getInstance()` memoises one
+    // `SharedPreferences` per isolate, so an identical instance is the proof
+    // that this is a repeat call against the cache this isolate already holds
+    // - the only case the refresh below is for. When the instance differs the
+    // store underneath has been replaced and its contents have never been
+    // migrated, whoever replaced it; treating that as a repeat call is what
+    // left a fresh store unmigrated (#305 regression).
+    final sameStore = identical(store, _preferences);
+    _preferences = store;
     Preference.preferences = _preferences;
+
+    if (!sameStore) {
+      // A different store object is a cache that was just built from disk, so
+      // whatever an earlier one failed to re-read no longer describes it.
+      _cacheRefreshFailed = false;
+    }
+
+    if (isInit && sameStore) {
+      // Already initialised IN THIS ISOLATE, against this very cache.
+      // Re-running the migrations would achieve nothing, because the line
+      // above returned the snapshot taken when this isolate started. The one
+      // thing a repeat call can usefully do is pick up what another isolate
+      // has written since - which is exactly what the background-message
+      // entry points calling `init()` per message were written to get.
+      await refreshFromDisk();
+      return;
+    }
+
     await _migrateThemeSelection();
     await _migrateCheckForUpdatesDefault();
     await _migrateLegacyPushGateway();
@@ -141,6 +237,39 @@ class Preferences {
     await _migrateWindowsDeepFilterNetBaseline();
     await _rememberBundledIntegrationDefaults();
     isInit = true;
+  }
+
+  /// Re-reads every preference from disk into this isolate's cache.
+  ///
+  /// WHY THIS EXISTS. Android renders message notifications in a background
+  /// isolate (the FCM background handler, and the background service), and
+  /// each isolate gets its own `SharedPreferences` cache, built once when it
+  /// starts. A setting the user changes in the UI isolate lands on disk but
+  /// never invalidates that cache, so the background isolate keeps rendering
+  /// against the value it read at startup. The isolate outlives backgrounding
+  /// and dies only when the app is fully closed - which is why such a change
+  /// appeared to need a close-and-reopen to take effect.
+  ///
+  /// This is not specific to one setting. Every preference read in a
+  /// background isolate has the same staleness, so call this before reading
+  /// preferences on a path that renders a notification.
+  ///
+  /// A failed reload leaves the previous cache in place rather than clearing
+  /// it, so the caller keeps reading last-known values. That is why the
+  /// failure is RECORDED as well as rethrown: a caller that renders anyway
+  /// cannot otherwise tell a fresh read from a stale one, and
+  /// [cacheRefreshFailed] is what makes the privacy read fail closed.
+  Future<void> refreshFromDisk() async {
+    if (!isInit) {
+      return;
+    }
+    try {
+      await _preferences?.reload();
+      _cacheRefreshFailed = false;
+    } catch (_) {
+      _cacheRefreshFailed = true;
+      rethrow;
+    }
   }
 
   Future<void> _rememberBundledIntegrationDefaults() async {
@@ -430,6 +559,56 @@ class Preferences {
 
   String _knockedRoomsKey(String clientId) => 'knocked_room_ids.$clientId';
 
+  /// Records completion only for the Matrix account whose global Mute policy
+  /// was successfully written to the homeserver.
+  bool isGlobalMutePushRuleMigrated(String clientId) =>
+      _preferences!.getBool('$_globalMutePushRuleMigrationPrefix$clientId') ??
+      false;
+
+  Future<void> markGlobalMutePushRuleMigrated(String clientId) async {
+    if (clientId.isEmpty) {
+      throw ArgumentError.value(clientId, 'clientId', 'must not be empty');
+    }
+    await _preferences!.setBool(
+      '$_globalMutePushRuleMigrationPrefix$clientId',
+      true,
+    );
+  }
+
+  /// Records that this MATRIX ACCOUNT's favourites have been moved to
+  /// `m.favourite` room tags. Keyed by Matrix user id rather than the locally
+  /// generated client identifier, because the tags themselves live on the
+  /// account and survive a re-login that produces a new client id.
+  bool isFavoriteRoomTagsMigrated(String userId) =>
+      _preferences?.getBool('$_favoriteRoomTagsMigrationPrefix$userId') ??
+      false;
+
+  Future<void> markFavoriteRoomTagsMigrated(String userId) async {
+    if (userId.isEmpty) {
+      throw ArgumentError.value(userId, 'userId', 'must not be empty');
+    }
+    await _preferences!.setBool(
+      '$_favoriteRoomTagsMigrationPrefix$userId',
+      true,
+    );
+  }
+
+  /// Records that a Matrix account's legacy local Favorites categories have
+  /// been considered for migration into its account-data event.
+  bool isFavoriteRoomCategoriesMigrated(String userId) =>
+      _preferences?.getBool('$_favoriteRoomCategoriesMigrationPrefix$userId') ??
+      false;
+
+  Future<void> markFavoriteRoomCategoriesMigrated(String userId) async {
+    if (userId.isEmpty) {
+      throw ArgumentError.value(userId, 'userId', 'must not be empty');
+    }
+    await _preferences!.setBool(
+      '$_favoriteRoomCategoriesMigrationPrefix$userId',
+      true,
+    );
+  }
+
   /// Room ids [clientId] has an outstanding knock on. Persisted so the
   /// resulting invite can be auto-accepted even across an app restart and
   /// regardless of sync timing. Scoped per client so one account's prune does
@@ -520,6 +699,47 @@ class Preferences {
 
     final normalized = _normalizeJsonMap(profile);
     return normalized.isEmpty ? null : normalized;
+  }
+
+  List<Map<String, dynamic>> getRecentStickers(String clientId) {
+    final raw = _preferences!.getString(_recentStickers);
+    if (raw == null || raw.isEmpty) {
+      return [];
+    }
+
+    try {
+      final all = _normalizeJsonMap(jsonDecode(raw));
+      final entries = all[clientId];
+      if (entries is! List) {
+        return [];
+      }
+      return entries
+          .map(_normalizeJsonMap)
+          .where((entry) => entry['key'] is String)
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> setRecentStickers(
+    String clientId,
+    List<Map<String, dynamic>> stickers,
+  ) async {
+    final raw = _preferences!.getString(_recentStickers);
+    Map<String, dynamic> all;
+    try {
+      all = raw == null || raw.isEmpty
+          ? <String, dynamic>{}
+          : _normalizeJsonMap(jsonDecode(raw));
+    } catch (_) {
+      // A truncated or hand-edited preference must not make future sticker
+      // selections fail with an unhandled async JSON error. Recover the
+      // current account's store and let the next write repair the value.
+      all = <String, dynamic>{};
+    }
+    all[clientId] = stickers;
+    await _preferences!.setString(_recentStickers, jsonEncode(all));
   }
 
   List<Map<String, dynamic>> getMatrixDeviceProfilesForHomeserver(
@@ -838,6 +1058,12 @@ class Preferences {
 
   Future<void> clear() async {
     await _preferences!.clear();
+    final hook = Preference.afterClear;
+    if (hook != null) {
+      try {
+        await hook();
+      } catch (_) {}
+    }
   }
 
   Future<void> setPushGateway(String value) async {
@@ -922,6 +1148,16 @@ class Preferences {
   Future<void> setTopLevelSpaceOrder(List<String> spaceIds) async {
     await _preferences!.setStringList(_topLevelSpaceOrder, spaceIds);
     onSettingChangedController.add(null);
+  }
+
+  bool isSpaceOrderMigrated(String userId) =>
+      _preferences?.getBool('$_spaceOrderMigrationPrefix$userId') ?? false;
+
+  Future<void> markSpaceOrderMigrated(String userId) async {
+    if (userId.isEmpty) {
+      throw ArgumentError.value(userId, 'userId', 'must not be empty');
+    }
+    await _preferences!.setBool('$_spaceOrderMigrationPrefix$userId', true);
   }
 
   List<String> getSpaceChildOrder(String spaceId) {
@@ -1361,6 +1597,14 @@ class Preferences {
         jsonEncode(snoozes),
       );
     }
+    // Snoozes bypass Preference.set, so the policy-snapshot hook is invoked
+    // here explicitly (S&C C3: same operation as the preference change).
+    final hook = Preference.afterWrite;
+    if (hook != null) {
+      try {
+        await hook(_roomNotificationSnoozes);
+      } catch (_) {}
+    }
     onSettingChangedController.add(null);
   }
 
@@ -1479,6 +1723,13 @@ class Preferences {
   }
 
   bool get usePrivateNotificationPreviews {
+    // Fails closed while the cache could not be refreshed - see
+    // [cacheRefreshFailed]. Every reader of this getter is deciding how much
+    // of a message reaches a lock screen, so a cached value that may predate
+    // the user switching AWAY from rich previews has to be read as private.
+    if (_cacheRefreshFailed) {
+      return true;
+    }
     return notificationPreviewPrivacyChoiceValue.value ==
         notificationPreviewPrivacyChoicePrivate;
   }
@@ -1495,6 +1746,22 @@ class Preferences {
   Future<void> applyUrlPreviewE2EEConsentChoice({required bool allow}) async {
     await urlPreviewInE2EEChat.set(allow);
     await urlPreviewInE2EEChatConsentCompleted.set(true);
+  }
+
+  /// Whether a direct, third-party URL preview fetch may run as a fallback
+  /// for a room whose encryption state is [roomIsE2EE].
+  ///
+  /// This does not gate previews overall - the homeserver/service path is
+  /// unconditional in an unencrypted room and gated by
+  /// [shouldAllowUrlPreviewInE2EEChat] in an encrypted one. It gates only
+  /// whether, if that preferred path comes back insufficient, a direct fetch
+  /// to a third-party CDN may be attempted instead - the disclosure the user
+  /// must have chosen, per room type, rather than one service availability
+  /// picked for them.
+  bool shouldAllowDirectUrlPreviewFallback({required bool roomIsE2EE}) {
+    return roomIsE2EE
+        ? allowDirectUrlPreviewFallbackInE2EEChat.value
+        : allowDirectUrlPreviewFallbackInUnencryptedChat.value;
   }
 
   Future<void> applyNotificationPreviewPrivacyChoice(String value) async {
@@ -1764,6 +2031,17 @@ class Preferences {
     _urlPreviewInE2EEChatConsentCompleted,
     defaultValue: false,
   );
+
+  BoolPreference allowDirectUrlPreviewFallbackInE2EEChat = BoolPreference(
+    _allowDirectUrlPreviewFallbackInE2EEChat,
+    defaultValue: false,
+  );
+
+  BoolPreference allowDirectUrlPreviewFallbackInUnencryptedChat =
+      BoolPreference(
+        _allowDirectUrlPreviewFallbackInUnencryptedChat,
+        defaultValue: false,
+      );
 
   StringPreference matrixKeySharingPolicy = StringPreference(
     "matrix_key_sharing_policy",
@@ -2312,6 +2590,12 @@ class Preferences {
   BoolPreference voipNoiseSuppressionDeepFilterNetHushSuppression =
       BoolPreference(
         "voip_noise_suppression_deepfilternet_hush_suppression",
+        defaultValue: false,
+      );
+
+  BoolPreference voipNoiseSuppressionDeepFilterNetSpeechProtectHysteresis =
+      BoolPreference(
+        "voip_noise_suppression_deepfilternet_speech_protect_hysteresis",
         defaultValue: false,
       );
 

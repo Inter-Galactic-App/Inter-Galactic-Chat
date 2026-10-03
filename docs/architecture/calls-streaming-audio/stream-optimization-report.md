@@ -2,8 +2,6 @@
 
 Last updated: 2026-06-22
 Status: current index for historical streaming evidence
-Runtime owner: EXPERIMENTAL
-Structure owner: DOCUMENTATION
 
 ## Current Use
 
@@ -23,15 +21,15 @@ runtime guidance live in:
 - `stream-diagnostic-contract.md` and `stream-bottleneck-classification.md` -
   stream-test reporting and classifier contract.
 
-2026-06-19 refactor note: EXPERIMENTAL split the stream-test runner internals
+2026-06-19 refactor note: the stream-test runner internals were split
 into same-library `stream_test_runner_*.dart` parts while keeping
 `stream_test_runner.dart` as the stable import/orchestration surface. This was
 an organization-only change; it did not alter LiveKit, sender/receiver runtime,
 native capture, bitrate, codec, fallback, server, RNNoise, JSON schema,
 Markdown output, or diagnostic labels.
 
-2026-06-21 Phase 4 receiver-presentation note: EXPERIMENTAL implemented the
-fourth phase of `docs/streaming/archive/historical-plans/stream-optimization-plan-2026-06-21.md` by adding
+2026-06-21 Phase 4 receiver-presentation note: the fourth phase of the
+historical stream-optimization plan was implemented by adding
 receiver presentation stage lineage for `remote_renderer_callback`,
 `remote_texture_ready`, and `remote_ui_paint`. The external receiver runtime
 now displays the same diagnostic `RTCVideoRenderer` that produces native frame
@@ -53,8 +51,8 @@ average 63.8 ms, and max gap 117 ms. `remote_screen_present` remains missing,
 and the app-generated report still needs an external receiver summary merge so
 external `remote_ui_paint` lineage is visible in the main report.
 
-2026-06-22 non-DX11 app-default routing note: EXPERIMENTAL tightened the
-shared Windows app-default backend selector so window titles marked DX12,
+2026-06-22 non-DX11 app-default routing note: the shared Windows app-default
+backend selector was tightened so window titles marked DX12,
 D3D12, Vulkan, or OpenGL stay on the DirectX/window-GDI compatibility path
 instead of the experimental D3D11 game hook unless a developer explicitly
 selects the D3D11 override. The existing browser/non-game title guard and the
@@ -62,8 +60,8 @@ current BG3 D3D11 testing route remain intact. Validation was local/focused:
 Dart format, `stream_test_runner_test.dart`, targeted Flutter analyze, and
 scoped `git diff --check` passed. No live/BG3 smoke was run for this note.
 
-2026-06-21 Phase 3 GPU-timestamp note: EXPERIMENTAL implemented the third
-phase of `docs/streaming/archive/historical-plans/stream-optimization-plan-2026-06-21.md` by adding D3D11
+2026-06-21 Phase 3 GPU-timestamp note: the third
+phase of the historical stream-optimization plan was implemented by adding D3D11
 GPU timestamp/disjoint query diagnostics around native NV12
 `VideoProcessorBlt`. The stream-test contract now reports BLT CPU submit,
 submit-to-fence, measured GPU execution, estimated GPU queue delay, and
@@ -78,8 +76,8 @@ GPU scheduling/contention/admission and sender-to-receiver presentation
 correlation, not shader-converter, bitrate, hook-target, receiver-widget,
 server, LiveKit, or RNNoise work.
 
-2026-06-21 Phase 2 sender-mailbox note: EXPERIMENTAL implemented the second
-phase of `docs/streaming/archive/historical-plans/stream-optimization-plan-2026-06-21.md` by adding a
+2026-06-21 Phase 2 sender-mailbox note: the second
+phase of the historical stream-optimization plan was implemented by adding a
 latest-frame mailbox inside native WebRTC `FrameCadenceAdapter` for Inter
 Galactic native D3D11 gameplay frames and dummy NV12 live-sender frames. The
 mailbox keeps one active frame and one newest pending frame, replaces pending
@@ -94,10 +92,10 @@ and stream Debug packaging. Later BG3/live validation showed the mailbox path
 active but not green: receiver presentation remained red, leading to the Phase
 3 GPU-timestamp diagnostic branch above.
 
-2026-06-21 mailbox discard safety addendum: REVIEW found that the new mailbox
+2026-06-21 mailbox discard safety addendum: a review found that the new mailbox
 and coalesce drop sites bypassed the existing adapter discard path that also
-posts ZeroHz discarded-frame bookkeeping. EXPERIMENTAL verified the finding and
-updated native `FrameCadenceAdapter` so mailbox replacement drops, mailbox
+posts ZeroHz discarded-frame bookkeeping. The finding was verified and native
+`FrameCadenceAdapter` was updated so mailbox replacement drops, mailbox
 stale drops, mailbox internal coalesce drops, pre/post coalesce drops, and
 queued coalesce drops all route through the shared discard notifier. The
 mailbox eligibility gate remains limited to `helper-d3d11` and
@@ -106,8 +104,8 @@ mailbox eligibility gate remains limited to `helper-d3d11` and
 and app-build refresh remain follow-up validation before the next BG3/browser
 smoke.
 
-2026-06-21 Phase 1 receiver-vocabulary note: EXPERIMENTAL implemented the
-first phase of `docs/streaming/archive/historical-plans/stream-optimization-plan-2026-06-21.md` without a
+2026-06-21 Phase 1 receiver-vocabulary note: the
+first phase of the historical stream-optimization plan was implemented without a
 streaming runtime behavior change. The current candidate baseline remains
 D3D11 native NV12, explicit fence readiness, inactive native sink bypass, H.264
 Media Foundation hardware encode, CBR, a single high-quality 1280x720 external
@@ -123,8 +121,8 @@ hash-tap evidence therefore proves renderer callback freshness only; texture,
 UI paint, and screen-present proof remain the next diagnostic gap before
 receiver-visible green claims.
 
-2026-06-19 native cleanup note: EXPERIMENTAL implemented the first safe
-extraction from `docs/refactor/LIBWEBRTC_WIN_CUSTOM_REFACTOR_AUDIT.md` by
+2026-06-19 native cleanup note: the first safe
+extraction from `docs/refactor/LIBWEBRTC_WIN_CUSTOM_REFACTOR_AUDIT.md` was implemented by
 moving shared Windows libwebrtc diagnostic-file appending and `INTERGALACTIC_*`
 environment parsing into `intergalactic_native_diagnostics.*` and
 `intergalactic_native_config.*`. The D3D11 game-capture capturer and Media
@@ -133,9 +131,9 @@ diagnostic line shape, and runtime behavior. A focused Windows `libwebrtc`
 Ninja build passed with `DEPOT_TOOLS_WIN_TOOLCHAIN=0`; no synthetic, live, or
 BG3 validation was run for this behavior-preserving cleanup.
 
-2026-06-19 native proof-writer cleanup note: EXPERIMENTAL implemented the
+2026-06-19 native proof-writer cleanup note: the
 second safe extraction from
-`docs/refactor/LIBWEBRTC_WIN_CUSTOM_REFACTOR_AUDIT.md` by moving BGRA BMP
+`docs/refactor/LIBWEBRTC_WIN_CUSTOM_REFACTOR_AUDIT.md` was implemented by moving BGRA BMP
 proof writing, proof directory creation, and BGRA visibility sampling into
 `intergalactic_proof_frame_writer.*`. The D3D11 game-capture capturer still
 owns the same proof call sites, two-frame pre-I420 cap, first/first-visible
@@ -144,8 +142,8 @@ A focused Windows `libwebrtc` Ninja build passed with
 `DEPOT_TOOLS_WIN_TOOLCHAIN=0`; no synthetic, live, or BG3 validation was run
 for this behavior-preserving cleanup.
 
-2026-06-19 native NV12 interop note: EXPERIMENTAL implemented the audit's
-native buffer type-boundary characterization by adding a narrow
+2026-06-19 native NV12 interop note: the audit's
+native buffer type-boundary characterization was implemented by adding a narrow
 `NativeHandleBufferKind` discriminator, marking the Inter Galactic D3D11 NV12
 buffer as the custom kind, and rejecting generic native buffers before reading
 Inter Galactic handle metadata. The exported
@@ -167,16 +165,16 @@ but a compare report against the sender-only BG3 run
 healthy, while live capture/encode/send averaged `6.984 / 15.000 / 8.750` FPS
 with bottleneck `native_nv12_ready_limited`, live `OnFrame` around
 `24.535414 ms`, native NV12 readiness around `35.153987 ms`, native NV12
-failures `0`, and CPU fallback `0`. EXPERIMENTAL split
-`intergalactic_game_capture_config.*` out of the D3D11 game-capture capturer
+failures `0`, and CPU fallback `0`. `intergalactic_game_capture_config.*` was split
+out of the D3D11 game-capture capturer
 so source-mode, delivery, and native NV12 readiness config are separated
 before the deeper sender-handoff branch. Focused native `libwebrtc` build
 passed, native capture-to-MF isolation passed at handoff output FPS `32.079`,
 and WebRTC OnFrame isolation passed at gate delivery FPS `29.936` with
 native NV12 submitted/failures `222 / 0` and CPU fallback `0`.
 
-2026-06-19 adaptive native NV12 backpressure note: EXPERIMENTAL implemented a
-live `OnFrame` backpressure guard for the native NV12 handoff. By default,
+2026-06-19 adaptive native NV12 backpressure note: a
+live `OnFrame` backpressure guard was implemented for the native NV12 handoff. By default,
 `INTERGALACTIC_GAME_CAPTURE_NV12_ONFRAME_BACKPRESSURE_SUSPEND=1` suspends the
 native NV12 path after three consecutive native NV12 `OnFrame` calls slower
 than `20 ms`, then falls through to the existing GPU-scaled readback/I420 path.
@@ -206,11 +204,11 @@ failures `0`, CPU fallback `0`, and the rebuilt
 `B4A094E554016030948C60FEC8C8CA276AB1AAEABE592B88C135FB542E7840D3`. The
 legacy self-view/tight crop still failed at `11.413` unique FPS, but remains
 diagnostic-only. The live BG3 report did not include the expected
-`nativeNv12OnFrameBackpressure*` fields, so the next narrow EXPERIMENTAL
+`nativeNv12OnFrameBackpressure*` fields, so the next narrow
 follow-up is telemetry/reporting cleanup rather than receiver/server tuning.
 
-2026-06-19 BG3 strict receiver FPS note: EXPERIMENTAL kept a single native
-behavior change for the latest branch: the D3D11 immediate context is flushed
+2026-06-19 BG3 strict receiver FPS note: a single native
+behavior change was kept for the latest branch: the D3D11 immediate context is flushed
 immediately after a successful native NV12 ready-fence `Signal()` in
 `intergalactic_game_capture_video_capturer.cc`. The final candidate
 `libwebrtc.dll` hash is
@@ -228,10 +226,10 @@ average bitrate was only about `720 kbps` despite high subscription and
 receiver smear as a quality follow-up candidate rather than a resolution-only
 setup artifact.
 
-2026-06-19 CBR bitrate/smear note: EXPERIMENTAL added Media Foundation H.264
-rate-control diagnostics and a guarded
-`INTERGALACTIC_MF_H264_RATE_CONTROL_MODE` selector, then promoted CBR to the
-experimental default after BG3 external-render A/B evidence. The
+2026-06-19 CBR bitrate/smear note: Media Foundation H.264 rate-control
+diagnostics and a guarded `INTERGALACTIC_MF_H264_RATE_CONTROL_MODE` selector
+were added, then CBR was promoted to the experimental default after BG3
+external-render A/B evidence. The
 unconstrained/default baseline
 `source-live-call-freshness-20260619-161652` passed receiver render at
 `29.848636685466921` FPS but averaged about `698 kbps` and emitted
@@ -271,7 +269,7 @@ test gate is approved.
 The current 2026-06-19 boundary is: CBR is the experimental Windows Media
 Foundation H.264 rate-control default for the game-hook path because it raised
 BG3 receiver-delivered bitrate from about `0.7 Mbps` to `2.6 Mbps` without
-failing the true receiver freshness gate. Do not route this to SERVER or
+failing the true receiver freshness gate. Do not attribute this to the server or
 receiver auth unless future evidence shows healthy sender FPS with receiver,
 LiveKit, SFU, or network regression. The next runtime branch should stay on
 native NV12 readiness tails, sender queue/overload drops, and receiver FPS
@@ -298,7 +296,7 @@ NV12, fence, source-adapter, network, live `OnFrame`, and MF fence-wait
 counters are clean, isolated NV12 BLT-to-ready/source-to-submit max tails are
 reported as `native_tail_spike_review` evidence under `healthy` instead of
 high-confidence `native_nv12_ready_limited`. Keep the remaining review branch
-focused on parser validation, REVIEW native-diff acceptance, and one narrow
+focused on parser validation, native-diff acceptance review, and one narrow
 BG3 Smooth 720p confirmation rather than more SDR, bitrate, receiver,
 LiveKit, queue-depth, fallback, or custom encoded-frame tuning.
 
@@ -306,7 +304,7 @@ Live Testing Override is now closed for this branch by user direction. Treat
 the two source-adapter BG3 runs as the current validation baseline, not an
 active request for more live-loop iteration. Additional BG3 Smooth 720p
 validation should wait until the classifier/report change passes focused
-parser validation and REVIEW accepts the native diff/residual tail-spike risk.
+parser validation and the native diff/residual tail-spike risk is accepted in review.
 
 2026-06-17 follow-up: a rebuilt confirmation looked like one captured frame
 followed by black. Diffing against
@@ -329,7 +327,7 @@ evidence. The report contract now parses future `game_capture_visual_freshness`
 markers, adds a `visual freshness cadence` coverage row, and shows a dedicated
 Markdown section. Keep output copies bounded: sender-side proof frames are fine,
 but continuous audit recordings should be receiver/tool-side unless a separate
-SERVER/LiveKit recording branch is explicitly opened.
+server-side/LiveKit recording branch is explicitly opened.
 
 The receiver/tool-side proof source now exists as
 `tools/stream-lab/measure_visual_freshness.ps1`. It analyzes a video file or a
@@ -364,11 +362,11 @@ longest stale run. Stream-test counters averaged `21.3 / 21.2 / 25.0`
 capture/encode/send FPS with source mode `helper-d3d11`, bottleneck
 `delivery_queue_limited`, and inactive native refresh/bypass `1707 / 0`.
 Treat recorder foreground/preflight safety as validated for this rerun, but keep
-BG3 gated while EXPERIMENTAL investigates sender/output delivery cadence.
+BG3 gated pending further investigation of sender/output delivery cadence.
 
 2026-06-17 true receiver BG3 follow-up: self-view/local-preview evidence is no
-longer enough to classify remote smoothness. EXPERIMENTAL launched an isolated
-receiver client/profile, the user joined the call with a second account, and
+longer enough to classify remote smoothness. An isolated
+receiver client/profile was launched, the user joined the call with a second account, and
 receiver-side recordings showed that hidden remote stream tiles are invalid
 freshness proof because the stream renderer is not instantiated until the tile
 is revealed. Valid revealed-tile BG3 receiver runs still failed the 25 unique
@@ -388,9 +386,9 @@ live sender, local native-MF, WebRTC OnFrame, and failed live sender-handoff
 steps is archived in
 `stream-optimization-report/2026-06-15-to-16-sender-handoff.md`.
 
-Do not use this report for RNNoise/noise-suppression tuning. AUDIO owns
-RNNoise behavior and related diagnostics; EXPERIMENTAL retains gameplay
-streaming, D3D11 capture, WebRTC/LiveKit video pipeline work, stream
+Do not use this report for RNNoise/noise-suppression tuning; RNNoise behavior
+and related diagnostics are covered elsewhere. This report is scoped to
+gameplay streaming, D3D11 capture, WebRTC/LiveKit video pipeline work, stream
 diagnostics, stream presets, and native stream helpers.
 
 ## Evidence Archives

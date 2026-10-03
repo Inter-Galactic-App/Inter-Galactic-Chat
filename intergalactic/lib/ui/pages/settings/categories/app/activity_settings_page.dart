@@ -37,67 +37,67 @@ class _ActivitySettingsPageState extends State<ActivitySettingsPage> {
   String? _steamDisplayName;
   int _displayNameGeneration = 0;
 
-  String get titlePrivacy => Intl.message(
+  String get titleActivityPrivacy => Intl.message(
     'Activity privacy',
     desc: 'Header for rich presence privacy settings',
     name: 'titleActivityPrivacy',
   );
 
-  String get titleSources => Intl.message(
+  String get titleActivitySources => Intl.message(
     'Connections',
     desc: 'Header for rich presence account connection settings',
     name: 'titleActivitySources',
   );
 
-  String get titleDeveloper => Intl.message(
+  String get titleActivityDeveloperTools => Intl.message(
     'Activity developer tools',
     desc: 'Header for rich presence developer settings',
     name: 'titleActivityDeveloperTools',
   );
 
-  String get showLocallyTitle => Intl.message(
+  String get showActivityLocallyTitle => Intl.message(
     'Show activity locally',
     desc: 'Toggle title for showing local activity cards',
     name: 'showActivityLocallyTitle',
   );
 
-  String get showLocallyDescription => Intl.message(
+  String get showActivityLocallyDescription => Intl.message(
     'Show the current activity card near the account panel.',
     desc: 'Toggle description for showing local activity cards',
     name: 'showActivityLocallyDescription',
   );
 
-  String get hideCurrentTitle => Intl.message(
+  String get hideCurrentActivityTitle => Intl.message(
     'Hide current activity',
     desc: 'Toggle title for hiding current rich presence activity',
     name: 'hideCurrentActivityTitle',
   );
 
-  String get hideCurrentDescription => Intl.message(
+  String get hideCurrentActivityDescription => Intl.message(
     'Temporarily suppress the active local activity card.',
     desc: 'Toggle description for hiding current rich presence activity',
     name: 'hideCurrentActivityDescription',
   );
 
-  String get localMediaTitle => Intl.message(
+  String get localMediaControlsTitle => Intl.message(
     'Apple Music controls',
     desc: 'Toggle title for iOS local media playback controls',
     name: 'localMediaControlsTitle',
   );
 
-  String get localMediaDescription => Intl.message(
+  String get localMediaControlsDescription => Intl.message(
     'Show a compact iPhone media card for Apple Music and local media-library playback.',
     desc: 'Toggle description for iOS local media playback controls',
     name: 'localMediaControlsDescription',
   );
 
-  String get publishBasicTitle => Intl.message(
+  String get publishBasicActivityStatusTitle => Intl.message(
     'Publish Matrix status',
     desc: 'Toggle title for publishing rich presence to Matrix status',
     name: 'publishBasicActivityStatusTitle',
   );
 
-  String get publishBasicDescription => Intl.message(
+  String get publishBasicActivityStatusDescription => Intl.message(
     'Share a simple Listening or Playing line through Matrix presence.',
     desc: 'Toggle description for publishing rich presence to Matrix status',
     name: 'publishBasicActivityStatusDescription',
@@ -109,13 +109,13 @@ class _ActivitySettingsPageState extends State<ActivitySettingsPage> {
     name: 'spotifyConfiguredDialogTitle',
   );
 
-  String get demoTitle => Intl.message(
+  String get demoActivityTitle => Intl.message(
     'Demo activity',
     desc: 'Toggle title for the rich presence demo source',
     name: 'demoActivityTitle',
   );
 
-  String get demoDescription => Intl.message(
+  String get demoActivityDescription => Intl.message(
     'Show a mock music activity for validating layout and controls.',
     desc: 'Toggle description for the rich presence demo source',
     name: 'demoActivityDescription',
@@ -173,15 +173,15 @@ class _ActivitySettingsPageState extends State<ActivitySettingsPage> {
     return Column(
       children: [
         SettingsSection(
-          title: titleSources,
+          title: titleActivitySources,
           children: [
             Column(
               children: [
                 if (PlatformUtils.isIOS)
                   BooleanPreferenceToggle(
                     preference: preferences.activityShowLocalMediaControls,
-                    title: localMediaTitle,
-                    description: localMediaDescription,
+                    title: localMediaControlsTitle,
+                    description: localMediaControlsDescription,
                     onChanged: (_) => _notifyLocalMediaChanged(),
                   ),
                 ActivityConnectionSetupRow(
@@ -270,26 +270,26 @@ class _ActivitySettingsPageState extends State<ActivitySettingsPage> {
             ),
           ),
         SettingsSection(
-          title: titlePrivacy,
+          title: titleActivityPrivacy,
           children: [
             Column(
               children: [
                 BooleanPreferenceToggle(
                   preference: preferences.activityShowLocally,
-                  title: showLocallyTitle,
-                  description: showLocallyDescription,
+                  title: showActivityLocallyTitle,
+                  description: showActivityLocallyDescription,
                   onChanged: (_) => activityService.refreshSettings(),
                 ),
                 BooleanPreferenceToggle(
                   preference: preferences.activityHideCurrent,
-                  title: hideCurrentTitle,
-                  description: hideCurrentDescription,
+                  title: hideCurrentActivityTitle,
+                  description: hideCurrentActivityDescription,
                   onChanged: (_) => activityService.refreshSettings(),
                 ),
                 BooleanPreferenceToggle(
                   preference: preferences.activityPublishBasicStatus,
-                  title: publishBasicTitle,
-                  description: publishBasicDescription,
+                  title: publishBasicActivityStatusTitle,
+                  description: publishBasicActivityStatusDescription,
                   onChanged: (_) => activityService.refreshSettings(),
                 ),
               ],
@@ -298,13 +298,13 @@ class _ActivitySettingsPageState extends State<ActivitySettingsPage> {
         ),
         if (preferences.developerMode.value) ...[
           SettingsSection(
-            title: titleDeveloper,
+            title: titleActivityDeveloperTools,
             showDivider: false,
             children: [
               BooleanPreferenceToggle(
                 preference: preferences.activityMockSourceEnabled,
-                title: demoTitle,
-                description: demoDescription,
+                title: demoActivityTitle,
+                description: demoActivityDescription,
                 onChanged: (_) => activityService.refreshSettings(),
               ),
             ],

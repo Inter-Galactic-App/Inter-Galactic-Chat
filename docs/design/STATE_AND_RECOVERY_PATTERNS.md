@@ -1,7 +1,6 @@
 # State And Recovery Patterns
 
 Status: active design reference
-Owner: DESIGN
 Last updated: 2026-06-23
 Source backlog item: P18 in the workspace UX/UI polish backlog
 

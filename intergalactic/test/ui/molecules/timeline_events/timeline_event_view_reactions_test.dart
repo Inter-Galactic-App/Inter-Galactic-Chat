@@ -146,6 +146,88 @@ void main() {
       reason: 'an out-of-range index must clear, not keep the previous event',
     );
   });
+
+  testWidgets('a revision bump re-reads the reactions of the same event', (
+    tester,
+  ) async {
+    // A reaction arriving on an already-reacted message changes the EVENT at
+    // an index, not the index. The owning entry reports that by bumping
+    // updateRevision. The index-only test above cannot see this case, and
+    // before the revision existed the chips stayed at the old set until the
+    // row happened to be rebuilt for some other reason.
+    final event = _MutableReactionEvent();
+    final timeline = _FakeTimeline(
+      selfId: '@first:example.org',
+      timelineEvents: [event],
+    );
+
+    Widget subject(int revision) => MaterialApp(
+      home: Scaffold(
+        body: TimelineEventViewReactions(
+          index: 0,
+          updateRevision: revision,
+          timeline: timeline,
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(subject(0));
+    await tester.pump();
+    expect(find.byType(EmojiReaction), findsOneWidget);
+
+    event.reactions[const _FakeEmoticon(shortcode: 'tada', key: '\u{1F389}')] =
+        {_reactorId};
+
+    await tester.pumpWidget(subject(1));
+    await tester.pump();
+    expect(
+      find.byType(EmojiReaction),
+      findsNWidgets(2),
+      reason:
+          'the second reaction is on the event but not on screen - '
+          'didUpdateWidget is not reacting to the revision',
+    );
+    // The count alone does not say the NEW reaction is the one that arrived.
+    // A view that re-read the event but rendered a chip per stale entry, or
+    // that appended without replacing, reaches two chips carrying the wrong
+    // emoji and passes the count.
+    expect(
+      tester
+          .widgetList<EmojiReaction>(find.byType(EmojiReaction))
+          .map((chip) => chip.emoji.shortcode),
+      containsAll(['thumbsup', 'tada']),
+    );
+  });
+}
+
+class _MutableReactionEvent
+    implements TimelineEvent, TimelineEventFeatureReactions {
+  final Map<Emoticon, Set<String>> reactions = {
+    const _FakeEmoticon(): {_reactorId},
+  };
+
+  @override
+  String get eventId => r'$mutable';
+
+  @override
+  String get senderId => '@alice:example.org';
+
+  @override
+  DateTime get originServerTs => DateTime.utc(2026, 8, 17, 10);
+
+  @override
+  bool hasReactions(Timeline timeline) => reactions.isNotEmpty;
+
+  /// A snapshot, like the real implementation, which builds a fresh map from
+  /// the aggregated events on every call. Handing out the live map would let
+  /// the view's stale copy change underneath it, and the test would pass with
+  /// the revision comparison deleted - measured 2026-09-02, all four green.
+  @override
+  Map<Emoticon, Set<String>> getReactions(Timeline timeline) =>
+      Map.of(reactions);
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class _FakeEmoticon implements Emoticon {

@@ -3,6 +3,7 @@ import 'package:intergalactic/client/components/emoticon/emoticon.dart';
 import 'package:intergalactic/client/matrix/components/read_receipts/matrix_read_receipt_component.dart';
 import 'package:intergalactic/client/matrix/matrix_client.dart';
 import 'package:intergalactic/client/matrix/matrix_room.dart';
+import 'package:intergalactic/client/matrix/matrix_timeline_rows.dart';
 import 'package:intergalactic/client/matrix/timeline_events/matrix_timeline_event.dart';
 import 'package:intergalactic/client/timeline_events/local_media_send_event.dart';
 import 'package:intergalactic/client/timeline_events/timeline_event.dart';
@@ -56,7 +57,7 @@ class MatrixTimeline extends Timeline {
     );
 
     if (_matrixTimeline?.events.isEmpty == true) {
-      await _matrixTimeline?.requestHistory();
+      await _matrixTimeline?.requestHistory(filter: timelineRowFilter());
     }
 
     _matrixRoom.postLoad();
@@ -67,17 +68,24 @@ class MatrixTimeline extends Timeline {
   }
 
   void convertAllTimelineEvents() {
-    for (int i = 0; i < _matrixTimeline!.events.length; i++) {
-      var converted = _room.convertEvent(_matrixTimeline!.events[i]);
-      insertEvent(i, converted);
+    for (final matrixEvent in _matrixTimeline!.events) {
+      if (isHiddenTimelineEventType(matrixEvent.type)) {
+        continue;
+      }
+      insertEvent(events.length, _room.convertEvent(matrixEvent));
     }
   }
 
   void onEventInserted(index) {
     if (_matrixTimeline == null) return;
+    final matrixEvent = _matrixTimeline!.events[index];
+    if (isHiddenTimelineEventType(matrixEvent.type)) {
+      return;
+    }
+
     insertEvent(
       _eventListInsertIndexForMatrixIndex(index),
-      _room.convertEvent(_matrixTimeline!.events[index]),
+      _room.convertEvent(matrixEvent),
     );
   }
 
@@ -85,13 +93,18 @@ class MatrixTimeline extends Timeline {
     if (_matrixTimeline == null) return;
 
     if (index < _matrixTimeline!.events.length) {
+      final matrixEvent = _matrixTimeline!.events[index];
+      if (isHiddenTimelineEventType(matrixEvent.type)) {
+        return;
+      }
+
       final eventIndex = _eventListIndexForMatrixIndex(index);
       if (eventIndex == -1) {
         return;
       }
 
       events[eventIndex] = (room as MatrixRoom).convertEvent(
-        _matrixTimeline!.events[index],
+        matrixEvent,
         timeline: _matrixTimeline,
       );
 
@@ -100,50 +113,75 @@ class MatrixTimeline extends Timeline {
   }
 
   void onEventRemoved(index) {
-    final eventIndex = _eventListIndexForMatrixIndex(index);
+    // The SDK has already taken the event out of its list, so its type cannot
+    // be read here. The row that WOULD be its row is found the usual way, then
+    // checked against the SDK list: if the SDK still holds that row's event,
+    // what was removed had no row, and nothing here should move.
+    final eventIndex = _eventListIndexForMatrixIndex(
+      index,
+      checkTargetHidden: false,
+    );
     if (eventIndex == -1) {
       return;
     }
 
-    removeEvent(events[eventIndex].eventId);
+    final rowEventId = events[eventIndex].eventId;
+    final stillHeld =
+        _matrixTimeline?.events.any(
+          (e) => e.matchesEventOrTransactionId(rowEventId),
+        ) ??
+        false;
+    if (stillHeld) {
+      return;
+    }
+
+    removeEvent(rowEventId);
   }
+
+  bool _matrixEventIsHidden(int matrixIndex) =>
+      isHiddenTimelineEventType(_matrixTimeline!.events[matrixIndex].type);
+
+  bool _rowIsMatrixEvent(int row) => events[row] is MatrixTimelineEvent;
 
   int _eventListInsertIndexForMatrixIndex(int matrixIndex) {
-    var matrixEventsSeen = 0;
-    for (var eventIndex = 0; eventIndex < events.length; eventIndex++) {
-      if (matrixEventsSeen == matrixIndex) {
-        return eventIndex;
-      }
-
-      if (events[eventIndex] is MatrixTimelineEvent) {
-        matrixEventsSeen += 1;
-      }
-    }
-
-    return events.length;
+    return rowInsertIndexForMatrixRowNumber(
+      matrixRowNumber: visibleMatrixEventsBefore(
+        matrixIndex: matrixIndex,
+        matrixEventIsHidden: _matrixEventIsHidden,
+      ),
+      rowCount: events.length,
+      rowIsMatrixEvent: _rowIsMatrixEvent,
+    );
   }
 
-  int _eventListIndexForMatrixIndex(int matrixIndex) {
-    var matrixEventsSeen = 0;
-    for (var eventIndex = 0; eventIndex < events.length; eventIndex++) {
-      if (events[eventIndex] is! MatrixTimelineEvent) {
-        continue;
-      }
-
-      if (matrixEventsSeen == matrixIndex) {
-        return eventIndex;
-      }
-
-      matrixEventsSeen += 1;
+  int _eventListIndexForMatrixIndex(
+    int matrixIndex, {
+    bool checkTargetHidden = true,
+  }) {
+    final matrixEvents = _matrixTimeline!.events;
+    if (matrixIndex < 0 || matrixIndex > matrixEvents.length) {
+      return -1;
+    }
+    if (checkTargetHidden &&
+        (matrixIndex == matrixEvents.length ||
+            _matrixEventIsHidden(matrixIndex))) {
+      return -1;
     }
 
-    return -1;
+    return rowOfMatrixRowNumber(
+      matrixRowNumber: visibleMatrixEventsBefore(
+        matrixIndex: matrixIndex,
+        matrixEventIsHidden: _matrixEventIsHidden,
+      ),
+      rowCount: events.length,
+      rowIsMatrixEvent: _rowIsMatrixEvent,
+    );
   }
 
   @override
   Future<void> loadMoreHistory() async {
     if (_matrixTimeline?.canRequestHistory == true) {
-      var f = _matrixTimeline!.requestHistory();
+      var f = _matrixTimeline!.requestHistory(filter: timelineRowFilter());
       _loadingStatusChangedController.add(null);
 
       await f;
@@ -170,7 +208,7 @@ class MatrixTimeline extends Timeline {
   @override
   Future<void> loadMoreFuture() async {
     if (canLoadFuture) {
-      var f = _matrixTimeline?.requestFuture();
+      var f = _matrixTimeline?.requestFuture(filter: timelineRowFilter());
 
       _loadingStatusChangedController.add(null);
       await f;

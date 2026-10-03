@@ -1,8 +1,6 @@
 # Stream-Test Local Env
 
 Status: current
-Owner: EXPERIMENTAL for stream-lab behavior; REVIEW for public-safe local path
-workflow
 Last updated: 2026-07-15
 
 The stream-lab wrappers need machine-local roots for runtime output, patched

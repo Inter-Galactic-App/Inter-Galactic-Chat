@@ -172,11 +172,9 @@ void main() {
     });
 
     test('the default capture front end enables AGC', () {
-      // Enabled 2026-08-20. Measured across three machines: the raw microphone
-      // of a participant nobody reports as quiet sits at -23.9 dBFS active
-      // speech while the two who do sit at -37.6 and -40.8, and nothing else in
-      // the chain can raise a quiet talker - the native processor costs about
-      // 1.5 dB and the output limiter never engages.
+      // Enabled 2026-08-20 because no other stage can raise a quiet talker;
+      // two participants arrived 14-17 dB low. See
+      // docs/audio/sender-side-stage-order.md.
       final frontend = NoiseSuppressionCaptureProfile.captureFrontendOptions();
 
       expect(frontend.autoGainControl, isTrue);

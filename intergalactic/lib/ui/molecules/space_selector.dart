@@ -10,15 +10,17 @@ import 'package:tiamat/tiamat.dart';
 import '../atoms/space_icon.dart';
 
 class SpaceSelector extends StatefulWidget {
-  const SpaceSelector(this.spaces,
-      {super.key,
-      this.onSelected,
-      this.onReordered,
-      this.clearSelection,
-      required this.width,
-      this.shouldShowAvatarForSpace,
-      this.header,
-      this.footer});
+  const SpaceSelector(
+    this.spaces, {
+    super.key,
+    this.onSelected,
+    this.onReordered,
+    this.clearSelection,
+    required this.width,
+    this.shouldShowAvatarForSpace,
+    this.header,
+    this.footer,
+  });
   final List<Space> spaces;
   final double width;
   final Widget? header;
@@ -29,6 +31,17 @@ class SpaceSelector extends StatefulWidget {
   final bool Function(Space space)? shouldShowAvatarForSpace;
 
   static EdgeInsets get padding => const EdgeInsets.fromLTRB(7, 0, 7, 0);
+
+  /// Shared outer-rail anchor for ordinary unread state.
+  ///
+  /// Virtual spaces use this too, so their attention mark stays in lockstep
+  /// with a Matrix Space instead of maintaining a near-identical copy.
+  static Widget unreadIndicator() {
+    return const Positioned(
+      left: -12,
+      child: IgnorePointer(child: DotIndicator()),
+    );
+  }
 
   @override
   State<SpaceSelector> createState() => _SpaceSelectorState();
@@ -63,11 +76,13 @@ class _SpaceSelectorState extends State<SpaceSelector> {
       children: [
         Flexible(
           child: ScrollConfiguration(
-            behavior:
-                ScrollConfiguration.of(context).copyWith(scrollbars: false),
+            behavior: ScrollConfiguration.of(
+              context,
+            ).copyWith(scrollbars: false),
             child: SingleChildScrollView(
-              physics:
-                  BuildConfig.ANDROID ? const BouncingScrollPhysics() : null,
+              physics: BuildConfig.ANDROID
+                  ? const BouncingScrollPhysics()
+                  : null,
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(0, 8, 0, 0),
                 child: Column(
@@ -96,8 +111,9 @@ class _SpaceSelectorState extends State<SpaceSelector> {
                         orderedSpaces.insert(newIndex, item);
 
                         setState(() {});
-                        widget.onReordered
-                            ?.call(List<Space>.from(orderedSpaces));
+                        widget.onReordered?.call(
+                          List<Space>.from(orderedSpaces),
+                        );
                       },
                       itemBuilder: (context, index) {
                         final data = orderedSpaces[index];
@@ -162,20 +178,22 @@ class _SpaceSelectorState extends State<SpaceSelector> {
     return true;
   }
 
-  Widget buildSpaceIcon(
-      {required String displayName,
-      Stream<void>? onUpdate,
-      ImageProvider? avatar,
-      ImageProvider? userAvatar,
-      Color? userColor,
-      String? userDisplayName,
-      Color? placeholderColor,
-      int highlightedNotificationCount = 0,
-      bool roomWideMentionNotification = false,
-      int notificationCount = 0,
-      required Space space}) {
+  Widget buildSpaceIcon({
+    required String displayName,
+    Stream<void>? onUpdate,
+    ImageProvider? avatar,
+    ImageProvider? userAvatar,
+    Color? userColor,
+    String? userDisplayName,
+    Color? placeholderColor,
+    int highlightedNotificationCount = 0,
+    bool roomWideMentionNotification = false,
+    int notificationCount = 0,
+    required Space space,
+  }) {
     return Stack(
       alignment: Alignment.centerLeft,
+      clipBehavior: Clip.none,
       children: [
         Padding(
           padding: SpaceSelector.padding,
@@ -201,12 +219,8 @@ class _SpaceSelectorState extends State<SpaceSelector> {
             ),
           ),
         ),
-        if (notificationCount > 0) messageOverlay()
+        if (notificationCount > 0) SpaceSelector.unreadIndicator(),
       ],
     );
-  }
-
-  Widget messageOverlay() {
-    return const Positioned(left: -6, child: DotIndicator());
   }
 }

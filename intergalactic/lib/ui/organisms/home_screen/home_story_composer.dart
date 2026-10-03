@@ -29,6 +29,7 @@ import 'package:intergalactic/utils/mime.dart';
 import 'package:intergalactic/utils/text_utils.dart';
 import 'package:intl/intl.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:tiamat/tiamat.dart' as tiamat;
 
 @visibleForTesting
 const double homeStoryDraftReviewTileWidth = 92;
@@ -332,325 +333,332 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
 
   StoryVideoProbe get _videoProbe => widget.mediaServices.videoProbe;
 
-  String get title => Intl.message(
+  String get homeStoryComposerTitle => Intl.message(
     'Your Story',
     name: 'homeStoryComposerTitle',
     desc: 'Title for the Home story composer sheet',
   );
 
-  String get addPhotos => Intl.message(
+  String get homeStoryComposerAddPhotos => Intl.message(
     'Album',
     name: 'homeStoryComposerAddPhotos',
     desc: 'Button text for selecting story photos',
   );
 
-  String get addVideos => Intl.message(
+  String get homeStoryComposerAddVideos => Intl.message(
     'Video',
     name: 'homeStoryComposerAddVideos',
     desc: 'Button text for selecting story videos',
   );
 
-  String get share => Intl.message(
+  String get homeStoryComposerShare => Intl.message(
     'Share',
     name: 'homeStoryComposerShare',
     desc: 'Button text for sharing selected story photos',
   );
 
-  String get mention => Intl.message(
+  String get homeStoryComposerMention => Intl.message(
     'Mention',
     name: 'homeStoryComposerMention',
     desc: 'Button text for selecting story mentions',
   );
 
-  String get mentions => Intl.message(
+  String get homeStoryComposerMentions => Intl.message(
     'Mentions',
     name: 'homeStoryComposerMentions',
     desc: 'Section label for selected story mentions',
   );
 
-  String get done => Intl.message(
+  String get homeStoryComposerDone => Intl.message(
     'Done',
     name: 'homeStoryComposerDone',
     desc: 'Button text for confirming story mention selection',
   );
 
-  String get noMentionContacts => Intl.message(
+  String get homeStoryComposerNoMentionContacts => Intl.message(
     'No DM contacts available.',
     name: 'homeStoryComposerNoMentionContacts',
     desc: 'Message shown when story mentions have no selectable contacts',
   );
 
-  String get currentStories => Intl.message(
+  String get homeStoryComposerCurrentStories => Intl.message(
     'Current',
     name: 'homeStoryComposerCurrentStories',
     desc: 'Section label for active own stories in the story composer',
   );
 
-  String get noCurrentStories => Intl.message(
+  String get homeStoryComposerNoCurrentStories => Intl.message(
     'No active stories yet.',
     name: 'homeStoryComposerNoCurrentStories',
     desc: 'Message shown when the current stories panel is empty',
   );
 
-  String get editDraft => Intl.message(
+  String get homeStoryComposerEditDraft => Intl.message(
     'Edit story photo',
     name: 'homeStoryComposerEditDraft',
     desc: 'Tooltip for editing a selected story draft',
   );
 
-  String get removeDraft => Intl.message(
+  String get homeStoryComposerRemoveDraft => Intl.message(
     'Remove story photo',
     name: 'homeStoryComposerRemoveDraft',
     desc: 'Tooltip for removing a selected story draft',
   );
 
-  String get editVideoDraft => Intl.message(
+  String get homeStoryComposerEditVideoDraft => Intl.message(
     'Edit story video',
     name: 'homeStoryComposerEditVideoDraft',
     desc: 'Tooltip for editing a selected story video draft',
   );
 
-  String get removeVideoDraft => Intl.message(
+  String get homeStoryComposerRemoveVideoDraft => Intl.message(
     'Remove story video',
     name: 'homeStoryComposerRemoveVideoDraft',
     desc: 'Tooltip for removing a selected story video draft',
   );
 
-  String get saveDraft => Intl.message(
+  String get homeStoryComposerSaveDraft => Intl.message(
     'Save story',
     name: 'homeStoryComposerSaveDraft',
     desc: 'Tooltip for saving a selected story draft before sharing',
   );
 
-  String get saveDraftSuccess => Intl.message(
+  String get homeStoryComposerSaveDraftSuccess => Intl.message(
     'Story saved.',
     name: 'homeStoryComposerSaveDraftSuccess',
     desc: 'Confirmation shown after a story draft is saved locally',
   );
 
-  String get saveDraftError => Intl.message(
+  String get homeStoryComposerSaveDraftError => Intl.message(
     'Story could not be saved.',
     name: 'homeStoryComposerSaveDraftError',
     desc: 'Error shown when a story draft cannot be saved locally',
   );
 
-  String get deleteStory => Intl.message(
+  String get homeStoryComposerDeleteStory => Intl.message(
     'Delete story',
     name: 'homeStoryComposerDeleteStory',
     desc: 'Tooltip for deleting an active own story from the composer',
   );
 
-  String get noContacts => Intl.message(
+  String get homeStoryComposerNoContacts => Intl.message(
     'No DM contacts available.',
     name: 'homeStoryComposerNoContacts',
     desc: 'Message shown when stories cannot be sent to any DM contacts',
   );
 
-  String get pickError => Intl.message(
+  String get homeStoryComposerPickError => Intl.message(
     'Could not add those photos.',
     name: 'homeStoryComposerPickError',
     desc: 'Error shown when story photo selection fails',
   );
 
-  String get imageTooLargeError => Intl.message(
+  String get homeStoryComposerImageTooLargeError => Intl.message(
     'Story photos must be 50 MB or smaller.',
     name: 'homeStoryComposerImageTooLargeError',
     desc: 'Error shown when selected story photos exceed the size limit',
   );
 
-  String get videoTooLargeError => Intl.message(
+  String get homeStoryComposerVideoTooLargeError => Intl.message(
     'Story videos must be 100 MB or smaller.',
     name: 'homeStoryComposerVideoTooLargeError',
     desc: 'Error shown when selected story videos exceed the size limit',
   );
 
-  String get videoPickError => Intl.message(
+  String get homeStoryComposerVideoPickError => Intl.message(
     'Could not add that video.',
     name: 'homeStoryComposerVideoPickError',
     desc: 'Error shown when story video selection fails',
   );
 
-  String get videoTrimUnavailable => Intl.message(
+  String get homeStoryComposerVideoTrimUnavailable => Intl.message(
     'Open the video editor and use Done to prepare the selected segment before sharing.',
     name: 'homeStoryComposerVideoTrimUnavailable',
     desc:
         'Error shown when a story video selection has not been prepared for upload',
   );
 
-  String get recordingUnavailable => Intl.message(
+  String get homeStoryComposerRecordingUnavailable => Intl.message(
     'Story video recording is not available for this camera or build. Use a video from your library.',
     name: 'homeStoryComposerRecordingUnavailable',
     desc: 'Error shown when story video recording is unavailable',
   );
 
-  String get recordVideo => Intl.message(
+  String get homeStoryComposerRecordVideo => Intl.message(
     'Record video',
     name: 'homeStoryComposerRecordVideo',
     desc: 'Tooltip for starting a story video recording',
   );
 
-  String get stopRecording => Intl.message(
+  String get homeStoryComposerStopRecording => Intl.message(
     'Stop recording',
     name: 'homeStoryComposerStopRecording',
     desc: 'Tooltip for stopping a story video recording',
   );
 
-  String get recordingFailed => Intl.message(
+  String get homeStoryComposerRecordingFailed => Intl.message(
     'That video could not be recorded. Try again or choose a video from your library.',
     name: 'homeStoryComposerRecordingFailed',
     desc: 'Error shown when story video recording fails',
   );
 
-  String get recordedVideoTooLong => Intl.message(
+  String get homeStoryComposerRecordedVideoTooLong => Intl.message(
     'That recording ran over 30 seconds and was not added. Try recording again.',
     name: 'homeStoryComposerRecordedVideoTooLong',
     desc: 'Error shown when a recorded story video exceeds the duration cap',
   );
 
-  String recordingTimeLeft(String time) => Intl.message(
+  String homeStoryComposerRecordingTimeLeftLabel(String time) => Intl.message(
     '$time left',
-    name: 'homeStoryComposerRecordingTimeLeft',
+    name: 'homeStoryComposerRecordingTimeLeftLabel',
     args: [time],
     desc: 'Short label for remaining story video recording time',
   );
 
-  String get uploadError => Intl.message(
+  String get homeStoryComposerUploadError => Intl.message(
     'Story photos could not be shared.',
     name: 'homeStoryComposerUploadError',
     desc: 'Error shown when story upload fails',
   );
 
-  String get uploadRetry => Intl.message(
+  String get homeStoryComposerUploadRetry => Intl.message(
     'Retry',
     name: 'homeStoryComposerUploadRetry',
     desc: 'Button label for retrying a failed story upload',
   );
 
-  String get draftPreparing => Intl.message(
+  String get homeStoryComposerDraftPreparing => Intl.message(
     'Preparing',
     name: 'homeStoryComposerDraftPreparing',
     desc: 'Status label shown while selected story drafts are prepared',
   );
 
-  String get draftSharing => Intl.message(
+  String get homeStoryComposerDraftSharing => Intl.message(
     'Sharing',
     name: 'homeStoryComposerDraftSharing',
     desc: 'Status label shown while story drafts are being shared',
   );
 
-  String get draftSent => Intl.message(
+  String get homeStoryComposerDraftSent => Intl.message(
     'Sent',
     name: 'homeStoryComposerDraftSent',
     desc: 'Status label shown after story drafts are shared',
   );
 
-  String get draftFailed => Intl.message(
+  String get homeStoryComposerDraftFailed => Intl.message(
     'Failed',
     name: 'homeStoryComposerDraftFailed',
     desc: 'Status label shown after story drafts fail to share',
   );
 
-  String get uploadSent => Intl.message(
+  String get homeStoryComposerUploadSent => Intl.message(
     'Story shared.',
     name: 'homeStoryComposerUploadSent',
     desc: 'Snackbar shown when queued story uploads are sent successfully',
   );
 
-  String get uploadPrepareFailed => Intl.message(
+  String get homeStoryComposerUploadPrepareFailed => Intl.message(
     'Story could not be prepared. Try again.',
     name: 'homeStoryComposerUploadPrepareFailed',
     desc: 'Snackbar shown when a queued story upload cannot be rendered',
   );
 
-  String get uploadFailed => Intl.message(
+  String get homeStoryComposerUploadFailed => Intl.message(
     'Story upload failed. Try again.',
     name: 'homeStoryComposerUploadFailed',
     desc: 'Snackbar shown when a queued story upload fails before sending',
   );
 
-  String uploadSentNone(int storyCount, int failedEventCount) => Intl.message(
+  String homeStoryComposerUploadSentNone(
+    int storyCount,
+    int failedEventCount,
+  ) => Intl.message(
     'No story shares were sent. $failedEventCount failed.',
     name: 'homeStoryComposerUploadSentNone',
     args: [storyCount, failedEventCount],
-    examples: const {'storyCount': 2, 'failedEventCount': 2},
+    // Strings, not ints: flutter gen-l10n builds a synthetic localizations
+    // package from this ARB and rejects a placeholder whose example is not a
+    // non-empty STRING. The extractor copies the literal through unchanged, so
+    // an int here fails the build rather than this file.
+    examples: const {'storyCount': '2', 'failedEventCount': '2'},
     desc:
         'Snackbar shown when queued story uploads finish without sending any story events',
   );
 
-  String uploadPartiallyFailed(
+  String homeStoryComposerUploadPartiallyFailed(
     int sentEventCount,
     int failedEventCount,
   ) => Intl.message(
     'Some story shares failed. $sentEventCount sent, $failedEventCount failed.',
     name: 'homeStoryComposerUploadPartiallyFailed',
     args: [sentEventCount, failedEventCount],
-    examples: const {'sentEventCount': 3, 'failedEventCount': 1},
+    examples: const {'sentEventCount': '3', 'failedEventCount': '1'},
     desc: 'Snackbar shown when queued story uploads partially fail',
   );
 
-  String get renderError => Intl.message(
+  String get homeStoryComposerRenderError => Intl.message(
     'Story edits could not be applied.',
     name: 'homeStoryComposerRenderError',
     desc: 'Error shown when selected story drafts cannot be rendered',
   );
 
-  String get deleteError => Intl.message(
+  String get homeStoryComposerDeleteError => Intl.message(
     'Story could not be deleted.',
     name: 'homeStoryComposerDeleteError',
     desc: 'Error shown when an active story delete fails',
   );
 
-  String get cameraStarting => Intl.message(
+  String get homeStoryComposerCameraStarting => Intl.message(
     'Opening camera...',
     name: 'homeStoryComposerCameraStarting',
     desc: 'Status shown while the story camera preview opens',
   );
 
-  String get cameraError => Intl.message(
+  String get homeStoryComposerCameraError => Intl.message(
     'Camera is not available.',
     name: 'homeStoryComposerCameraError',
     desc: 'Error shown when the story camera preview cannot open',
   );
 
-  String get captureError => Intl.message(
+  String get homeStoryComposerCaptureError => Intl.message(
     'Could not capture that photo.',
     name: 'homeStoryComposerCaptureError',
     desc: 'Error shown when a story camera capture fails',
   );
 
-  String get takePhoto => Intl.message(
+  String get homeStoryComposerTakePhoto => Intl.message(
     'Take photo',
     name: 'homeStoryComposerTakePhoto',
     desc: 'Tooltip for the story camera capture button',
   );
 
-  String get switchCamera => Intl.message(
+  String get homeStoryComposerSwitchCamera => Intl.message(
     'Switch camera',
     name: 'homeStoryComposerSwitchCamera',
     desc: 'Tooltip for switching story camera devices',
   );
 
-  String get cameraInput => Intl.message(
+  String get homeStoryComposerCameraInput => Intl.message(
     'Camera input',
     name: 'homeStoryComposerCameraInput',
     desc: 'Label for selecting a desktop story recording camera input',
   );
 
-  String get frontCameraSelected => Intl.message(
+  String get homeStoryComposerFrontCameraSelected => Intl.message(
     'Front camera',
     name: 'homeStoryComposerFrontCameraSelected',
     desc:
         'Status shown when native mobile story capture prefers the front camera',
   );
 
-  String get rearCameraSelected => Intl.message(
+  String get homeStoryComposerRearCameraSelected => Intl.message(
     'Rear camera',
     name: 'homeStoryComposerRearCameraSelected',
     desc:
         'Status shown when native mobile story capture prefers the rear camera',
   );
 
-  String get textStory => Intl.message(
+  String get homeStoryComposerTextStory => Intl.message(
     'Text story',
     name: 'homeStoryComposerTextStory',
     desc: 'Tooltip for creating a text-only story draft',
@@ -870,7 +878,9 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
               bottom: 18,
               child: Center(
                 child: _StoryCaptureButton(
-                  tooltip: _recordingVideo ? stopRecording : takePhoto,
+                  tooltip: _recordingVideo
+                      ? homeStoryComposerStopRecording
+                      : homeStoryComposerTakePhoto,
                   busy: _busy || _cameraStarting,
                   recording: _recordingVideo,
                   recordingProgress: _recordingProgress,
@@ -900,7 +910,7 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
                 bottom: 108,
                 child: Center(
                   child: _StoryRecordingPill(
-                    label: recordingTimeLeft(
+                    label: homeStoryComposerRecordingTimeLeftLabel(
                       storyVideoDurationLabel(_recordingRemaining),
                     ),
                   ),
@@ -982,11 +992,15 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
       // progress that had already been given up on is worse than saying
       // nothing; `_cameraStarting` below still labels a real start.
       final String? idleLabel = _usesMobileCameraCapture
-          ? (_usingFrontCamera ? frontCameraSelected : rearCameraSelected)
+          ? (_usingFrontCamera
+                ? homeStoryComposerFrontCameraSelected
+                : homeStoryComposerRearCameraSelected)
           : null;
       return _buildCameraPlaceholder(
         context,
-        label: _cameraError ?? (_cameraStarting ? cameraStarting : idleLabel),
+        label:
+            _cameraError ??
+            (_cameraStarting ? homeStoryComposerCameraStarting : idleLabel),
       );
     }
     final renderer = _cameraRenderer;
@@ -1039,7 +1053,9 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
   Widget _buildCameraPlaceholder(BuildContext context, {String? label}) {
     final scheme = Theme.of(context).colorScheme;
     final effectiveLabel =
-        label ?? _cameraError ?? (_cameraStarting ? cameraStarting : null);
+        label ??
+        _cameraError ??
+        (_cameraStarting ? homeStoryComposerCameraStarting : null);
     return ColoredBox(
       color: Colors.black,
       child: Center(
@@ -1092,7 +1108,7 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             child: Text(
-              title,
+              homeStoryComposerTitle,
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
                 color: Colors.white,
                 fontWeight: FontWeight.w700,
@@ -1135,9 +1151,9 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
                         if (index < _drafts.length) {
                           return _StoryDraftTile(
                             draft: _drafts[index],
-                            editTooltip: editDraft,
-                            removeTooltip: removeDraft,
-                            saveTooltip: saveDraft,
+                            editTooltip: homeStoryComposerEditDraft,
+                            removeTooltip: homeStoryComposerRemoveDraft,
+                            saveTooltip: homeStoryComposerSaveDraft,
                             thumbnailCacheWidth: thumbnailCacheWidth,
                             thumbnailCacheHeight: thumbnailCacheHeight,
                             onEdit: _controlsLocked
@@ -1154,8 +1170,8 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
                         final videoIndex = index - _drafts.length;
                         return _StoryVideoDraftTile(
                           draft: _videoDrafts[videoIndex],
-                          editTooltip: editVideoDraft,
-                          removeTooltip: removeVideoDraft,
+                          editTooltip: homeStoryComposerEditVideoDraft,
+                          removeTooltip: homeStoryComposerRemoveVideoDraft,
                           thumbnailCacheWidth: thumbnailCacheWidth,
                           thumbnailCacheHeight: thumbnailCacheHeight,
                           onEdit: _controlsLocked
@@ -1191,7 +1207,7 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
       InterGalacticMotion.short,
     );
     final label = activeStatus == null
-        ? share
+        ? homeStoryComposerShare
         : _draftStatusLabel(activeStatus);
     final icon = activeStatus == null
         ? const Icon(
@@ -1223,13 +1239,13 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
       mainAxisSize: MainAxisSize.min,
       children: [
         _StoryCameraToolButton(
-          tooltip: currentStories,
+          tooltip: homeStoryComposerCurrentStories,
           icon: Icons.collections_bookmark_outlined,
           onPressed: _controlsLocked ? null : _showCurrentStories,
         ),
         const SizedBox(height: 12),
         _StoryCameraToolButton(
-          tooltip: mention,
+          tooltip: homeStoryComposerMention,
           icon: Icons.add,
           badge: _mentionedUserIds.isEmpty
               ? null
@@ -1238,13 +1254,13 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
         ),
         const SizedBox(height: 12),
         _StoryCameraToolButton(
-          tooltip: addPhotos,
+          tooltip: homeStoryComposerAddPhotos,
           icon: Icons.photo_library_outlined,
           onPressed: _controlsLocked ? null : _pickPhotos,
         ),
         const SizedBox(height: 12),
         _StoryCameraToolButton(
-          tooltip: addVideos,
+          tooltip: homeStoryComposerAddVideos,
           icon: Icons.video_library_outlined,
           onPressed: _controlsLocked ? null : _pickVideos,
         ),
@@ -1257,17 +1273,17 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
       mainAxisSize: MainAxisSize.min,
       children: [
         _StoryCameraToolButton(
-          tooltip: textStory,
+          tooltip: homeStoryComposerTextStory,
           icon: Icons.text_fields,
           onPressed: _controlsLocked ? null : _createTextStory,
         ),
         const SizedBox(height: 12),
         _StoryCameraToolButton(
           tooltip: _recordingVideo
-              ? stopRecording
+              ? homeStoryComposerStopRecording
               : _canRecordVideo
-              ? recordVideo
-              : recordingUnavailable,
+              ? homeStoryComposerRecordVideo
+              : homeStoryComposerRecordingUnavailable,
           icon: _recordingVideo ? Icons.stop : Icons.videocam_outlined,
           onPressed: _busy || _cameraStarting
               ? null
@@ -1280,7 +1296,7 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
         )) ...[
           const SizedBox(height: 12),
           _StoryCameraToolButton(
-            tooltip: switchCamera,
+            tooltip: homeStoryComposerSwitchCamera,
             icon: Icons.flip_camera_ios_outlined,
             onPressed: _controlsLocked ? null : _switchCamera,
           ),
@@ -1300,7 +1316,7 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
     final devices = _nativeCameraDevicesCache ?? const [];
     if (devices.isEmpty) {
       return _StoryCameraToolButton(
-        tooltip: cameraInput,
+        tooltip: homeStoryComposerCameraInput,
         icon: _cameraStarting
             ? Icons.more_horiz
             : Icons.video_camera_front_outlined,
@@ -1311,8 +1327,8 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
     }
 
     final selectedLabel = _selectedNativeCameraNameFor(devices);
-    return Tooltip(
-      message: cameraInput,
+    return tiamat.Tooltip(
+      text: homeStoryComposerCameraInput,
       child: SizedBox(
         width: 210,
         child: DecoratedBox(
@@ -1401,10 +1417,10 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
 
   String _draftStatusLabel(HomeStoryComposerDraftStatus status) {
     return switch (status) {
-      HomeStoryComposerDraftStatus.preparing => draftPreparing,
-      HomeStoryComposerDraftStatus.sharing => draftSharing,
-      HomeStoryComposerDraftStatus.sent => draftSent,
-      HomeStoryComposerDraftStatus.failed => draftFailed,
+      HomeStoryComposerDraftStatus.preparing => homeStoryComposerDraftPreparing,
+      HomeStoryComposerDraftStatus.sharing => homeStoryComposerDraftSharing,
+      HomeStoryComposerDraftStatus.sent => homeStoryComposerDraftSent,
+      HomeStoryComposerDraftStatus.failed => homeStoryComposerDraftFailed,
     };
   }
 
@@ -1504,9 +1520,9 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
       setState(() {
         _cameraStarting = false;
         if (hasPreviousPreview) {
-          _error = cameraError;
+          _error = homeStoryComposerCameraError;
         } else {
-          _cameraError = cameraError;
+          _cameraError = homeStoryComposerCameraError;
         }
       });
     }
@@ -1745,9 +1761,9 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
       setState(() {
         _cameraStarting = false;
         if (hasPreviousPreview && !releasedPreviousController) {
-          _error = cameraError;
+          _error = homeStoryComposerCameraError;
         } else {
-          _cameraError = cameraError;
+          _cameraError = homeStoryComposerCameraError;
         }
       });
     }
@@ -1838,7 +1854,7 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
     final track = _cameraStream?.getVideoTracks().firstOrNull;
     if (track == null) {
       setState(() {
-        _error = _cameraError ?? cameraError;
+        _error = _cameraError ?? homeStoryComposerCameraError;
       });
       return;
     }
@@ -1868,7 +1884,7 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
       if (!PlatformUtils.isWeb && !_usesNativeCameraCapture) {
         setState(() {
           _preparingDrafts = false;
-          _error = captureError;
+          _error = homeStoryComposerCaptureError;
         });
         return;
       }
@@ -1913,7 +1929,7 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
       }
       setState(() {
         _preparingDrafts = false;
-        _error = captureError;
+        _error = homeStoryComposerCaptureError;
       });
     }
   }
@@ -2004,7 +2020,7 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
         _recordingHoldActive = false;
         _recordingStartedAt = null;
         _recordingProgress = 0;
-        _error = recordingFailed;
+        _error = homeStoryComposerRecordingFailed;
       });
     }
   }
@@ -2054,7 +2070,7 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
           _preparingDrafts = false;
           _recordingStartedAt = null;
           _recordingProgress = 0;
-          _error = recordingFailed;
+          _error = homeStoryComposerRecordingFailed;
         });
       }
       return;
@@ -2098,7 +2114,7 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
       }
       setState(() {
         _preparingDrafts = false;
-        _error = recordingFailed;
+        _error = homeStoryComposerRecordingFailed;
       });
     } finally {
       if (mounted) {
@@ -2202,7 +2218,7 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
       if (mounted) {
         setState(() {
           _preparingDrafts = false;
-          _error = recordingFailed;
+          _error = homeStoryComposerRecordingFailed;
         });
       }
       return;
@@ -2213,7 +2229,7 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
       if (mounted) {
         setState(() {
           _preparingDrafts = false;
-          _error = recordingFailed;
+          _error = homeStoryComposerRecordingFailed;
         });
       }
       return;
@@ -2227,7 +2243,7 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
       if (mounted) {
         setState(() {
           _preparingDrafts = false;
-          _error = videoTooLargeError;
+          _error = homeStoryComposerVideoTooLargeError;
         });
       }
       return;
@@ -2355,7 +2371,7 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
       setState(() {
         _cameraStarting = false;
         _preparingDrafts = false;
-        _error = captureError;
+        _error = homeStoryComposerCaptureError;
       });
     }
   }
@@ -2373,7 +2389,7 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
       }
       setState(() {
         _preparingDrafts = false;
-        _error = imageTooLargeError;
+        _error = homeStoryComposerImageTooLargeError;
       });
       return;
     }
@@ -2385,7 +2401,7 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
       }
       setState(() {
         _preparingDrafts = false;
-        _error = imageTooLargeError;
+        _error = homeStoryComposerImageTooLargeError;
       });
       return;
     }
@@ -2434,7 +2450,7 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
       }
       setState(() {
         _preparingDrafts = false;
-        _error = renderError;
+        _error = homeStoryComposerRenderError;
       });
     }
   }
@@ -2551,7 +2567,7 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      currentStories,
+                      homeStoryComposerCurrentStories,
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const SizedBox(height: 12),
@@ -2559,7 +2575,7 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
                       child: ownStories.isEmpty
                           ? Center(
                               child: Text(
-                                noCurrentStories,
+                                homeStoryComposerNoCurrentStories,
                                 style: Theme.of(context).textTheme.bodyMedium
                                     ?.copyWith(
                                       color: Theme.of(
@@ -2590,7 +2606,7 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
                                       ) ??
                                       const [],
                                   deleting: deleting,
-                                  deleteTooltip: deleteStory,
+                                  deleteTooltip: homeStoryComposerDeleteStory,
                                   onDelete: deleting
                                       ? null
                                       : () async {
@@ -2661,7 +2677,7 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
       }
       final firstNewDraftId = selected.firstOrNull?.id;
       setState(() {
-        _error = skippedOversized ? imageTooLargeError : null;
+        _error = skippedOversized ? homeStoryComposerImageTooLargeError : null;
         _drafts.addAll(selected);
         _preparingDrafts = false;
       });
@@ -2688,7 +2704,7 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
       }
       setState(() {
         _preparingDrafts = false;
-        _error = pickError;
+        _error = homeStoryComposerPickError;
       });
     }
   }
@@ -2809,9 +2825,9 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
       setState(() {
         _preparingDrafts = false;
         _error = oversized
-            ? videoTooLargeError
+            ? homeStoryComposerVideoTooLargeError
             : failed
-            ? videoPickError
+            ? homeStoryComposerVideoPickError
             : null;
       });
     } catch (error, stackTrace) {
@@ -2829,7 +2845,7 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
       }
       setState(() {
         _preparingDrafts = false;
-        _error = videoPickError;
+        _error = homeStoryComposerVideoPickError;
       });
     }
   }
@@ -2900,7 +2916,7 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
 
   void _showRecordingUnavailable() {
     setState(() {
-      _error = recordingUnavailable;
+      _error = homeStoryComposerRecordingUnavailable;
     });
   }
 
@@ -2948,8 +2964,8 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
       }
       setState(() {
         _error = error is StoryImageRenderException
-            ? renderError
-            : saveDraftError;
+            ? homeStoryComposerRenderError
+            : homeStoryComposerSaveDraftError;
       });
       return;
     } finally {
@@ -2965,7 +2981,7 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
     }
     ScaffoldMessenger.maybeOf(
       context,
-    )?.showSnackBar(SnackBar(content: Text(saveDraftSuccess)));
+    )?.showSnackBar(SnackBar(content: Text(homeStoryComposerSaveDraftSuccess)));
   }
 
   Future<bool> _savePhotoUploadToPhotosIfSupported(
@@ -3013,9 +3029,9 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
       builder: (context) => _StoryMentionSheet(
         contacts: contacts,
         selectedUserIds: _mentionedUserIds,
-        title: mentions,
-        doneLabel: done,
-        emptyLabel: noMentionContacts,
+        title: homeStoryComposerMentions,
+        doneLabel: homeStoryComposerDone,
+        emptyLabel: homeStoryComposerNoMentionContacts,
       ),
     );
     if (!mounted || selected == null) {
@@ -3033,7 +3049,7 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
     final stories = _storyComponent;
     if (stories == null) {
       setState(() {
-        _error = uploadError;
+        _error = homeStoryComposerUploadError;
       });
       return;
     }
@@ -3042,7 +3058,7 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
     }
     if (_mentionContacts.isEmpty) {
       setState(() {
-        _error = noContacts;
+        _error = homeStoryComposerNoContacts;
       });
       return;
     }
@@ -3057,7 +3073,7 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
       return !upload.hasValidSelection || !upload.usesFullSource;
     })) {
       setState(() {
-        _error = videoTrimUnavailable;
+        _error = homeStoryComposerVideoTrimUnavailable;
       });
       return;
     }
@@ -3114,7 +3130,7 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
       if (failure == null) {
         _showStoryUploadOutcomeSnackBar(
           messenger: messenger,
-          message: uploadSent,
+          message: homeStoryComposerUploadSent,
         );
         return;
       }
@@ -3129,7 +3145,10 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
         );
         _showStoryUploadFailureSnackBar(
           messenger: messenger,
-          message: uploadSentNone(result.storyCount, result.failedEventCount),
+          message: homeStoryComposerUploadSentNone(
+            result.storyCount,
+            result.failedEventCount,
+          ),
           stories: stories,
           drafts: failure.retryDrafts(drafts),
           videoDrafts: failure.retryVideoDrafts(videoDrafts),
@@ -3145,7 +3164,7 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
         );
         _showStoryUploadFailureSnackBar(
           messenger: messenger,
-          message: uploadPartiallyFailed(
+          message: homeStoryComposerUploadPartiallyFailed(
             result.sentEventCount,
             result.failedEventCount,
           ),
@@ -3168,8 +3187,8 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
       _showStoryUploadFailureSnackBar(
         messenger: messenger,
         message: error is StoryImageRenderException
-            ? uploadPrepareFailed
-            : uploadFailed,
+            ? homeStoryComposerUploadPrepareFailed
+            : homeStoryComposerUploadFailed,
         stories: stories,
         drafts: drafts.sublist(nextPendingDraftIndex),
         videoDrafts: videoDrafts.sublist(nextPendingVideoIndex),
@@ -3200,7 +3219,7 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
           action: retryDrafts.isEmpty && retryVideoDrafts.isEmpty
               ? null
               : SnackBarAction(
-                  label: uploadRetry,
+                  label: homeStoryComposerUploadRetry,
                   onPressed: () {
                     unawaited(
                       _shareStoryDraftsInBackground(
@@ -3317,7 +3336,7 @@ class _HomeStoryComposerSheetState extends State<_HomeStoryComposerSheet>
     } catch (_) {
       if (mounted) {
         setState(() {
-          _error = deleteError;
+          _error = homeStoryComposerDeleteError;
         });
       }
     } finally {
@@ -3346,8 +3365,8 @@ class _StoryCameraToolButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Tooltip(
-      message: tooltip,
+    return tiamat.Tooltip(
+      text: tooltip,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -3418,8 +3437,8 @@ class _StoryCaptureButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final enabled = onPressed != null || onLongPressStart != null;
-    return Tooltip(
-      message: tooltip,
+    return tiamat.Tooltip(
+      text: tooltip,
       child: Semantics(
         button: true,
         label: tooltip,

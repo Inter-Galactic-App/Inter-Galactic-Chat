@@ -51,7 +51,7 @@ Install Flutter with Windows desktop support, then clone the repository and
 work from the app package directory:
 
 ```powershell
-git clone https://github.com/Inter-Galactic-App/Inter-Galactic.git inter-galactic
+git clone https://github.com/Inter-Galactic-App/Inter-Galactic-Chat.git inter-galactic
 cd inter-galactic
 cd intergalactic
 flutter pub get
@@ -78,4 +78,4 @@ Security reports should follow [SECURITY.md](SECURITY.md) and should not be post
 Inter Galactic is based on Commet. See [LICENSE](LICENSE) and [FORK_NOTICE.md](FORK_NOTICE.md) for license and attribution details.
 
 Shoutout to Renzo Mayo aka [Renzo!](https://www.instagram.com/_renzobeats_/)
-for creating Inter Galactic's original call and notification sounds.
+for creating Inter Galactic's original call, notification, and stream cues.

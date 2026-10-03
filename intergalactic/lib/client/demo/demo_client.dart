@@ -3823,9 +3823,12 @@ class DemoRecentEmoticonComponent
     UnicodeEmoticon('🪐'),
     UnicodeEmoticon('🔥'),
   ];
+  final List<Emoticon> _recentStickers = [];
 
   @override
-  Future<void> clear() async {}
+  Future<void> clear() async {
+    _recentStickers.clear();
+  }
 
   @override
   List<Emoticon> getQuickReactionEmoticon(Room? room) =>
@@ -3838,6 +3841,10 @@ class DemoRecentEmoticonComponent
   @override
   List<Emoticon> getRecentTypedEmoticon(Room? room) =>
       getQuickReactionEmoticon(room);
+
+  @override
+  List<Emoticon> getRecentStickerEmoticon(Room? room) =>
+      List.unmodifiable(_recentStickers);
 
   @override
   Future<void> reactedEmoticon(Room room, Emoticon emoticon) async {}
@@ -3862,6 +3869,16 @@ class DemoRecentEmoticonComponent
 
   @override
   Future<void> typedEmoticon(Room room, Emoticon emoticon) async {}
+
+  @override
+  Future<void> stickerEmoticon(Room room, Emoticon emoticon) async {
+    _recentStickers
+      ..remove(emoticon)
+      ..insert(0, emoticon);
+    if (_recentStickers.length > 30) {
+      _recentStickers.removeLast();
+    }
+  }
 }
 
 class DemoRoomEmoticonComponent

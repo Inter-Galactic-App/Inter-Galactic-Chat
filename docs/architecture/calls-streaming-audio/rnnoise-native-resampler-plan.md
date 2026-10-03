@@ -1,8 +1,7 @@
 # RNNoise Native Resampler Plan
 
-Status: AUDIO-owned microphone capture-format plan
-Owner: AUDIO for RNNoise behavior; DOCUMENTATION for structure
-Last reviewed: 2026-06-27 by AUDIO
+Status: Microphone capture-format plan
+Last reviewed: 2026-06-27
 
 This note tracks the desktop microphone-format work needed to make RNNoise
 reliable when WebRTC does not deliver RNNoise's preferred native frame shape.

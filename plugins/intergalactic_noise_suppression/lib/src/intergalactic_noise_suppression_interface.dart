@@ -7,6 +7,7 @@ class NoiseSuppressionNativeConfig {
     required this.fastCloseEnabled,
     required this.deepFilterNetTransientSuppressionEnabled,
     required this.deepFilterNetHushSuppressionEnabled,
+    this.deepFilterNetSpeechProtectHysteresisEnabled = false,
   });
 
   final double vadThreshold;
@@ -16,6 +17,7 @@ class NoiseSuppressionNativeConfig {
   final bool fastCloseEnabled;
   final bool deepFilterNetTransientSuppressionEnabled;
   final bool deepFilterNetHushSuppressionEnabled;
+  final bool deepFilterNetSpeechProtectHysteresisEnabled;
 }
 
 abstract final class NoiseSuppressionDiagnosticStageMask {
@@ -129,6 +131,7 @@ class NoiseSuppressionNativeStatus {
     required this.deepFilterNetLastLocalSnr,
     required this.deepFilterNetSpeechProtectedFrames,
     required this.deepFilterNetLastSpeechProtectWetMix,
+    this.deepFilterNetSpeechProtectHysteresisEnabled = false,
     required this.deepFilterNetAttenuationLimitDb,
     required this.deepFilterNetPostFilterBeta,
     required this.deepFilterNetTransientSuppressionEnabled,
@@ -246,6 +249,7 @@ class NoiseSuppressionNativeStatus {
   final double deepFilterNetLastLocalSnr;
   final int deepFilterNetSpeechProtectedFrames;
   final double deepFilterNetLastSpeechProtectWetMix;
+  final bool deepFilterNetSpeechProtectHysteresisEnabled;
   final double deepFilterNetAttenuationLimitDb;
   final double deepFilterNetPostFilterBeta;
   final bool deepFilterNetTransientSuppressionEnabled;
@@ -543,6 +547,8 @@ class NoiseSuppressionNativeStatus {
         json['deepFilterNetLastSpeechProtectWetMix'],
         fallback: 1,
       ),
+      deepFilterNetSpeechProtectHysteresisEnabled:
+          parseBool(json['deepFilterNetSpeechProtectHysteresisEnabled']),
       deepFilterNetAttenuationLimitDb: parseDouble(
         json['deepFilterNetAttenuationLimitDb'],
       ),

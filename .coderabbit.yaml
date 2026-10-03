@@ -252,6 +252,27 @@ reviews:
         - platform coverage for Windows desktop, Android APK, iPhone TestFlight, and web beta
         - PR and issue templates that ask for useful validation without exposing private data
 
+    # Forgejo Actions reads .forgejo/workflows/, and that is where the gates
+    # that actually block a merge live - the Dart gates job and the l10n
+    # extraction gate. It was absent here until 2026-09-08, so the workflow
+    # carrying those gates had never been reviewed by CodeRabbit at all.
+    - path: ".forgejo/**"
+      instructions: |
+        Review Forgejo Actions automation as the gate that actually blocks a
+        merge in this repository. GitHub Actions is the secondary route.
+        Focus on:
+        - a gate that can pass without running: a path filter that matches
+          nothing, a resolver that selects zero tests, a step skipped at count
+          zero. Silence here reads as success and has cost this repo real
+          regressions
+        - a check whose exit code cannot fail, or whose failure is swallowed by
+          a pipeline that reports the wrong stage's status
+        - least-privilege permissions and secret handling on a self-hosted
+          runner
+        - assumptions about the runner's filesystem, ordering or locale that a
+          contributor's machine would not share
+        - steps that mutate the checkout and then compare against it
+
     - path: "README.md"
       instructions: |
         Review as a public beta landing document.
@@ -296,6 +317,7 @@ reviews:
 
   path_filters:
     - ".github/**"
+    - ".forgejo/**"
     - ".coderabbit.yaml"
     - "README.md"
     - "SECURITY.md"
@@ -316,6 +338,7 @@ reviews:
     - "intergalactic/linux/**"
     - "intergalactic/macos/**"
     - "intergalactic/ios/**"
+    - "scripts/**"
     - "intergalactic/scripts/**"
     - "intergalactic/tool/**"
     - "intergalactic/test/**"

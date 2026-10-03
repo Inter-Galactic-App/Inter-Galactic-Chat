@@ -136,9 +136,10 @@ when present.
   `0.8.1+1003`. The gate HAS since been re-run against the released build:
   `Assert-NativePayloadInventory.ps1` mapped all 43 Windows native files on the
   clean recut `18e425e9` and verified the shipped `libwebrtc.dll` digest
-  `ED53C3D4...`. This item is cleared for `0.8.1+1004`. The 2026-08-21 note
-  said the gate had not been re-run; that is superseded and kept only so the
-  change is visible.
+  `ED53C3D4...`. The **Windows native-payload/libwebrtc recut gate** is
+  cleared for `0.8.1+1004`; the unticked OpenVINO evidence item is not.
+  The 2026-08-21 note said the native-payload gate had not been re-run; that
+  is superseded and kept only so the change is visible.
 - [x] Native DeepFilterNet C API / DeepFilterNet3 ONNX evidence is recorded
   under `docs/release/evidence/license-sources/deepfilternet-native/`,
   including the current Windows developer package hashes for `df.dll`,

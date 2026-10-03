@@ -22,23 +22,28 @@ class AppSettingsPage extends StatelessWidget {
   const AppSettingsPage({
     this.initialTabId,
     this.includeTutorialPreviewTabs = false,
+    this.initialTabInline = false,
     super.key,
   });
 
   final String? initialTabId;
   final bool includeTutorialPreviewTabs;
 
+  /// Keeps a demo-only mobile settings tab in the current widget tree instead
+  /// of pushing its normal route above the tutorial card.
+  final bool initialTabInline;
+
   String get promptLogoutFailedTitle => Intl.message(
-        "Logout failed",
-        name: "promptLogoutFailedTitle",
-        desc: "Title shown when logging out of an account fails",
-      );
+    "Logout failed",
+    name: "promptLogoutFailedTitle",
+    desc: "Title shown when logging out of an account fails",
+  );
 
   String get promptLogoutFailedDescription => Intl.message(
-        "Couldn't log out this account. Please try again.",
-        name: "promptLogoutFailedDescription",
-        desc: "Error text shown when logging out of an account fails",
-      );
+    "Couldn't log out this account. Please try again.",
+    name: "promptLogoutFailedDescription",
+    desc: "Error text shown when logging out of an account fails",
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -71,6 +76,7 @@ class AppSettingsPage extends StatelessWidget {
       ],
       buttons: logoutButtons,
       initialTabId: initialTabId,
+      initialTabInline: initialTabInline,
       accountClientManager: manager,
       initialSelectedAccount: initialSelectedAccount,
     );
@@ -82,7 +88,7 @@ class AppSettingsPage extends StatelessWidget {
   ) async {
     final initialClient =
         SettingsAccountScope.maybeRead(context)?.selectedClient ??
-            SettingsAccountController.resolvePreferredClient(manager);
+        SettingsAccountController.resolvePreferredClient(manager);
     final selectedClient = await AdaptiveDialog.show<Client>(
       context,
       title: "Are you sure you want to log out?",
@@ -131,10 +137,7 @@ ClientManager? _providedClientManager(BuildContext context) {
 }
 
 class _LogoutDialog extends StatefulWidget {
-  const _LogoutDialog({
-    required this.clientManager,
-    this.initialClient,
-  });
+  const _LogoutDialog({required this.clientManager, this.initialClient});
 
   final ClientManager clientManager;
   final Client? initialClient;
@@ -150,9 +153,8 @@ class _LogoutDialogState extends State<_LogoutDialog> {
   void initState() {
     super.initState();
     if (widget.clientManager.clients.isNotEmpty) {
-      _selectedClient = widget.clientManager.clients.contains(
-        widget.initialClient,
-      )
+      _selectedClient =
+          widget.clientManager.clients.contains(widget.initialClient)
           ? widget.initialClient
           : SettingsAccountController.resolvePreferredClient(
               widget.clientManager,
@@ -166,8 +168,8 @@ class _LogoutDialogState extends State<_LogoutDialog> {
     final validatedSelectedClient = clients.contains(_selectedClient)
         ? _selectedClient
         : clients.isNotEmpty
-            ? clients.first
-            : null;
+        ? clients.first
+        : null;
 
     return SizedBox(
       width: 460,
@@ -178,8 +180,8 @@ class _LogoutDialogState extends State<_LogoutDialog> {
           Text(
             "Choose which signed-in account to log out.",
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 14),
           if (clients.isNotEmpty && validatedSelectedClient != null)
@@ -222,7 +224,7 @@ class _LogoutDialogState extends State<_LogoutDialog> {
                   onTap: validatedSelectedClient == null
                       ? null
                       : () =>
-                          Navigator.of(context).pop(validatedSelectedClient),
+                            Navigator.of(context).pop(validatedSelectedClient),
                 ),
               ),
             ],

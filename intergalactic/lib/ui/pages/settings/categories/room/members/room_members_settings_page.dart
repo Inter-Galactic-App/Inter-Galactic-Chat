@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intergalactic/client/components/invitation/invitation_component.dart';
 import 'package:intergalactic/client/member.dart';
 import 'package:intergalactic/client/matrix/matrix_role.dart';
 import 'package:intergalactic/client/role.dart';
@@ -10,6 +11,8 @@ import 'package:intergalactic/config/build_config.dart';
 import 'package:intergalactic/debug/log.dart';
 import 'package:intergalactic/ui/atoms/role_view.dart';
 import 'package:intergalactic/ui/molecules/user_panel.dart';
+import 'package:intergalactic/ui/navigation/adaptive_dialog.dart';
+import 'package:intergalactic/ui/organisms/invitation_view/send_invitation.dart';
 import 'package:intergalactic/ui/pages/settings/categories/app/setting_row.dart';
 import 'package:intergalactic/ui/pages/settings/settings_status_components.dart';
 import 'package:intergalactic/utils/error_utils.dart';
@@ -38,6 +41,14 @@ class _RoomMembersSettingsPageState extends State<RoomMembersSettingsPage> {
   bool _isSaving = false;
 
   bool get _canEdit => widget.room.permissions.canChangeRoles;
+
+  InvitationComponent? get _invitation =>
+      widget.room.client.getComponent<InvitationComponent>();
+
+  /// This page is the Members tab for both a room and a space, so the copy
+  /// below deliberately avoids naming either.
+  bool get _canInvite =>
+      _invitation != null && widget.room.permissions.canInviteUser;
 
   bool get _canReviewJoinRequests =>
       widget.room.permissions.canInviteUser || widget.room.permissions.canKick;
@@ -136,6 +147,10 @@ class _RoomMembersSettingsPageState extends State<RoomMembersSettingsPage> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // First, because it is the one thing on this page you come here to
+            // DO. Join requests below still announce themselves with an accent
+            // panel, so leading with the action does not bury them.
+            if (_canInvite) _buildInviteSection(context),
             if (_joinRequests.isNotEmpty) _buildJoinRequestsSection(context),
             if (_pendingInvites.isNotEmpty)
               _buildPendingInvitesSection(context),
@@ -200,6 +215,63 @@ class _RoomMembersSettingsPageState extends State<RoomMembersSettingsPage> {
         );
       },
     );
+  }
+
+  Widget _buildInviteSection(BuildContext context) {
+    return SettingsSection(
+      title: 'Invite',
+      showDivider: false,
+      children: [
+        SettingsControlRow(
+          title: 'Invite people',
+          description:
+              'Search for someone and send them an invite. They appear under '
+              'Pending invites until they accept.',
+          trailing: Align(
+            alignment: Alignment.centerRight,
+            child: SizedBox(
+              width: 124,
+              child: tiamat.Button(
+                text: 'Invite',
+                onTap: _isSaving ? null : () => _showInviteDialog(context),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _showInviteDialog(BuildContext context) async {
+    final invitation = _invitation;
+    if (invitation == null) {
+      return;
+    }
+
+    await AdaptiveDialog.show<void>(
+      context,
+      title: 'Invite',
+      builder: (context) => SendInvitationWidget(
+        widget.room.client,
+        invitation,
+        roomId: widget.room.identifier,
+        displayName: widget.room.displayName,
+        existingMembers: widget.room.memberIds,
+        room: widget.room,
+      ),
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    // The pending-invite list is loaded once, in initState. Without this the
+    // person you just invited is missing from the very section that exists to
+    // show them, which reads as the invite having failed.
+    await ErrorUtils.tryRun(context, _loadMembers);
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   Widget _buildJoinRequestsSection(BuildContext context) {

@@ -51,8 +51,13 @@ Use one active release-cycle record per semantic version:
 
 - `docs/release/release-record-vX.Y.Z.md`
 
-That record should contain a build ledger with rows for each candidate or
-published build, for example `0.7.4+985`, `0.7.4+986`, and so on. When release
+Maintain the build-attempt ledger in the private maintainer workspace at that
+semantic-version path, with rows for each candidate or published build, for
+example `0.7.4+985`, `0.7.4+986`, and so on. The app repository's matching
+record is public: keep it concise and factual, with published artifact identities
+added only after verification and authorized publication. Do not put internal
+review checkpoints, failed-artifact ledgers or agent assignments there.
+When release
 pipeline work finds an issue and the fix requires a new build number, continue
 the same `vX.Y.Z` release-cycle record instead of restarting the whole release
 packet in a new build-specific document.

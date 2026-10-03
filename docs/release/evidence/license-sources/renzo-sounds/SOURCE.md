@@ -1,9 +1,7 @@
 # Inter Galactic Original Sound Pack
 
-Status: release-ready project asset provenance for the current Inter Galactic
-sound and ringtone pack.
-
-Reviewed by REVIEW on 2026-06-27.
+Status: project asset provenance for the Inter Galactic sound and ringtone pack;
+the newly added stream cues still need exact-candidate package verification.
 
 ## Source
 
@@ -31,10 +29,29 @@ that the sounds were imported from Commet or another upstream dependency.
 | `intergalactic/assets/sound/ringtone_out.ogg` | `references/inter-galactic-sounds/IG_Ringtone_Out.ogg` | `867132EB1AF7A7391FCD8C7AA9551E7ABDECFCFF3566A76BFA61BD27F499B30E` |
 | `intergalactic/assets/sound/unmuted.ogg` | `references/inter-galactic-sounds/IG_Unmuted.ogg` | `34441B9493E62511120AA1DB432515794A9E50BE159715DC6DB873FC86D8C626` |
 
+## Stream Lifecycle Cues Added 2026-09-26
+
+Renzo's supplied `IG_Stream_Sounds.zip` contained two OGG masters. Its local
+archive SHA-256 was `4AC686E011B6EB3294B92A6DD1C8D84BD83C5D66A6ED1960E99723A7A74AEB0C`.
+The archive is a comparison input, not a tracked or recipient-served evidence
+path; the app's committed OGG bytes and hashes below are the durable asset
+identity. The bundled app files match the corresponding archive entries byte
+for byte.
+
+| Bundled asset | Supplied archive entry | Bytes | SHA-256 |
+| --- | --- | ---: | --- |
+| `intergalactic/assets/sound/stream_start.ogg` | `IG_Stream_Sounds/IG_Stream_Start.ogg` | 32,190 | `E673CF867909F9515A476F172DA2E9B9D3A1B140F29FF62F523C16509AF2C303` |
+| `intergalactic/assets/sound/stream_end.ogg` | `IG_Stream_Sounds/IG_Stream_End.ogg` | 31,878 | `4BE4EDFA900349C7B324ACF784CBD27A3EC1BAA3EDD32E3064DF75E01F462B52` |
+
+These are original creator-provided app sounds under the same project usage
+basis and Renzo credit above, not a third-party stock-sound licence. The
+Flutter asset declaration includes `assets/sound/`; this record does not
+establish the contents of any particular release package or notice display.
+
 ## Android Raw Resources
 
-Android notification channels use raw resources by stable resource name. REVIEW
-regenerated these WAV resources from the Renzo sound masters on 2026-06-27:
+Android notification channels use raw resources by stable resource name. These
+WAV resources were regenerated from the Renzo sound masters on 2026-06-27:
 
 | Shipped asset | Source master | Format | SHA-256 |
 | --- | --- | --- | --- |

@@ -12,6 +12,8 @@ import 'package:matrix/matrix_api_lite/model/sync_update.dart';
 
 const String interGalacticDirectRoomsAccountDataKey =
     'chat.intergalactic.direct_rooms.v1';
+const String interGalacticGroupRoomsAccountDataKey =
+    'chat.intergalactic.group_rooms.v1';
 
 class MatrixDirectMessagesComponent
     extends DirectMessagesComponent<MatrixClient>
@@ -44,13 +46,16 @@ class MatrixDirectMessagesComponent
   StreamSubscription<int>? _roomAddedSubscription;
   StreamSubscription<int>? _roomRemovedSubscription;
   final Map<String, StreamSubscription<void>> _roomUpdateSubscriptions = {};
+  Set<String>? _localExplicitGroupRoomIds;
   bool _disposed = false;
 
   MatrixDirectMessagesComponent(this.client) {
-    _onSyncSubscription =
-        client.getMatrixClient().onSync.stream.listen(onMatrixSync);
-    _onSelectedRoomSubscription =
-        EventBus.onSelectedRoomChanged.stream.listen((value) {
+    _onSyncSubscription = client.getMatrixClient().onSync.stream.listen(
+      onMatrixSync,
+    );
+    _onSelectedRoomSubscription = EventBus.onSelectedRoomChanged.stream.listen((
+      value,
+    ) {
       if (_disposed) {
         return;
       }
@@ -82,6 +87,10 @@ class MatrixDirectMessagesComponent
       return false;
     }
 
+    if (isRoomExplicitlyGroup(room)) {
+      return false;
+    }
+
     if (room.matrixRoom.isDirectChat) {
       return true;
     }
@@ -93,9 +102,64 @@ class MatrixDirectMessagesComponent
     return _getJoinedOneToOnePartnerId(room) != null;
   }
 
+  /// Returns whether this account has explicitly classified [room] as a group.
+  ///
+  /// Matrix falls back to treating a complete one-to-one room as a direct
+  /// message. This local marker lets someone intentionally keep such a room in
+  /// the regular room list after removing its `m.direct` tag.
+  bool isRoomExplicitlyGroup(MatrixRoom room) {
+    return _explicitGroupRoomIds().contains(room.identifier);
+  }
+
+  /// Marks [room] as a direct message with [partnerId] for this account.
+  Future<void> markRoomAsDirectMessage(
+    MatrixRoom room, {
+    required String partnerId,
+  }) async {
+    await room.matrixRoom.addToDirectChat(partnerId);
+    await _setRoomExplicitlyGroup(room.identifier, false);
+    updateRoomsList();
+  }
+
+  /// Marks [room] as a regular group room for this account.
+  Future<void> markRoomAsGroup(MatrixRoom room) async {
+    // The local classification is written first. Removing the `m.direct` entry
+    // first would leave the room with neither marker if this write then failed,
+    // and a complete one-to-one room is classified as a direct message again
+    // on the next list update.
+    await _setRoomExplicitlyGroup(room.identifier, true);
+
+    try {
+      await room.matrixRoom.removeFromDirectChat();
+    } catch (_) {
+      try {
+        await _setRoomExplicitlyGroup(room.identifier, false);
+      } catch (error, stackTrace) {
+        // The caller still gets the original failure. This account keeps the
+        // group classification while the `m.direct` entry survives.
+        Log.w(
+          'Failed to restore the direct classification (${error.runtimeType})',
+          category: LogCategory.matrix,
+          source: 'MatrixDirectMessagesComponent',
+        );
+        Log.d(stackTrace, category: LogCategory.matrix);
+      }
+      rethrow;
+    }
+
+    updateRoomsList();
+  }
+
   @override
   String? getDirectMessagePartnerId(Room room) {
     if (room is! MatrixRoom) {
+      return null;
+    }
+
+    // Mirrors the gate in [isRoomDirectMessage]. Consumers key direct-message
+    // presentation on a non-null partner id, so a room this account has
+    // explicitly classified as a group must report none.
+    if (isRoomExplicitlyGroup(room)) {
       return null;
     }
 
@@ -196,6 +260,30 @@ class MatrixDirectMessagesComponent
     };
   }
 
+  static Set<String> explicitGroupRoomIdsFromContent(
+    Map<String, Object?>? content,
+  ) {
+    if (content == null || content['v'] != 1) {
+      return const {};
+    }
+
+    final rawRooms = content['rooms'];
+    if (rawRooms is! List) {
+      return const {};
+    }
+
+    return rawRooms.whereType<String>().where(_looksLikeMatrixRoomId).toSet();
+  }
+
+  static Map<String, Object?> explicitGroupRoomIdsToContent(
+    Iterable<String> roomIds,
+  ) {
+    return {
+      'v': 1,
+      'rooms': roomIds.where(_looksLikeMatrixRoomId).toSet().toList()..sort(),
+    };
+  }
+
   static String? _partnerIdFromMarkerValue(Object? value) {
     if (value is String) {
       return value;
@@ -243,8 +331,9 @@ class MatrixDirectMessagesComponent
       return;
     }
 
-    directMessageRooms =
-        client.rooms.where((r) => isRoomDirectMessage(r)).toList();
+    directMessageRooms = client.rooms
+        .where((r) => isRoomDirectMessage(r))
+        .toList();
     _refreshRoomUpdateSubscriptions();
     updateNotificationsList();
 
@@ -256,17 +345,22 @@ class MatrixDirectMessagesComponent
       return;
     }
 
-    if (event.accountData?.any((e) =>
-            e.type == "m.direct" ||
-            e.type == interGalacticDirectRoomsAccountDataKey) ==
+    if (event.accountData?.any(
+          (e) =>
+              e.type == "m.direct" ||
+              e.type == interGalacticDirectRoomsAccountDataKey ||
+              e.type == interGalacticGroupRoomsAccountDataKey,
+        ) ==
         true) {
+      _localExplicitGroupRoomIds = null;
       updateRoomsList();
     } else if (_syncShouldRefreshRoomsList(event)) {
       _scheduleRoomsListUpdate();
     }
 
-    if (event.rooms?.join?.entries
-            .any((e) => e.value.unreadNotifications != null) ==
+    if (event.rooms?.join?.entries.any(
+          (e) => e.value.unreadNotifications != null,
+        ) ==
         true) {
       updateNotificationsList();
     }
@@ -290,8 +384,10 @@ class MatrixDirectMessagesComponent
     }
 
     highlightedRoomsList = directMessageRooms
-        .where((e) =>
-            e.displayNotificationCount > 0 && e.identifier != currentRoomId)
+        .where(
+          (e) =>
+              e.displayNotificationCount > 0 && e.identifier != currentRoomId,
+        )
         .toList();
 
     highlightedListUpdated.add(null);
@@ -347,10 +443,12 @@ class MatrixDirectMessagesComponent
   }
 
   bool _hasRoomClassificationEvent(Iterable<dynamic>? events) {
-    return events?.any((e) =>
-            e.type == matrix.EventTypes.RoomMember ||
-            e.type == matrix.EventTypes.SpaceChild ||
-            e.type == matrix.EventTypes.SpaceParent) ==
+    return events?.any(
+          (e) =>
+              e.type == matrix.EventTypes.RoomMember ||
+              e.type == matrix.EventTypes.SpaceChild ||
+              e.type == matrix.EventTypes.SpaceParent,
+        ) ==
         true;
   }
 
@@ -363,13 +461,53 @@ class MatrixDirectMessagesComponent
   }
 
   Map<String, Object?>? _directRoomMarkerContent() {
-    final content = client.matrixClient
-        .accountData[interGalacticDirectRoomsAccountDataKey]?.content;
+    final content = client
+        .matrixClient
+        .accountData[interGalacticDirectRoomsAccountDataKey]
+        ?.content;
     if (content == null) {
       return null;
     }
 
     return Map<String, Object?>.from(content);
+  }
+
+  Set<String> _explicitGroupRoomIds() {
+    final locallyUpdatedRoomIds = _localExplicitGroupRoomIds;
+    if (locallyUpdatedRoomIds != null) {
+      return locallyUpdatedRoomIds;
+    }
+
+    final content = client
+        .matrixClient
+        .accountData[interGalacticGroupRoomsAccountDataKey]
+        ?.content;
+    if (content == null) {
+      return const {};
+    }
+
+    return explicitGroupRoomIdsFromContent(Map<String, Object?>.from(content));
+  }
+
+  Future<void> _setRoomExplicitlyGroup(String roomId, bool group) async {
+    final selfId = client.matrixClient.userID ?? client.self?.identifier;
+    if (selfId == null) {
+      throw StateError('A signed-in Matrix account is required.');
+    }
+
+    final roomIds = Set<String>.from(_explicitGroupRoomIds());
+    if (group) {
+      roomIds.add(roomId);
+    } else {
+      roomIds.remove(roomId);
+    }
+
+    await client.matrixClient.setAccountData(
+      selfId,
+      interGalacticGroupRoomsAccountDataKey,
+      explicitGroupRoomIdsToContent(roomIds),
+    );
+    _localExplicitGroupRoomIds = roomIds;
   }
 
   Future<void> _rememberAppDirectRoomMarker({

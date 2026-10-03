@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
+
+import 'package:intergalactic/client/favorite_room_categories.dart';
 import 'package:intergalactic/client/matrix/matrix_space.dart';
 import 'package:intergalactic/client/space.dart';
 import 'package:matrix/matrix.dart' as matrix;
@@ -9,7 +12,6 @@ import 'package:uuid/uuid.dart';
 
 const String matrixSpaceRoomCategoriesEventType =
     'chat.intergalactic.space.categories';
-const int matrixSpaceCategoryAdminPowerLevel = 100;
 
 final spaceRoomCategoryStore = SpaceRoomCategoryStore();
 
@@ -18,22 +20,72 @@ String normalizeSpaceRoomCategoryName(String value) {
   return trimmed.isEmpty ? 'New Category' : trimmed;
 }
 
+/// Whether this account may edit the space's category state event.
+///
+/// `canChangeStateEvent` is the whole answer. It reads the space's own
+/// `m.room.power_levels`, including an explicit entry for this event type in
+/// the `events` map, so a space that deliberately grants categories at PL 50
+/// is honoured.
+///
+/// It used to ALSO require power level 100. That extra clause could only ever
+/// disagree with the room by refusing something the room had allowed: the room
+/// said yes and the client said no, with no way to tell the user why. Matrix
+/// has no notion of "space admin" beyond the power levels the space itself
+/// declares, so there was nothing for the hardcoded number to be right about.
 bool canManageSpaceRoomCategories(Space space) {
   if (space case MatrixSpace matrixSpace) {
-    final userId = matrixSpace.matrixRoom.client.userID ??
-        matrixSpace.client.self?.identifier;
-    if (userId == null) {
-      return false;
-    }
-
-    return matrixSpace.matrixRoom.getPowerLevelByUserId(userId) >=
-            matrixSpaceCategoryAdminPowerLevel &&
-        matrixSpace.matrixRoom.canChangeStateEvent(
-          matrixSpaceRoomCategoriesEventType,
-        );
+    return matrixSpace.matrixRoom.canChangeStateEvent(
+      matrixSpaceRoomCategoriesEventType,
+    );
   }
 
   return space.permissions.canEditChildren;
+}
+
+/// The scope of the DEVICE-LOCAL category store.
+///
+/// It exists so a Matrix space's id cannot be handed to the local-only path.
+/// A Matrix space keeps its categories in a room state event on the space,
+/// shared with every member; the local store serves spaces that have no server
+/// to write to - the favourites pseudo-space, and any future non-Matrix space.
+///
+/// Before this type both paths took a bare `String spaceLocalId`, so a Matrix
+/// space could be written to the local store by passing the wrong id. Nothing
+/// read it back - `loadForSpace` goes to room state for a Matrix space - so the
+/// copy would sit there, stale, diverging silently from the shared truth. That
+/// is limb 2 of the space-categories audit, and a type is a better answer to it
+/// than a guard, because it removes the call rather than rejecting it.
+extension type const LocalSpaceCategoryScope._(String localId) {
+  /// The favourites pseudo-space, which has no Matrix room behind it.
+  static const favorites = LocalSpaceCategoryScope._(
+    favoriteRoomCategoriesLocalId,
+  );
+
+  /// For a space with no server-side home for its categories.
+  ///
+  /// Throws for a [MatrixSpace]: that is a caller reaching for the wrong store,
+  /// not a case to fall back on.
+  factory LocalSpaceCategoryScope.forSpace(Space space) {
+    if (space is MatrixSpace) {
+      throw ArgumentError.value(
+        space.identifier,
+        'space',
+        'A Matrix space keeps its categories in room state. Use the ForSpace '
+            'methods, which write the shared event.',
+      );
+    }
+    return LocalSpaceCategoryScope._(space.localId);
+  }
+
+  /// For tests that exercise the local store's own behaviour - per-client
+  /// isolation, ordering - with synthetic ids rather than a Space.
+  @visibleForTesting
+  factory LocalSpaceCategoryScope.forTesting(String localId) =>
+      LocalSpaceCategoryScope._(localId);
+
+  /// For account-scoped local state that has no Space object behind it.
+  factory LocalSpaceCategoryScope.forClient(String localId) =>
+      LocalSpaceCategoryScope._(localId);
 }
 
 class SpaceRoomCategoryDefinition {
@@ -84,11 +136,7 @@ class SpaceRoomCategoryDefinition {
   }
 
   Map<String, Object?> toJson({bool includeLocalState = true}) {
-    final json = <String, Object?>{
-      'id': id,
-      'name': name,
-      'room_ids': roomIds,
-    };
+    final json = <String, Object?>{'id': id, 'name': name, 'room_ids': roomIds};
     if (roomOrderIds.isNotEmpty) {
       json['room_order_ids'] = roomOrderIds;
     }
@@ -110,19 +158,19 @@ class SpaceRoomCategoryState {
     return SpaceRoomCategoryState(
       categories: json['categories'] is List
           ? (json['categories'] as List)
-              .whereType<Map>()
-              .map(
-                (category) => SpaceRoomCategoryDefinition.fromJson(
-                  Map<String, Object?>.from(category),
-                ),
-              )
-              .toList()
+                .whereType<Map>()
+                .map(
+                  (category) => SpaceRoomCategoryDefinition.fromJson(
+                    Map<String, Object?>.from(category),
+                  ),
+                )
+                .toList()
           : const [],
       uncategorizedCollapsed: json['uncategorized_collapsed'] == true,
       uncategorizedRoomOrderIds: json['uncategorized_room_order_ids'] is List
           ? (json['uncategorized_room_order_ids'] as List)
-              .whereType<String>()
-              .toList()
+                .whereType<String>()
+                .toList()
           : const [],
     );
   }
@@ -437,8 +485,8 @@ class SpaceRoomCategoryStore {
   SpaceRoomCategoryStore({
     SharedPreferences? preferences,
     String Function()? idFactory,
-  })  : _preferences = preferences,
-        _idFactory = idFactory ?? const Uuid().v4;
+  }) : _preferences = preferences,
+       _idFactory = idFactory ?? const Uuid().v4;
 
   static const uncategorizedGroupId = '__uncategorized__';
   static const _keyPrefix = 'space_room_categories.v1.';
@@ -458,12 +506,12 @@ class SpaceRoomCategoryStore {
       return sharedState.withLocalViewState(localViewState);
     }
 
-    return load(space.localId);
+    return load(LocalSpaceCategoryScope.forSpace(space));
   }
 
-  Future<SpaceRoomCategoryState> load(String spaceLocalId) async {
+  Future<SpaceRoomCategoryState> load(LocalSpaceCategoryScope scope) async {
     final prefs = await _prefs();
-    final raw = prefs.getString(_storageKey(spaceLocalId));
+    final raw = prefs.getString(_storageKey(scope.localId));
     if (raw == null || raw.isEmpty) {
       return SpaceRoomCategoryState.empty;
     }
@@ -483,17 +531,17 @@ class SpaceRoomCategoryStore {
   }
 
   Future<SpaceRoomCategoryDefinition> createCategory(
-    String spaceLocalId,
+    LocalSpaceCategoryScope scope,
     String name,
   ) async {
-    final state = await load(spaceLocalId);
+    final state = await load(scope);
     final category = SpaceRoomCategoryDefinition(
       id: _idFactory(),
       name: normalizeSpaceRoomCategoryName(name),
     );
 
     await save(
-      spaceLocalId,
+      scope,
       state.copyWith(categories: [...state.categories, category]),
     );
     return category;
@@ -517,13 +565,13 @@ class SpaceRoomCategoryStore {
   }
 
   Future<void> renameCategory(
-    String spaceLocalId,
+    LocalSpaceCategoryScope scope,
     String categoryId,
     String name,
   ) async {
-    final state = await load(spaceLocalId);
+    final state = await load(scope);
     await save(
-      spaceLocalId,
+      scope,
       state.copyWith(
         categories: [
           for (final category in state.categories)
@@ -556,10 +604,13 @@ class SpaceRoomCategoryStore {
     );
   }
 
-  Future<void> deleteCategory(String spaceLocalId, String categoryId) async {
-    final state = await load(spaceLocalId);
+  Future<void> deleteCategory(
+    LocalSpaceCategoryScope scope,
+    String categoryId,
+  ) async {
+    final state = await load(scope);
     await save(
-      spaceLocalId,
+      scope,
       state.copyWith(
         categories: [
           for (final category in state.categories)
@@ -583,14 +634,15 @@ class SpaceRoomCategoryStore {
   }
 
   Future<void> moveCategory(
-    String spaceLocalId,
+    LocalSpaceCategoryScope scope,
     String categoryId,
     int newIndex,
   ) async {
-    final state = await load(spaceLocalId);
+    final state = await load(scope);
     final categories = List<SpaceRoomCategoryDefinition>.from(state.categories);
-    final oldIndex =
-        categories.indexWhere((category) => category.id == categoryId);
+    final oldIndex = categories.indexWhere(
+      (category) => category.id == categoryId,
+    );
     if (oldIndex < 0 || categories.length < 2) {
       return;
     }
@@ -598,7 +650,7 @@ class SpaceRoomCategoryStore {
     final category = categories.removeAt(oldIndex);
     final targetIndex = newIndex.clamp(0, categories.length).toInt();
     categories.insert(targetIndex, category);
-    await save(spaceLocalId, state.copyWith(categories: categories));
+    await save(scope, state.copyWith(categories: categories));
   }
 
   Future<void> moveCategoryForSpace(
@@ -608,8 +660,9 @@ class SpaceRoomCategoryStore {
   ) async {
     final state = await loadForSpace(space);
     final categories = List<SpaceRoomCategoryDefinition>.from(state.categories);
-    final oldIndex =
-        categories.indexWhere((category) => category.id == categoryId);
+    final oldIndex = categories.indexWhere(
+      (category) => category.id == categoryId,
+    );
     if (oldIndex < 0 || categories.length < 2) {
       return;
     }
@@ -621,13 +674,13 @@ class SpaceRoomCategoryStore {
   }
 
   Future<void> setCategoryCollapsed(
-    String spaceLocalId,
+    LocalSpaceCategoryScope scope,
     String categoryId,
     bool collapsed,
   ) async {
-    final state = await load(spaceLocalId);
+    final state = await load(scope);
     await save(
-      spaceLocalId,
+      scope,
       state.copyWith(
         categories: [
           for (final category in state.categories)
@@ -646,7 +699,11 @@ class SpaceRoomCategoryStore {
     bool collapsed,
   ) async {
     if (space is! MatrixSpace) {
-      await setCategoryCollapsed(space.localId, categoryId, collapsed);
+      await setCategoryCollapsed(
+        LocalSpaceCategoryScope.forSpace(space),
+        categoryId,
+        collapsed,
+      );
       return;
     }
 
@@ -665,14 +722,11 @@ class SpaceRoomCategoryStore {
   }
 
   Future<void> setUncategorizedCollapsed(
-    String spaceLocalId,
+    LocalSpaceCategoryScope scope,
     bool collapsed,
   ) async {
-    final state = await load(spaceLocalId);
-    await save(
-      spaceLocalId,
-      state.copyWith(uncategorizedCollapsed: collapsed),
-    );
+    final state = await load(scope);
+    await save(scope, state.copyWith(uncategorizedCollapsed: collapsed));
   }
 
   Future<void> setUncategorizedCollapsedForSpace(
@@ -680,7 +734,10 @@ class SpaceRoomCategoryStore {
     bool collapsed,
   ) async {
     if (space is! MatrixSpace) {
-      await setUncategorizedCollapsed(space.localId, collapsed);
+      await setUncategorizedCollapsed(
+        LocalSpaceCategoryScope.forSpace(space),
+        collapsed,
+      );
       return;
     }
 
@@ -691,13 +748,13 @@ class SpaceRoomCategoryStore {
   }
 
   Future<void> assignRoomToCategory(
-    String spaceLocalId,
+    LocalSpaceCategoryScope scope,
     String roomId,
     String categoryId,
   ) async {
-    final state = await load(spaceLocalId);
+    final state = await load(scope);
     await save(
-      spaceLocalId,
+      scope,
       state.copyWith(
         categories: [
           for (final category in state.categories)
@@ -770,10 +827,13 @@ class SpaceRoomCategoryStore {
     );
   }
 
-  Future<void> unassignRoom(String spaceLocalId, String roomId) async {
-    final state = await load(spaceLocalId);
+  Future<void> unassignRoom(
+    LocalSpaceCategoryScope scope,
+    String roomId,
+  ) async {
+    final state = await load(scope);
     await save(
-      spaceLocalId,
+      scope,
       state.copyWith(
         categories: [
           for (final category in state.categories)
@@ -815,26 +875,25 @@ class SpaceRoomCategoryStore {
   }
 
   Future<void> save(
-    String spaceLocalId,
+    LocalSpaceCategoryScope scope,
     SpaceRoomCategoryState state,
   ) async {
     final prefs = await _prefs();
     if (!state.hasPersistedState) {
-      await prefs.remove(_storageKey(spaceLocalId));
+      await prefs.remove(_storageKey(scope.localId));
     } else {
       await prefs.setString(
-          _storageKey(spaceLocalId), jsonEncode(state.toJson()));
+        _storageKey(scope.localId),
+        jsonEncode(state.toJson()),
+      );
     }
 
     _onChanged.add(
-      SpaceRoomCategoryChanged(spaceLocalId: spaceLocalId, state: state),
+      SpaceRoomCategoryChanged(spaceLocalId: scope.localId, state: state),
     );
   }
 
-  Future<void> saveForSpace(
-    Space space,
-    SpaceRoomCategoryState state,
-  ) async {
+  Future<void> saveForSpace(Space space, SpaceRoomCategoryState state) async {
     if (space case MatrixSpace matrixSpace) {
       if (!canManageSpaceRoomCategories(space)) {
         throw Exception('Only space admins can manage room categories.');
@@ -870,7 +929,7 @@ class SpaceRoomCategoryStore {
       return;
     }
 
-    await save(space.localId, state);
+    await save(LocalSpaceCategoryScope.forSpace(space), state);
   }
 
   Future<void> dispose() async {

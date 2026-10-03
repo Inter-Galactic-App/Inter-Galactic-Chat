@@ -1,7 +1,6 @@
 # Theming, Accessibility Tokens, And Motion
 
 Status: active architecture map
-Maintenance: DESIGN
 Last reviewed: 2026-08-19
 
 This document maps the runtime systems behind Inter Galactic's visual and
@@ -202,8 +201,8 @@ back to a static gradient built from the active `ColorScheme`, so both the
 shader and its fallback are theme-aware. It self-throttles - a frame-rate
 watcher disables the animation after ten consecutive sub-30fps frames - and is
 fully frozen by `InterGalacticMotion.shouldReduce` for accessibility. See
-`docs/agent-control/design-handoff.md` ("Replace Shadertoy-Derived Shader
-Material") for why this asset was replaced.
+the maintainer design record ("Replace Shadertoy-Derived Shader Material") for
+why this asset was replaced.
 
 `particle_system_confetti.dart`
 (`intergalactic/lib/ui/organisms/particle_player/`) is a separate system built

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:http/http.dart' as http;
 import 'package:intergalactic/client/components/component.dart';
 import 'package:intergalactic/client/components/user_presence/user_presence_component.dart';
@@ -11,6 +12,7 @@ import 'package:intergalactic/client/matrix/components/typing_indicators/matrix_
 import 'package:intergalactic/client/matrix/matrix_client.dart';
 import 'package:intergalactic/debug/log.dart';
 import 'package:intergalactic/utils/in_memory_cache.dart';
+import 'package:intergalactic/utils/database/database_release_trigger.dart';
 import 'package:matrix/matrix.dart';
 
 class MatrixUserPresenceComponent
@@ -35,8 +37,9 @@ class MatrixUserPresenceComponent
 
   MatrixUserPresenceComponent(this.client) {
     lastSeen = InMemoryCache(
-        maxRetention: Duration(minutes: 2),
-        pollFrequency: Duration(seconds: 100));
+      maxRetention: Duration(minutes: 2),
+      pollFrequency: Duration(seconds: 100),
+    );
     _subscriptions.addAll([
       client.matrixClient.onPresenceChanged.stream.listen(changed),
       client.matrixClient.onSync.stream.listen(onSync),
@@ -85,6 +88,15 @@ class MatrixUserPresenceComponent
   @override
   Future<UserPresence> getUserPresence(String userId) async {
     if (_disposed) {
+      return UserPresence(UserPresenceStatus.unknown);
+    }
+
+    // Consumer-driven, so it can run at wake before the release trigger has
+    // re-established the account database (B5); the read below throws by
+    // design against a released connection. Wait on the trigger's gate,
+    // which is already complete when nothing was released.
+    if (!await DatabaseReleaseTrigger.waitForDatabase('presence.get') ||
+        _disposed) {
       return UserPresence(UserPresenceStatus.unknown);
     }
 
@@ -194,8 +206,10 @@ class MatrixUserPresenceComponent
 
     final statusMessage = presence.statusMsg?.trim();
     if (statusMessage != null && statusMessage.isNotEmpty) {
-      message =
-          UserPresenceMessage(statusMessage, PresenceMessageType.userCustom);
+      message = UserPresenceMessage(
+        statusMessage,
+        PresenceMessageType.userCustom,
+      );
     }
 
     return UserPresence(status, message: message);
@@ -213,8 +227,11 @@ class MatrixUserPresenceComponent
   Stream<(String, UserPresence)> get onPresenceChanged => _controller.stream;
 
   @override
-  Future<void> setStatus(UserPresenceStatus status,
-      {String? message, bool clearMessage = false}) async {
+  Future<void> setStatus(
+    UserPresenceStatus status, {
+    String? message,
+    bool clearMessage = false,
+  }) async {
     if (_disposed) {
       return;
     }
@@ -250,7 +267,9 @@ class MatrixUserPresenceComponent
     int? currentLastActiveAgo;
     bool? currentCurrentlyActive;
     try {
-      final current = await client.matrixClient.getPresence(self);
+      final current = await _runPresenceNetworkOperation(
+        () => client.matrixClient.getPresence(self),
+      );
       currentStatusMessage = current.statusMsg;
       currentPresenceType = current.presence;
       currentLastActiveAgo = current.lastActiveAgo;
@@ -290,7 +309,8 @@ class MatrixUserPresenceComponent
           matrixStatus,
           statusMsg: statusMsg,
           lastActiveAgo: currentLastActiveAgo,
-          currentlyActive: currentCurrentlyActive ??
+          currentlyActive:
+              currentCurrentlyActive ??
               (matrixStatus == PresenceType.online ? true : null),
         );
         Log.d(
@@ -319,7 +339,9 @@ class MatrixUserPresenceComponent
     }
 
     try {
-      await _setPresence(self, matrixStatus, statusMsg: statusMsg);
+      await _runPresenceNetworkOperation(
+        () => _setPresence(self, matrixStatus, statusMsg: statusMsg),
+      );
       await _rememberPresence(
         self,
         matrixStatus,
@@ -353,6 +375,14 @@ class MatrixUserPresenceComponent
     }
   }
 
+  Future<T> _runPresenceNetworkOperation<T>(Future<T> Function() operation) =>
+      runZoned(
+        operation,
+        zoneValues: {
+          Log.matrixNetworkOperationZoneKey: Log.matrixPresenceUpdateOperation,
+        },
+      );
+
   Future<void> _setPresence(
     String userId,
     PresenceType presence, {
@@ -384,13 +414,37 @@ class MatrixUserPresenceComponent
       _throwPresenceResponse(response);
     }
 
-    final responseText =
-        utf8.decode(response.bodyBytes, allowMalformed: true).trim();
+    final responseText = utf8
+        .decode(response.bodyBytes, allowMalformed: true)
+        .trim();
     if (responseText.isEmpty) {
       return;
     }
 
     jsonDecode(responseText);
+  }
+
+  /// Test-only entry to [_rememberPresence].
+  ///
+  /// The database gate lives inside that method, and every public route to it
+  /// goes through an HTTP PUT. A test that reached the gate through a mocked
+  /// transport would be asserting the transport; this enters the unit that
+  /// contains the gate, which is the thing that must not be removed.
+  @visibleForTesting
+  Future<CachedPresence> debugRememberPresenceForTesting(
+    String userId,
+    PresenceType presence, {
+    String? statusMsg,
+    int? lastActiveAgo,
+    bool? currentlyActive,
+  }) {
+    return _rememberPresence(
+      userId,
+      presence,
+      statusMsg: statusMsg,
+      lastActiveAgo: lastActiveAgo,
+      currentlyActive: currentlyActive,
+    );
   }
 
   Future<CachedPresence> _rememberPresence(
@@ -415,7 +469,49 @@ class MatrixUserPresenceComponent
     // Keep the Matrix SDK's fast presence reads aligned with direct PUTs.
     // ignore: deprecated_member_use
     client.matrixClient.presences[userId] = cachedPresence;
-    await client.matrixClient.database.storePresence(userId, cachedPresence);
+
+    // The WRITE half of the same gate the presence reads already use. This
+    // path is lifecycle-driven: the inactivity timer fires on wake, or while
+    // backgrounded-but-running, and reaches storePresence before the release
+    // trigger has re-established the account database - where the connection
+    // throws by design. Observed on device at 01:55:17Z after a suspend/resume
+    // cycle, named end to end from setState -> setStatus -> here.
+    //
+    // TIMING: `waitForDatabase` waits while a database is merely released and
+    // answers false only when a resume FAILS under it, re-arming for the next
+    // one. So this awaits the store coming back rather than skipping straight
+    // past, and only a failed resume takes the else branch.
+    //
+    // A failed gate skips only the PERSIST. The in-memory presence above and
+    // the notification below still happen, because this row is a cache of a
+    // value the server already has: dropping the cache write loses nothing a
+    // later fetch cannot restore, while failing the whole call would discard
+    // a presence change the user actually made.
+    final databaseReady = await DatabaseReleaseTrigger.waitForDatabase(
+      'presence.remember',
+    );
+    // Re-read the flag on the far side of the gate, the way `getUserPresence`
+    // and `onLastSeenRemoved` already do on their reads. The gate SUSPENDS,
+    // and a logout or account removal is exactly the kind of thing that
+    // happens during that suspension - so waiting here and then writing means
+    // writing to a database being torn down. `setStatus` awaits this call, so
+    // that tear-down error would reach the user as a failed presence update.
+    if (_disposed) {
+      return cachedPresence;
+    }
+    if (databaseReady) {
+      await client.matrixClient.database.storePresence(userId, cachedPresence);
+    } else {
+      // Said here rather than left to the gate's own line, because the caller
+      // logs 'local cache updated' a few frames later and that stays true -
+      // the memory copy above did happen. Only the persisted one did not.
+      Log.w(
+        'Matrix presence not persisted, database unavailable '
+        'user=${_matrixPresenceHash(userId)} presence=${presence.name}',
+        category: LogCategory.matrix,
+        source: 'presence',
+      );
+    }
     if (!_disposed && !_controller.isClosed) {
       _controller.add((userId, convertPresence(cachedPresence)));
     }
@@ -535,19 +631,26 @@ class MatrixUserPresenceComponent
       try {
         if (event.type == "m.typing") {
           handleTyping(event, time);
-          return;
+          continue;
         }
 
         if (event.type == "m.receipt") {
           handleReadReceipt(event);
-          return;
+          continue;
         }
 
         if (event.type == "m.room.member") {
           handleRoomMemberEvent(event);
-          return;
+          continue;
         }
-      } catch (_) {}
+      } catch (error, _) {
+        Log.w(
+          'Failed to handle Matrix presence event type=${event.type}: $error',
+          category: LogCategory.matrix,
+          source: 'presence',
+        );
+        continue;
+      }
     }
   }
 
@@ -566,8 +669,10 @@ class MatrixUserPresenceComponent
         var value = entry.value as Map<String, dynamic>;
 
         if (value.containsKey("ts")) {
-          sawUser(entry.key,
-              DateTime.fromMicrosecondsSinceEpoch((value["ts"] as int) * 1000));
+          sawUser(
+            entry.key,
+            DateTime.fromMicrosecondsSinceEpoch((value["ts"] as int) * 1000),
+          );
         }
       }
     }
@@ -590,8 +695,10 @@ class MatrixUserPresenceComponent
       return;
     }
 
-    final presence = await client.matrixClient
-        .fetchCurrentPresence(id, fetchOnlyFromCached: true);
+    final presence = await client.matrixClient.fetchCurrentPresence(
+      id,
+      fetchOnlyFromCached: true,
+    );
     if (_disposed) {
       return;
     }
@@ -624,8 +731,23 @@ class MatrixUserPresenceComponent
       return;
     }
 
-    final presence = await client.matrixClient
-        .fetchCurrentPresence(event, fetchOnlyFromCached: true);
+    // Timer-driven: the last-seen cache's cleaner fires on its own poll,
+    // including while the app is backgrounded-and-running or in the first
+    // seconds of a wake, and this read reached the released account
+    // database as an unhandled zone error two seconds before the trigger's
+    // `event=resumed` (iPhone, 2026-09-04). A timer that READS is bound by
+    // the same rule as one that writes; waiting on the gate defers a
+    // presence refresh, which costs nothing, and a failed gate is logged
+    // where it happened.
+    if (!await DatabaseReleaseTrigger.waitForDatabase('presence.last_seen') ||
+        _disposed) {
+      return;
+    }
+
+    final presence = await client.matrixClient.fetchCurrentPresence(
+      event,
+      fetchOnlyFromCached: true,
+    );
     if (!_disposed &&
         !_controller.isClosed &&
         presence.presence == PresenceType.offline) {
@@ -841,8 +963,9 @@ String _matrixPresenceCompact(String? value, {int max = 120}) {
     return 'none';
   }
 
-  final cleaned =
-      Log.redactSensitiveInfo(value).replaceAll(RegExp(r'\s+'), ' ').trim();
+  final cleaned = Log.redactSensitiveInfo(
+    value,
+  ).replaceAll(RegExp(r'\s+'), ' ').trim();
   if (cleaned.isEmpty) {
     return 'none';
   }

@@ -207,8 +207,8 @@ does not carry forward automatically.
 
 ## Current Gate Disposition
 
-Use `docs/policies/PUBLIC_RELEASE_READINESS_TRACKER.md` and
-`docs/agent-control/integration-queue.md` as the live gate sources. At the time
+Use `docs/policies/PUBLIC_RELEASE_READINESS_TRACKER.md` as the public-facing
+gate source. Internal coordination remains maintainer-only. At the time
 this cycle record was opened, the remaining release gates were owner-scoped and
 included encryption export evidence, runtime/report redaction resampling where
 needed, encrypted-room push payload privacy proof, final third-party

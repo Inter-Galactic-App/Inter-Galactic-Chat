@@ -1,4 +1,10 @@
 {
+  "notificationAttachmentSentImage": "Enviou uma imagem",
+  "notificationAttachmentSentVideo": "Enviou um vídeo",
+  "notificationAttachmentSentAudio": "Enviou uma mensagem de áudio",
+  "notificationAttachmentSentFile": "Enviou um arquivo",
+  "notificationAttachmentSharedLocation": "Compartilhou uma localização",
+  "notificationAttachmentSentSticker": "Enviou um adesivo",
   "messagePlaceholderSticker": "{user} enviou uma figurinha",
   "@messagePlaceholderSticker": {
     "description": "Message body for when a user sends a sticker",

@@ -29,9 +29,9 @@ ci_transcript_slug() {
   printf '%s' "${1-}" | tr -c 'A-Za-z0-9._-' '-'
 }
 
-# The `<run_id>-<attempt>-<job>.log` convention documented in
-# docs/ci/forgejo-ci-transcripts.md. Used for both the staging path under the
-# runner temp directory and the published path.
+# The `<run_id>-<attempt>-<job>.log` convention documented in the workspace's
+# internal CI docs. Used for both the staging path under the runner temp
+# directory and the published path.
 ci_transcript_basename() {
   local run_id attempt job
   run_id="$(ci_transcript_slug "${GITHUB_RUN_ID:-manual}")"

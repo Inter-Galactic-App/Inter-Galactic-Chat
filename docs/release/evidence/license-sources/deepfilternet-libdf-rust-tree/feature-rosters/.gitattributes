@@ -2,6 +2,11 @@
 *.txt -text -diff
 crate-license-texts/** -text -diff
 
+# This is structured, authored roster metadata rather than a verbatim upstream
+# notice packet. Keep its established raw CRLF bytes while allowing a reviewer
+# to see a narrow metadata correction as text.
+crate-license-roster.json -text diff whitespace=-trailing-space
+
 # These ten copied upstream notice files include the upstream terminal blank
 # line. Keep the bytes intact while suppressing only that diff-check warning;
 # every other whitespace class remains checked normally.

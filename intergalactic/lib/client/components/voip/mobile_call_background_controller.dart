@@ -45,33 +45,59 @@ class MethodChannelMobileCallBackgroundPlatform
 }
 
 class MobileCallBackgroundController {
-  MobileCallBackgroundController({MobileCallBackgroundPlatform? platform})
-    : _platform = platform ?? MethodChannelMobileCallBackgroundPlatform();
+  MobileCallBackgroundController({
+    MobileCallBackgroundPlatform? platform,
+    Duration platformCallTimeout = _defaultPlatformCallTimeout,
+  }) : _platform = platform ?? MethodChannelMobileCallBackgroundPlatform(),
+       _platformCallTimeout = platformCallTimeout;
 
   static final MobileCallBackgroundController instance =
       MobileCallBackgroundController();
 
+  static const Duration _defaultPlatformCallTimeout = Duration(seconds: 8);
+
   final MobileCallBackgroundPlatform _platform;
-  _MobileCallBackgroundSignature? _lastApplied;
+  final Duration _platformCallTimeout;
+  _MobileCallBackgroundSignature? _desiredSignature;
+  int _desiredGeneration = 0;
+  int? _queuedGeneration;
   Future<void> _lastOperation = Future<void>.value();
 
   Future<void> syncSessions(Iterable<VoipSession> sessions) {
     final signature = _signatureFor(sessions);
-    if (_lastApplied == signature) {
-      return _lastOperation;
-    }
 
     // No platform work to serialize when backgrounding is unsupported; keep
     // this path synchronous so shutdown never waits on the operation chain.
     if (!_platform.isSupported) {
-      _lastApplied = const _MobileCallBackgroundSignature.inactive();
+      _desiredSignature = const _MobileCallBackgroundSignature.inactive();
+      _desiredGeneration++;
+      _queuedGeneration = _desiredGeneration;
       _lastOperation = Future<void>.value();
       return _lastOperation;
     }
 
+    if (_desiredSignature != signature) {
+      _desiredSignature = signature;
+      _desiredGeneration++;
+    }
+
+    return _enqueueLatestDesiredState();
+  }
+
+  Future<void> _enqueueLatestDesiredState({bool force = false}) {
+    final signature = _desiredSignature;
+    if (signature == null) {
+      return _lastOperation;
+    }
+    final generation = _desiredGeneration;
+    if (!force && _queuedGeneration == generation) {
+      return _lastOperation;
+    }
+
+    _queuedGeneration = generation;
     _lastOperation = _lastOperation
         .catchError((_) {})
-        .then((_) => _apply(signature));
+        .then((_) => _apply(signature, generation));
     return _lastOperation;
   }
 
@@ -107,21 +133,39 @@ class MobileCallBackgroundController {
     );
   }
 
-  Future<void> _apply(_MobileCallBackgroundSignature signature) async {
+  Future<void> _apply(
+    _MobileCallBackgroundSignature signature,
+    int generation,
+  ) async {
     if (!_platform.isSupported) {
-      _lastApplied = const _MobileCallBackgroundSignature.inactive();
       return;
     }
 
+    final platformOperation = _platform.setCallBackgroundActive(
+      active: signature.active,
+      roomName: signature.roomName,
+      usesMicrophone: signature.usesMicrophone,
+      usesCamera: signature.usesCamera,
+    );
+
     try {
-      await _platform.setCallBackgroundActive(
-        active: signature.active,
-        roomName: signature.roomName,
-        usesMicrophone: signature.usesMicrophone,
-        usesCamera: signature.usesCamera,
+      await platformOperation.timeout(_platformCallTimeout);
+    } on TimeoutException catch (error, stackTrace) {
+      _releaseTimedOutGeneration(generation);
+      _reconcileLateCompletion(
+        platformOperation,
+        generation: generation,
+        signature: signature,
       );
-      _lastApplied = signature;
+      Log.onError(
+        error,
+        stackTrace,
+        content: 'Timed out updating mobile call background retention',
+        category: LogCategory.livekit,
+        source: 'mobile-call-background',
+      );
     } catch (error, stackTrace) {
+      _releaseTimedOutGeneration(generation);
       Log.onError(
         error,
         stackTrace,
@@ -132,6 +176,50 @@ class MobileCallBackgroundController {
         source: 'mobile-call-background',
       );
     }
+  }
+
+  void _releaseTimedOutGeneration(int generation) {
+    if (_desiredGeneration == generation && _queuedGeneration == generation) {
+      _queuedGeneration = null;
+    }
+  }
+
+  void _reconcileLateCompletion(
+    Future<void> operation, {
+    required int generation,
+    required _MobileCallBackgroundSignature signature,
+  }) {
+    unawaited(
+      operation.then(
+        (_) => _reapplyLatestStateAfterLateCompletion(
+          generation: generation,
+          signature: signature,
+        ),
+        onError: (Object error, StackTrace stackTrace) {
+          Log.onError(
+            error,
+            stackTrace,
+            content: 'Mobile call background operation failed after timeout',
+            category: LogCategory.livekit,
+            source: 'mobile-call-background',
+          );
+          _reapplyLatestStateAfterLateCompletion(
+            generation: generation,
+            signature: signature,
+          );
+        },
+      ),
+    );
+  }
+
+  void _reapplyLatestStateAfterLateCompletion({
+    required int generation,
+    required _MobileCallBackgroundSignature signature,
+  }) {
+    if (_desiredGeneration == generation && _desiredSignature == signature) {
+      return;
+    }
+    unawaited(_enqueueLatestDesiredState(force: true));
   }
 }
 

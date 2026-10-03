@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:intergalactic/client/client.dart';
+import 'package:intergalactic/client/matrix/matrix_client.dart';
 import 'package:intergalactic/main.dart';
 import 'package:intergalactic/ui/onboarding/tutorial_anchor.dart';
 import 'package:intergalactic/ui/organisms/room_quick_access_menu/room_quick_access_menu.dart';
@@ -36,10 +37,23 @@ class _RoomQuickAccessMenuViewDesktopState
   void initState() {
     super.initState();
     sub = preferences.onSettingChanged.listen(onChanged);
+    // The Retry Decrypt entry resolves its enabled state from
+    // encryptionAvailability when the menu is CONSTRUCTED, below. Without
+    // this, a room opened while vodozemac is still initialising renders the
+    // padlock disabled and leaves it that way after encryption becomes ready,
+    // until some unrelated rebuild happens to run.
+    MatrixClient.encryptionAvailability.addListener(_onEncryptionChanged);
+  }
+
+  void _onEncryptionChanged() {
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   @override
   void dispose() {
+    MatrixClient.encryptionAvailability.removeListener(_onEncryptionChanged);
     unawaited(sub?.cancel() ?? Future.value());
     super.dispose();
   }
@@ -67,7 +81,14 @@ class _RoomQuickAccessMenuViewDesktopState
           .map(
             (e) => _QuickAccessActionButton(
               entry: e,
-              onPressed: () => e.action?.call(context),
+              // NOT `() => e.action?.call(context)`. That closure is never
+              // null, so the button renders and behaves as though it were
+              // operable and then does nothing when pressed. A disabled entry
+              // has to reach the atom as a null callback, which is what makes
+              // it inert and reports it as disabled to assistive technology.
+              onPressed: e.action == null
+                  ? null
+                  : () => e.action!.call(context),
             ),
           )
           .toList(),
@@ -86,7 +107,11 @@ class _QuickAccessActionButton extends StatelessWidget {
   });
 
   final RoomQuickAccessMenuEntry entry;
-  final VoidCallback onPressed;
+
+  /// Null for a disabled entry, and it must stay nullable all the way to
+  /// the atom: a non-null wrapper around a null action is exactly how an
+  /// inoperable button keeps looking operable.
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -102,12 +127,12 @@ class _QuickAccessActionButton extends StatelessWidget {
             ? colorScheme.primaryContainer.withValues(alpha: 0.42)
             : Colors.transparent,
         semanticLabel: entry.semanticLabel ?? entry.name,
-        tooltip: entry.name,
+        tooltip: entry.disabledReason ?? entry.name,
         onPressed: onPressed,
       ),
     );
 
-    if (entry.name != "Retry Decrypt") {
+    if (entry.name != retryDecryptActionName) {
       return button;
     }
 

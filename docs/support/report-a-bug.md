@@ -1,7 +1,6 @@
 # Report a Bug
 
 Status: implemented
-Owner: DEBUG / Help & diagnostics
 Last updated: 2026-07-23
 
 ## What this is

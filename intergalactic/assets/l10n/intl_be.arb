@@ -1,1 +1,8 @@
-{}
+{
+  "notificationAttachmentSentImage": "Адпраўлена выява",
+  "notificationAttachmentSentVideo": "Адпраўлена відэа",
+  "notificationAttachmentSentAudio": "Адпраўлена аўдыяпаведамленне",
+  "notificationAttachmentSentFile": "Адпраўлены файл",
+  "notificationAttachmentSharedLocation": "Абагулена месцазнаходжанне",
+  "notificationAttachmentSentSticker": "Адпраўлены стыкер"
+}

@@ -1,7 +1,6 @@
 # Guided Tutorial Backdrop
 
 Status: production tutorial backdrop plus developer preview modes
-Owner: DESIGN
 Last updated: 2026-05-19
 
 ## Purpose
@@ -161,6 +160,7 @@ scene layer uses `TutorialSceneSpec` to control the demo backdrop:
 - optional side-panel mode and thread root id
 - optional focus target rectangle, outline, and arrow
 - optional auto-advance timing for animation/menu demonstration steps
+- mobile panel reveal state and top/bottom sheet placement
 - keyboard navigation with right/Enter for Next/Finish, left for Back, and
   Escape for Skip
 
@@ -190,11 +190,12 @@ targets a specific setting, button, popup, or callout.
   animation is represented by inert tutorial visuals in the preview. The call
   tutorial highlights the real popout control but does not open an OS detached
   window.
-- Mobile and desktop both use the same scene model, but final mobile-specific
-  choreography is still future work.
+- Mobile and desktop share the scene model but use their own scene tables.
+  Mobile scenes declare the visible panel and place the tutorial sheet above
+  lower-screen targets; visual smoke still tunes fallback geometry on devices.
 
 ## Next Step
 
-Continue the guided overlay layer by adding more reusable anchors to call
-controls and any remaining settings subregions, then tune card placement and
-mobile-specific choreography against the measured target bounds.
+Keep the mobile and desktop scene tables aligned when a shared tutorial step is
+added. New mobile targets need a measured anchor in the widget that owns the
+visible control and a device smoke check for sheet placement.

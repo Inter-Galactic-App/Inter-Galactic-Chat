@@ -84,12 +84,7 @@ class InboundShareReviewLauncher {
           },
           onSelected: (destination) {
             if (!destination.room.permissions.canSendMessage) {
-              ScaffoldMessenger.of(routeContext).showSnackBar(
-                const SnackBar(
-                  content: Text('This conversation is no longer available.'),
-                ),
-              );
-              return;
+              return false;
             }
             EventBus.inboundShareDraft.add(
               InboundShareDraft(
@@ -100,6 +95,7 @@ class InboundShareReviewLauncher {
               ),
             );
             Navigator.of(routeContext).pop(true);
+            return true;
           },
         ),
       ),

@@ -29,16 +29,19 @@ class SteamApiClient {
 
     http.Response response;
     try {
-      response = await _httpClient
-          .get(
-            endpoint.replace(
-              queryParameters: {
-                ...endpoint.queryParameters,
-                'steamids': requestedSteamId,
-              },
-            ),
-          )
-          .timeout(_requestTimeout);
+      response = await runZoned(
+        () => _httpClient
+            .get(
+              endpoint.replace(
+                queryParameters: {
+                  ...endpoint.queryParameters,
+                  'steamids': requestedSteamId,
+                },
+              ),
+            )
+            .timeout(_requestTimeout),
+        zoneValues: {Log.handledOptionalNetworkRequestZoneKey: true},
+      );
     } catch (error) {
       Log.d(
         'Optional Steam activity summary request failed for host '

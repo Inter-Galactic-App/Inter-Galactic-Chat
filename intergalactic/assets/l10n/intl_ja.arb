@@ -1,4 +1,10 @@
 {
+  "notificationAttachmentSentImage": "画像を送信しました",
+  "notificationAttachmentSentVideo": "動画を送信しました",
+  "notificationAttachmentSentAudio": "音声メッセージを送信しました",
+  "notificationAttachmentSentFile": "ファイルを送信しました",
+  "notificationAttachmentSharedLocation": "位置情報を共有しました",
+  "notificationAttachmentSentSticker": "ステッカーを送信しました",
   "labelRoomsList": "ルーム",
   "@labelRoomsList": {
     "description": "Header label for the list of rooms",

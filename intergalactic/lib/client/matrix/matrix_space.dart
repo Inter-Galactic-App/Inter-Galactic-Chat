@@ -7,9 +7,11 @@ import 'package:intergalactic/client/client.dart';
 import 'package:intergalactic/client/components/component_registry.dart';
 import 'package:intergalactic/client/components/space_component.dart';
 import 'package:intergalactic/client/matrix/matrix_client.dart';
+import 'package:intergalactic/client/matrix/matrix_space_link_validation.dart';
 import 'package:intergalactic/client/matrix/matrix_mxc_image_provider.dart';
 import 'package:intergalactic/client/matrix/matrix_room.dart';
 import 'package:intergalactic/client/matrix/matrix_room_permissions.dart';
+import 'package:intergalactic/client/matrix/push_rule_state_cache.dart';
 import 'package:intergalactic/client/matrix/matrix_room_preview.dart';
 import 'package:intergalactic/client/permissions.dart';
 import 'package:intergalactic/client/room_preview.dart';
@@ -23,7 +25,7 @@ import 'package:matrix/matrix.dart' as matrix;
 
 import 'matrix_peer.dart';
 
-class MatrixSpace extends Space {
+class MatrixSpace extends Space implements PushRuleCacheHolder {
   late matrix.Room _matrixRoom;
   late matrix.Client _matrixClient;
   late MatrixClient _client;
@@ -32,8 +34,9 @@ class MatrixSpace extends Space {
 
   final StreamController<void> _onUpdate = StreamController.broadcast();
   final NotifyingList<Room> _rooms = NotifyingList.empty(growable: true);
-  final NotifyingList<RoomPreview> _previews =
-      NotifyingList.empty(growable: true);
+  final NotifyingList<RoomPreview> _previews = NotifyingList.empty(
+    growable: true,
+  );
 
   NotifyingList<Space> _subspaces = NotifyingList.empty(growable: true);
 
@@ -61,14 +64,12 @@ class MatrixSpace extends Space {
   Color get color => MatrixPeer.hashColor(_matrixRoom.id);
 
   // cache the result of push rule because this was becoming an expensive operation for ui stuff
-  matrix.PushRuleState? _pushRule;
+  late final PushRuleStateCache _pushRuleCache = PushRuleStateCache(
+    _readPushRuleState,
+  );
   @override
   PushRule get pushRule {
-    if (_pushRule == null) {
-      _pushRule = _readPushRuleState();
-    }
-
-    switch (_pushRule!) {
+    switch (_pushRuleCache.value) {
       case matrix.PushRuleState.notify:
         return PushRule.notify;
       case matrix.PushRuleState.mentionsOnly:
@@ -87,8 +88,65 @@ class MatrixSpace extends Space {
     };
 
     await _setPushRuleState(newRule);
-    _pushRule = newRule;
+    _pushRuleCache.assign(newRule);
     _onUpdate.add(null);
+    Log.i(
+      'BUG-319 space setPushRule applied: $pushRuleDiagnostics',
+      category: LogCategory.notifications,
+      source: 'MatrixSpace',
+    );
+  }
+
+  /// Drops the cached push-rule state so the next read reflects synced rules.
+  ///
+  /// The cache was previously invalidated only by a local [setPushRule] on this
+  /// instance, so a space override could be set and still not appear in the
+  /// app-wide notification settings until a restart built a fresh instance.
+  /// That is BUG-319, confirmed by the owner's restart discriminator. Returns
+  /// whether the state actually changed, so a sync carrying `m.push_rules`
+  /// does not rebuild every space for nothing.
+  @override
+  bool invalidatePushRuleCache() {
+    if (!_pushRuleCache.invalidate()) {
+      return false;
+    }
+    _onUpdate.add(null);
+    return true;
+  }
+
+  /// The three facts that separate the competing BUG-319 explanations, in one
+  /// redaction-safe line: a stale cache shows `cached` disagreeing with
+  /// `fresh`; a read-path mismatch shows both reading notify while `rules`
+  /// names a rule; an enumeration mismatch shows an `instance` that differs
+  /// from the one the matching `setPushRule` line reported.
+  ///
+  /// Added for BUG-319. It reads no state it does not already display and is
+  /// safe to remove with that bug.
+  String get pushRuleDiagnostics {
+    final cached = _pushRuleCache.cachedValue?.name ?? 'unset';
+    final fresh = _readPushRuleState().name;
+    // Deliberately the read path's own client rather than _matrixClient: if
+    // the two are ever different objects, that difference is the defect.
+    final readClient = _matrixRoom.client;
+    final globalPushRules = readClient.globalPushRules;
+    final matches = <String>[];
+    for (final entry in {
+      'override': globalPushRules?.override,
+      'room': globalPushRules?.room,
+    }.entries) {
+      for (final rule in entry.value ?? const <matrix.PushRule>[]) {
+        if (rule.ruleId == _matrixRoom.id) {
+          matches.add('${entry.key}(actions=${rule.actions.length})');
+        }
+      }
+    }
+    // Hashed, not raw: this line is written to the log file, and a raw room id
+    // is private room metadata. Same shape as the notification routing logs.
+    final space = MatrixClient.hash(_matrixRoom.id).substring(0, 12);
+    return 'space=$space cached=$cached fresh=$fresh '
+        'rules=${matches.isEmpty ? 'none' : matches.join('+')} '
+        'instance=${identityHashCode(this)} '
+        'sameClient=${identical(readClient, _matrixClient)}';
   }
 
   matrix.PushRuleState _readPushRuleState() {
@@ -135,7 +193,7 @@ class MatrixSpace extends Space {
   }
 
   Future<void> _setPushRuleState(matrix.PushRuleState newState) async {
-    final currentState = _pushRule ?? _readPushRuleState();
+    final currentState = _pushRuleCache.value;
     if (newState == currentState) {
       return;
     }
@@ -264,7 +322,8 @@ class MatrixSpace extends Space {
   Permissions get permissions => _permissions;
 
   @override
-  List<Room> get rooms => _rooms;
+  List<Room> get rooms =>
+      _rooms.where((room) => !_isTombstonedRoom(room)).toList(growable: false);
 
   @override
   bool get fullyLoaded => _fullyLoaded;
@@ -286,7 +345,10 @@ class MatrixSpace extends Space {
   }
 
   MatrixSpace(
-      MatrixClient client, matrix.Room room, matrix.Client matrixClient) {
+    MatrixClient client,
+    matrix.Room room,
+    matrix.Client matrixClient,
+  ) {
     _matrixRoom = room;
     _matrixClient = matrixClient;
     _client = client;
@@ -322,7 +384,8 @@ class MatrixSpace extends Space {
   }
 
   void onStateChanged(
-      ({String roomId, matrix.StrippedStateEvent state}) event) {
+    ({String roomId, matrix.StrippedStateEvent state}) event,
+  ) {
     refresh();
   }
 
@@ -353,11 +416,14 @@ class MatrixSpace extends Space {
   }
 
   void updateAvatar() {
-    var avatar = MatrixMxcImage(_matrixRoom.avatar!, _matrixClient,
-        doThumbnail: true,
-        thumbnailHeight: 128,
-        fullResHeight: 384,
-        autoLoadFullRes: false);
+    var avatar = MatrixMxcImage(
+      _matrixRoom.avatar!,
+      _matrixClient,
+      doThumbnail: true,
+      thumbnailHeight: 128,
+      fullResHeight: 384,
+      autoLoadFullRes: false,
+    );
     _avatar = avatar;
   }
 
@@ -369,40 +435,56 @@ class MatrixSpace extends Space {
       _onUpdate.add(null);
 
       // Update preview list
-      _matrixClient.getSpaceHierarchy(identifier, maxDepth: 1).then((value) {
-        var chunk = value.rooms
-            .where((element) => element.roomId == leftRoom.identifier)
-            .where((element) =>
-                _matrixClient.getRoomById(element.roomId)?.membership !=
-                matrix.Membership.join)
-            .firstOrNull;
-        if (chunk == null) return;
+      _matrixClient
+          .getSpaceHierarchy(identifier, maxDepth: 1)
+          .then((value) {
+            var chunk = value.rooms
+                .where((element) => element.roomId == leftRoom.identifier)
+                .where(
+                  (element) =>
+                      _matrixClient.getRoomById(element.roomId)?.membership !=
+                      matrix.Membership.join,
+                )
+                .firstOrNull;
+            if (chunk == null) return;
 
-        var viaContent = _matrixRoom
-            .getState(matrix.EventTypes.SpaceChild, chunk.roomId)
-            ?.content["via"];
+            var viaContent = _matrixRoom
+                .getState(matrix.EventTypes.SpaceChild, chunk.roomId)
+                ?.content["via"];
 
-        List<String> via = const [];
+            List<String> via = const [];
 
-        if (viaContent is List) {
-          via = List.from(viaContent);
-        }
-        _previews
-            .add(MatrixSpaceRoomChunkPreview(chunk, _matrixClient, via: via));
-      }).catchError((Object error, StackTrace stackTrace) {
-        Log.onError(
-          error,
-          stackTrace,
-          content: 'Failed to refresh Matrix space preview after room removal',
-          category: LogCategory.matrix,
-          source: 'space-preview',
-        );
-      });
+            if (viaContent is List) {
+              via = List.from(viaContent);
+            }
+            _previews.add(
+              MatrixSpaceRoomChunkPreview(chunk, _matrixClient, via: via),
+            );
+          })
+          .catchError((Object error, StackTrace stackTrace) {
+            Log.onError(
+              error,
+              stackTrace,
+              content:
+                  'Failed to refresh Matrix space preview after room removal',
+              category: LogCategory.matrix,
+              source: 'space-preview',
+            );
+          });
       _fullyLoaded = true;
     }
   }
 
   void updateRoomsList() {
+    final childRoomIds = _matrixRoom.spaceChildren
+        .map((child) => child.roomId)
+        .whereType<String>()
+        .toSet();
+    _removeRoomsWhere(
+      (room) =>
+          !childRoomIds.contains(room.identifier) || _isTombstonedRoom(room),
+    );
+
     for (var child in _matrixRoom.spaceChildren) {
       var space = client.getSpace(child.roomId!);
 
@@ -423,12 +505,13 @@ class MatrixSpace extends Space {
           _removeRoomsWhere((e) => e.identifier == child.roomId);
         }
 
-        if (room != null) {
+        if (room != null && !_isTombstonedRoom(room)) {
           if (!containsRoom(room.identifier) &&
               !client.hasSpace(room.identifier)) {
             _rooms.add(room);
-            _previews
-                .removeWhere((element) => element.roomId == room.identifier);
+            _previews.removeWhere(
+              (element) => element.roomId == room.identifier,
+            );
           }
         }
       }
@@ -478,14 +561,16 @@ class MatrixSpace extends Space {
   @override
   Future<Room> createRoom(String name, CreateRoomArgs args) async {
     var room = await client.createRoom(args);
-    _matrixRoom.setSpaceChild(room.identifier);
+    await setSpaceChildRoom(room);
     return room;
   }
 
   @override
   Future<List<RoomPreview>> fetchChildren() async {
-    var response =
-        await _matrixClient.getSpaceHierarchy(identifier, maxDepth: 5);
+    var response = await _matrixClient.getSpaceHierarchy(
+      identifier,
+      maxDepth: 5,
+    );
 
     return response.rooms
         .where((element) => element.roomId != identifier)
@@ -500,41 +585,49 @@ class MatrixSpace extends Space {
     ignoreNextAvatarUpdate = true;
     _avatar = avatar;
 
-    await _matrixRoom.setAvatar(matrix.MatrixImageFile(
+    await _matrixRoom.setAvatar(
+      matrix.MatrixImageFile(
         bytes: bytes,
         name: "avatar",
-        mimeType: mimeType == "" ? null : mimeType));
+        mimeType: mimeType == "" ? null : mimeType,
+      ),
+    );
     _onUpdate.add(null);
   }
 
   @override
   Future<void> loadExtra() async {
     try {
-      var response =
-          await _matrixClient.getSpaceHierarchy(identifier, maxDepth: 1);
+      var response = await _matrixClient.getSpaceHierarchy(
+        identifier,
+        maxDepth: 1,
+      );
 
       // read child rooms
       response.rooms
           .where((element) => element.roomId != identifier)
-          .where((element) =>
-              _matrixClient.getRoomById(element.roomId)?.membership !=
-              matrix.Membership.join)
+          .where(
+            (element) =>
+                _matrixClient.getRoomById(element.roomId)?.membership !=
+                matrix.Membership.join,
+          )
           .forEach((element) {
-        _previews.removeWhere((i) => i.roomId == element.roomId);
+            _previews.removeWhere((i) => i.roomId == element.roomId);
 
-        var viaContent = _matrixRoom
-            .getState(matrix.EventTypes.SpaceChild, element.roomId)
-            ?.content["via"];
+            var viaContent = _matrixRoom
+                .getState(matrix.EventTypes.SpaceChild, element.roomId)
+                ?.content["via"];
 
-        List<String> via = const [];
+            List<String> via = const [];
 
-        if (viaContent is List) {
-          via = List.from(viaContent);
-        }
+            if (viaContent is List) {
+              via = List.from(viaContent);
+            }
 
-        _previews
-            .add(MatrixSpaceRoomChunkPreview(element, _matrixClient, via: via));
-      });
+            _previews.add(
+              MatrixSpaceRoomChunkPreview(element, _matrixClient, via: via),
+            );
+          });
 
       _fullyLoaded = true;
     } catch (error, stackTrace) {
@@ -557,21 +650,38 @@ class MatrixSpace extends Space {
 
   @override
   Future<void> setSpaceChildRoom(Room room) async {
-    await _matrixRoom.setSpaceChild(room.identifier);
+    if (room is! MatrixRoom) {
+      throw ArgumentError.value(room, 'room', 'Expected a Matrix room');
+    }
+    await setSpaceChildWithCanonicalParent(_matrixRoom, room.matrixRoom);
     children.add(SpaceChildRoom(room));
     _onUpdate.add(null);
   }
 
   @override
   Future<void> setSpaceChildSpace(Space room) async {
-    await _matrixRoom.setSpaceChild(room.identifier);
+    if (room is! MatrixSpace) {
+      throw ArgumentError.value(room, 'room', 'Expected a Matrix space');
+    }
+    await setSpaceChildWithCanonicalParent(_matrixRoom, room.matrixRoom);
     children.add(SpaceChildSpace(room));
     _onUpdate.add(null);
   }
 
+  /// Repairs child links already created without a canonical parent. The
+  /// action is explicit because it writes room state on the homeserver.
+  bool get canRepairImagePackParentLinks =>
+      canRepairSpaceImagePackParentLinks(_matrixRoom);
+
+  Future<SpaceImagePackRepairResult> repairImagePackParentLinks() =>
+      repairSpaceImagePackParentLinks(_matrixRoom);
+
   @override
   bool containsRoom(String identifier) {
-    return _rooms.any((element) => element.identifier == identifier);
+    return _rooms.any(
+      (element) =>
+          element.identifier == identifier && !_isTombstonedRoom(element),
+    );
   }
 
   @override
@@ -589,8 +699,9 @@ class MatrixSpace extends Space {
 
     var thisRoom = update[_matrixRoom.id];
     if (thisRoom != null) {
-      if (thisRoom.timeline?.events
-              ?.any((i) => i.type == matrix.EventTypes.SpaceChild) ==
+      if (thisRoom.timeline?.events?.any(
+            (i) => i.type == matrix.EventTypes.SpaceChild,
+          ) ==
           true) {
         Log.d(
           'A Matrix space child has been modified',
@@ -620,6 +731,7 @@ class MatrixSpace extends Space {
 
       var room = client.getRoom(id);
       if (room != null) {
+        if (_isTombstonedRoom(room)) continue;
         result.add(SpaceChildRoom(room));
         continue;
       }
@@ -634,18 +746,29 @@ class MatrixSpace extends Space {
     return result;
   }
 
+  bool _isTombstonedRoom(Room room) {
+    if (room is! MatrixRoom) return false;
+    final replacement = room.matrixRoom.extinctInformations?.replacementRoom;
+    return matrixRoomHasReplacementId(replacement);
+  }
+
   @override
-  Future<void> setChildrenOrder(List<SpaceChild> ordered,
-      {Function(double?)? onProgressChanged}) async {
-    var orderKeys =
-        List.generate(ordered.length, (i) => RandomUtils.getRandomString(10));
+  Future<void> setChildrenOrder(
+    List<SpaceChild> ordered, {
+    Function(double?)? onProgressChanged,
+  }) async {
+    var orderKeys = List.generate(
+      ordered.length,
+      (i) => RandomUtils.getRandomString(10),
+    );
     orderKeys.sort();
 
     for (int i = 0; i < ordered.length; i++) {
       var item = ordered[i];
 
-      var existing = _matrixRoom.spaceChildren
-          .firstWhereOrNull((e) => e.roomId == item.id);
+      var existing = _matrixRoom.spaceChildren.firstWhereOrNull(
+        (e) => e.roomId == item.id,
+      );
 
       var order = orderKeys[i];
       var suggested = existing?.suggested;
@@ -655,11 +778,15 @@ class MatrixSpace extends Space {
 
       await exponentialBackoff(() async {
         await _matrixRoom.client.setRoomStateWithKey(
-            _matrixRoom.id, matrix.EventTypes.SpaceChild, item.id, {
-          'via': via,
-          'order': order,
-          if (suggested != null) 'suggested': suggested,
-        });
+          _matrixRoom.id,
+          matrix.EventTypes.SpaceChild,
+          item.id,
+          {
+            'via': via,
+            'order': order,
+            if (suggested != null) 'suggested': suggested,
+          },
+        );
       });
     }
 
@@ -678,4 +805,164 @@ class MatrixSpace extends Space {
   Future<void> removeChild(SpaceChild<dynamic> child) async {
     await matrixRoom.removeSpaceChild(child.id);
   }
+}
+
+/// Adds both sides of a Space link without replacing another primary Space.
+/// The SDK's setSpaceChild writes the parent side without `canonical`, which
+/// makes the Space's image packs disappear from rooms added through this UI.
+@visibleForTesting
+Future<void> setSpaceChildWithCanonicalParent(
+  matrix.Room space,
+  matrix.Room child,
+) async {
+  if (!space.isSpace) throw StateError('Parent room is not a Space');
+  final via = [space.client.userID!.domain!];
+  if (!hasValidSpaceVia(via)) throw StateError('No valid Space routing server');
+  final makeCanonical =
+      _hasCanonicalParent(child, space.id) || !_hasAnyCanonicalParent(child);
+
+  final childContent = <String, Object?>{'via': via};
+  await space.client.setRoomStateWithKey(
+    space.id,
+    matrix.EventTypes.SpaceChild,
+    child.id,
+    childContent,
+  );
+  _cacheSpaceLink(space, matrix.EventTypes.SpaceChild, child.id, childContent);
+
+  final parentContent = <String, Object?>{
+    'via': via,
+    if (makeCanonical) 'canonical': true,
+  };
+  await space.client.setRoomStateWithKey(
+    child.id,
+    matrix.EventTypes.SpaceParent,
+    space.id,
+    parentContent,
+  );
+  _cacheSpaceLink(
+    child,
+    matrix.EventTypes.SpaceParent,
+    space.id,
+    parentContent,
+  );
+}
+
+/// Sets a missing canonical parent for an existing valid Space child link.
+@visibleForTesting
+Future<void> setCanonicalSpaceParent({
+  required matrix.Room space,
+  required matrix.Room child,
+  required List<String> via,
+}) async {
+  if (!hasValidSpaceVia(via)) throw ArgumentError.value(via, 'via');
+  final content = <String, Object?>{'via': via, 'canonical': true};
+  await space.client.setRoomStateWithKey(
+    child.id,
+    matrix.EventTypes.SpaceParent,
+    space.id,
+    content,
+  );
+  _cacheSpaceLink(child, matrix.EventTypes.SpaceParent, space.id, content);
+}
+
+bool _hasAnyCanonicalParent(matrix.Room child) =>
+    child.states[matrix.EventTypes.SpaceParent]?.values.any(
+      (state) => state.content['canonical'] == true,
+    ) ??
+    false;
+
+bool _hasCanonicalParent(matrix.Room child, String spaceId) =>
+    child
+        .getState(matrix.EventTypes.SpaceParent, spaceId)
+        ?.content['canonical'] ==
+    true;
+
+bool _hasCanonicalParentOtherThan(matrix.Room child, String spaceId) =>
+    child.states[matrix.EventTypes.SpaceParent]?.entries.any(
+      (entry) =>
+          entry.key != spaceId && entry.value.content['canonical'] == true,
+    ) ??
+    false;
+
+void _cacheSpaceLink(
+  matrix.Room room,
+  String type,
+  String stateKey,
+  Map<String, Object?> content,
+) {
+  (room.states[type] ??= <String, matrix.StrippedStateEvent>{})[stateKey] =
+      matrix.StrippedStateEvent(
+        type: type,
+        content: content,
+        senderId: room.client.userID!,
+        stateKey: stateKey,
+      );
+}
+
+class SpaceImagePackRepairResult {
+  int repaired = 0;
+  int alreadyCanonical = 0;
+  int otherCanonicalParent = 0;
+  int noPermission = 0;
+  int unavailable = 0;
+  int failed = 0;
+}
+
+/// MatrixRole labels power level 100 or higher as Admin. A Space moderator
+/// might be allowed to edit child links, but cannot run a bulk room repair.
+@visibleForTesting
+bool canRepairSpaceImagePackParentLinks(matrix.Room space) {
+  final userId = space.client.userID;
+  return space.membership == matrix.Membership.join &&
+      userId != null &&
+      space.getPowerLevelByUserId(userId) >= 100;
+}
+
+@visibleForTesting
+Future<SpaceImagePackRepairResult> repairSpaceImagePackParentLinks(
+  matrix.Room space,
+) async {
+  if (!canRepairSpaceImagePackParentLinks(space)) {
+    throw StateError('Space admin permission required for image-pack repair');
+  }
+  final result = SpaceImagePackRepairResult();
+  final childLinks = space.states[matrix.EventTypes.SpaceChild]?.entries.toList(
+    growable: false,
+  );
+  if (childLinks == null) return result;
+  final userId = space.client.userID!;
+
+  for (final entry in childLinks) {
+    if (!hasValidSpaceVia(entry.value.content['via'])) continue;
+    final child = space.client.getRoomById(entry.key);
+    if (child == null || child.membership != matrix.Membership.join) {
+      result.unavailable++;
+      continue;
+    }
+    if (_hasCanonicalParentOtherThan(child, space.id)) {
+      result.otherCanonicalParent++;
+      continue;
+    }
+    if (_hasCanonicalParent(child, space.id)) {
+      result.alreadyCanonical++;
+      continue;
+    }
+    if (child.getPowerLevelByUserId(userId) < 100 ||
+        !child.canChangeStateEvent(matrix.EventTypes.SpaceParent)) {
+      result.noPermission++;
+      continue;
+    }
+    try {
+      await setCanonicalSpaceParent(
+        space: space,
+        child: child,
+        via: List<String>.from(entry.value.content['via'] as List),
+      );
+      result.repaired++;
+    } catch (_) {
+      result.failed++;
+    }
+  }
+  return result;
 }

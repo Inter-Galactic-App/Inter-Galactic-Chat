@@ -86,6 +86,18 @@ class BackgroundNotificationsManager {
           Log.i("Current queue length: ${queue.length}");
           queue.remove(entry);
           try {
+            // Same reason as the v2 manager: this isolate's preference cache
+            // is a startup snapshot and does not see the UI isolate's writes.
+            // Guarded on its own, as in the v2 manager: sharing the try below
+            // meant a transient read failure skipped handleMessage entirely
+            // and the notification was lost. Rendering against the unrefreshed
+            // cache is safe because Preferences records the failed read and
+            // usePrivateNotificationPreviews fails closed while it stands.
+            try {
+              await preferences.refreshFromDisk();
+            } catch (e, s) {
+              Log.onError(e, s);
+            }
             await handleMessage(entry);
           } catch (e, s) {
             Log.e("An error occurred while processing a notification entry");

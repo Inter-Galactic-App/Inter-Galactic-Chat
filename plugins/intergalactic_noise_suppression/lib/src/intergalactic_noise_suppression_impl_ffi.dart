@@ -32,6 +32,8 @@ typedef _ConfigureDart = int Function(
 
 typedef _SetPipelineModeNative = Int32 Function(Int32 mode);
 typedef _SetPipelineModeDart = int Function(int mode);
+typedef _SetSpeechProtectHysteresisNative = Int32 Function(Int32 enabled);
+typedef _SetSpeechProtectHysteresisDart = int Function(int enabled);
 
 typedef _StartDiagnosticCaptureNative = Int32 Function(
   Pointer<Utf8> directory,
@@ -84,6 +86,7 @@ class _FfiNoiseSuppressionNativeBinding
 
   late final _InitializeDart _initialize;
   _ConfigureDart? _configure;
+  _SetSpeechProtectHysteresisDart? _setSpeechProtectHysteresis;
   _SetPipelineModeDart? _setPipelineMode;
   _StartDiagnosticCaptureDart? _startDiagnosticCapture;
   _StartTapOrderCaptureDart? _startTapOrderCapture;
@@ -152,6 +155,7 @@ class _FfiNoiseSuppressionNativeBinding
       'intergalactic_noise_suppression_initialize',
     );
     _ConfigureDart? configure;
+    _SetSpeechProtectHysteresisDart? setSpeechProtectHysteresis;
     _SetPipelineModeDart? setPipelineMode;
     _StartDiagnosticCaptureDart? startDiagnosticCapture;
     _StartTapOrderCaptureDart? startTapOrderCapture;
@@ -174,6 +178,16 @@ class _FfiNoiseSuppressionNativeBinding
       );
     } catch (_) {
       configure = null;
+    }
+    if (Platform.isWindows) {
+      try {
+        setSpeechProtectHysteresis = library.lookupFunction<
+            _SetSpeechProtectHysteresisNative, _SetSpeechProtectHysteresisDart>(
+          'intergalactic_noise_suppression_set_speech_protect_hysteresis',
+        );
+      } catch (_) {
+        setSpeechProtectHysteresis = null;
+      }
     }
     try {
       setPipelineMode =
@@ -210,6 +224,7 @@ class _FfiNoiseSuppressionNativeBinding
 
     _initialize = initialize;
     _configure = configure;
+    _setSpeechProtectHysteresis = setSpeechProtectHysteresis;
     _setPipelineMode = setPipelineMode;
     _startDiagnosticCapture = startDiagnosticCapture;
     _startTapOrderCapture = startTapOrderCapture;
@@ -374,9 +389,11 @@ class _FfiNoiseSuppressionNativeBinding
 
     final configure = _configure;
     if (configure == null) {
-      return _readStatus();
+      return NoiseSuppressionNativeStatus.unavailable(
+        supported: true,
+        reason: 'configure_unavailable',
+      );
     }
-
     configure(
       config.vadThreshold,
       config.speechGraceFrames,
@@ -385,6 +402,9 @@ class _FfiNoiseSuppressionNativeBinding
       config.fastCloseEnabled ? 1 : 0,
       config.deepFilterNetTransientSuppressionEnabled ? 1 : 0,
       config.deepFilterNetHushSuppressionEnabled ? 1 : 0,
+    );
+    _setSpeechProtectHysteresis?.call(
+      config.deepFilterNetSpeechProtectHysteresisEnabled ? 1 : 0,
     );
     return _readStatus();
   }

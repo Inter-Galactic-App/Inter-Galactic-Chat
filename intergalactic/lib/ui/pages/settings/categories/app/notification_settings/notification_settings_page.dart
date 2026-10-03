@@ -15,6 +15,8 @@ import 'package:intergalactic/client/components/push_notification/push_notificat
 import 'package:intergalactic/client/components/push_notification/room_notification_snooze.dart';
 import 'package:intergalactic/client/components/push_notification/web/web_push_notifier.dart';
 import 'package:intergalactic/client/components/stories/story_component.dart';
+import 'package:intergalactic/client/matrix/matrix_space.dart';
+import 'package:intergalactic/client/matrix/matrix_client.dart';
 import 'package:intergalactic/config/build_config.dart';
 import 'package:intergalactic/config/platform_utils.dart';
 import 'package:intergalactic/config/preferences.dart';
@@ -24,6 +26,7 @@ import 'package:intergalactic/main.dart';
 import 'package:intergalactic/ui/pages/settings/categories/app/boolean_toggle.dart';
 import 'package:intergalactic/ui/pages/settings/categories/app/double_preference_slider.dart';
 import 'package:intergalactic/ui/pages/settings/categories/app/notification_settings/embedded_push_setup_view.dart';
+import 'package:intergalactic/client/components/push_notification/notification_mode_policy.dart';
 import 'package:intergalactic/ui/pages/settings/categories/app/notification_settings/notification_preview_privacy_choice.dart';
 import 'package:intergalactic/ui/pages/settings/categories/app/notification_settings/notifier_debug_view.dart';
 import 'package:intergalactic/ui/pages/settings/categories/app/setting_row.dart';
@@ -164,8 +167,8 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
           title: 'Notifications',
           children: [
             _NotificationModeControl(
-              value: _currentNotificationMode,
-              onChanged: _setNotificationMode,
+              value: _currentNotificationMode(selectedClient),
+              onChanged: (mode) => _setNotificationMode(selectedClient, mode),
             ),
             if (PlatformUtils.isAndroid)
               BooleanPreferenceToggle(
@@ -201,6 +204,31 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                 },
               ),
             ),
+            // Mobile-only, and deliberately NOT the desktop Appearance section.
+            //
+            // `showMediaInNotifications` is already honoured on iOS - the NSE
+            // policy snapshot reads it and emits `show_media` - but the toggle
+            // that sets it lived inside a section gated to desktop, so on a
+            // phone the preference was live and unreachable. The only way to
+            // stop image previews was the Private preset, which also removes
+            // the message text. IOS request, 2026-09-03: keep text previews,
+            // drop image previews.
+            //
+            // It is standalone here rather than nested under
+            // `formatNotificationBody` the way desktop nests it. That nesting
+            // is a desktop convention - rich body formatting implies rich
+            // media - and body formatting is not exposed on mobile, so
+            // inheriting the dependency would grey this control out with
+            // nothing on screen explaining why.
+            if (!supportsDesktopNotificationOptions)
+              BooleanPreferenceToggle(
+                preference: preferences.showMediaInNotifications,
+                title: "Show images in notifications",
+                description:
+                    "Turn this off to keep message text in notifications but "
+                    "hide image previews. Media Preview settings still apply.",
+                onChanged: (_) => _markNotificationPreviewCustom(),
+              ),
           ],
         ),
         if (storyAccounts.isNotEmpty)
@@ -378,17 +406,54 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
     );
   }
 
-  _NotificationMode get _currentNotificationMode {
-    if (preferences.enableNotifications.value == false) {
-      return _NotificationMode.mute;
-    }
+  NotificationMode _currentNotificationMode(Client? selectedClient) {
+    final isMigrated =
+        selectedClient is MatrixClient &&
+        preferences.isGlobalMutePushRuleMigrated(selectedClient.identifier);
 
-    return _NotificationMode.fromPreference(preferences.notificationMode.value);
+    return resolveNotificationMode(
+      isMigrated: isMigrated,
+      serverMuted:
+          isMigrated &&
+          selectedClient.getMatrixClient().allPushNotificationsMuted,
+      enableNotifications: preferences.enableNotifications.value,
+      localModeValue: preferences.notificationMode.value,
+    );
   }
 
-  Future<void> _setNotificationMode(_NotificationMode mode) async {
-    await preferences.notificationMode.set(mode.preferenceValue);
-    await preferences.enableNotifications.set(mode != _NotificationMode.mute);
+  Future<void> _setNotificationMode(
+    Client? selectedClient,
+    NotificationMode mode,
+  ) async {
+    if (selectedClient is MatrixClient) {
+      final result = await applyMatrixNotificationMode(
+        mode: mode,
+        clientIdentifier: selectedClient.identifier,
+        setMuted: selectedClient.getMatrixClient().setMuteAllPushNotifications,
+        preferences: preferences,
+      );
+      if (result == NotificationModeWriteResult.failed) {
+        if (mounted) {
+          // Non-modal: a mute the server did not accept needs showing, not
+          // acknowledging. This draws because the settings route now carries
+          // a Scaffold for the ScaffoldMessenger to present into.
+          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+            const SnackBar(
+              content: Text('Could not update the server notification policy.'),
+            ),
+          );
+        }
+        return;
+      }
+    }
+
+    if (selectedClient is! MatrixClient) {
+      // Legacy, pre-migration path only. A Matrix account has already had both
+      // preferences written by applyMatrixNotificationMode, against the server
+      // rule it just accepted.
+      await preferences.notificationMode.set(mode.preferenceValue);
+      await preferences.enableNotifications.set(mode != NotificationMode.mute);
+    }
 
     if (mounted) {
       setState(() {});
@@ -1377,46 +1442,26 @@ class _NotificationDeveloperSettingsState
   }
 }
 
-enum _NotificationMode {
-  all,
-  mentions,
-  mute;
-
-  static _NotificationMode fromPreference(String value) {
-    return switch (value) {
-      'mentions' => _NotificationMode.mentions,
-      'mute' => _NotificationMode.mute,
-      _ => _NotificationMode.all,
-    };
-  }
-}
-
-extension _NotificationModeDetails on _NotificationMode {
-  String get preferenceValue => switch (this) {
-    _NotificationMode.all => 'all',
-    _NotificationMode.mentions => 'mentions',
-    _NotificationMode.mute => 'mute',
-  };
-
+extension NotificationModeDetails on NotificationMode {
   String get title => switch (this) {
-    _NotificationMode.all => 'All',
-    _NotificationMode.mentions => 'Mentions & Keywords',
-    _NotificationMode.mute => 'Mute',
+    NotificationMode.all => 'All',
+    NotificationMode.mentions => 'Mentions & Keywords',
+    NotificationMode.mute => 'Mute',
   };
 
   String get description => switch (this) {
-    _NotificationMode.all =>
+    NotificationMode.all =>
       'Notify for all Matrix events that match your room settings.',
-    _NotificationMode.mentions =>
+    NotificationMode.mentions =>
       'Only notify for highlighted Matrix events such as mentions, keywords, and @room.',
-    _NotificationMode.mute =>
+    NotificationMode.mute =>
       'Do not show message notifications on this device.',
   };
 
   IconData get icon => switch (this) {
-    _NotificationMode.all => Icons.notifications_active_outlined,
-    _NotificationMode.mentions => Icons.alternate_email_outlined,
-    _NotificationMode.mute => Icons.notifications_off_outlined,
+    NotificationMode.all => Icons.notifications_active_outlined,
+    NotificationMode.mentions => Icons.alternate_email_outlined,
+    NotificationMode.mute => Icons.notifications_off_outlined,
   };
 }
 
@@ -1426,8 +1471,8 @@ class _NotificationModeControl extends StatelessWidget {
     required this.onChanged,
   });
 
-  final _NotificationMode value;
-  final Future<void> Function(_NotificationMode mode) onChanged;
+  final NotificationMode value;
+  final Future<void> Function(NotificationMode mode) onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -1440,8 +1485,8 @@ class _NotificationModeControl extends StatelessWidget {
           final useColumn = constraints.maxWidth < 660;
 
           final options = [
-            for (final mode in _NotificationMode.values)
-              _NotificationModeTile(
+            for (final mode in NotificationMode.values)
+              NotificationModeTile(
                 mode: mode,
                 selected: value == mode,
                 onTap: () {
@@ -1476,14 +1521,14 @@ class _NotificationModeControl extends StatelessWidget {
   }
 }
 
-class _NotificationModeTile extends StatelessWidget {
-  const _NotificationModeTile({
+class NotificationModeTile extends StatelessWidget {
+  const NotificationModeTile({
     required this.mode,
     required this.selected,
     required this.onTap,
   });
 
-  final _NotificationMode mode;
+  final NotificationMode mode;
   final bool selected;
   final VoidCallback onTap;
 
@@ -1597,6 +1642,23 @@ List<NotificationOverrideSummary> collectNotificationOverrides(
     }
 
     for (final space in currentClient.spaces) {
+      // BUG-319: a space override can be set and still not appear here. Log the
+      // collect-time reading only for spaces that actually carry a rule or
+      // disagree with their cache, so a normal account emits nothing. Pairs
+      // with the line MatrixSpace.setPushRule writes; remove with the bug.
+      if (space is MatrixSpace) {
+        final diagnostics = space.pushRuleDiagnostics;
+        if (!diagnostics.contains('rules=none') ||
+            !diagnostics.contains('fresh=notify')) {
+          Log.i(
+            'BUG-319 space collected: $diagnostics '
+            'included=${space.pushRule != PushRule.notify}',
+            category: LogCategory.notifications,
+            source: 'collectNotificationOverrides',
+          );
+        }
+      }
+
       if (space.pushRule == PushRule.notify) {
         continue;
       }
@@ -1760,7 +1822,7 @@ class _NotificationOverrideCard extends StatelessWidget {
         context,
         SpaceSettingsPage(
           space: space,
-          initialTabId: SettingsCategorySpace.tabIdGeneral,
+          initialTabId: SettingsCategorySpace.tabIdNotifications,
         ),
       );
     }

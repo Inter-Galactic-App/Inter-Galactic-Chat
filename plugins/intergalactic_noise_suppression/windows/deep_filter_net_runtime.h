@@ -46,12 +46,14 @@ class DeepFilterNetRuntime {
   // libdf delays enhanced output by the model's lookahead
   // (third_party/deepfilternet/libDF/src/tract.rs) but does not expose it
   // through the C API, so these constants mirror the shipped model configs
-  // and the diagnostic stage-WAV cross-correlation measurements:
-  // DeepFilterNet3 = 2 frames (20 ms at 48 kHz), Hush = 1 frame (10 ms at
-  // 16 kHz, which is also one 10 ms capture callback). Post-model stages
-  // must delay their dry reference by this many callbacks before blending
-  // with or comparing against the model output.
-  int lookahead_frames() const;
+  // (config.ini: df_lookahead * hop_size + (fft_size - hop_size), i.e. the
+  // model lookahead PLUS the one-hop STFT analysis/synthesis overlap) and
+  // were confirmed by driving df.dll directly: DeepFilterNet3 = 3 frames
+  // (30 ms at 48 kHz), Hush = 1 frame (10 ms at 16 kHz, which is also one
+  // 10 ms capture callback). Post-model stages must delay their dry
+  // reference by this many callbacks before blending with or comparing
+  // against the model output.
+  int output_delay_frames() const;
   const std::string& model_path() const { return model_path_; }
   int expected_sample_rate_hz() const;
   static float AttenuationLimitDb();
@@ -60,6 +62,9 @@ class DeepFilterNetRuntime {
  private:
   std::filesystem::path ResolveModelPath() const;
   static bool FileExists(const std::filesystem::path& path);
+  // Cheap container check before df_create(), which fail-fasts the process on
+  // a malformed archive instead of returning null.
+  static bool LooksLikeModelArchive(const std::filesystem::path& path);
 
   DeepFilterNetRuntimeModel model_ = DeepFilterNetRuntimeModel::kDeepFilterNet;
   void* state_ = nullptr;

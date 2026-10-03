@@ -15,10 +15,15 @@ class TimelineEventViewPoll extends StatefulWidget {
   const TimelineEventViewPoll({
     required this.index,
     required this.timeline,
+    this.updateRevision = 0,
     super.key,
   });
 
   final int index;
+
+  /// Bumped by the owning timeline entry whenever the event at [index] is
+  /// refreshed in place. A vote changes the poll event, not its index.
+  final int updateRevision;
   final Timeline timeline;
   @override
   State<TimelineEventViewPoll> createState() => _TimelineEventViewPollState();
@@ -48,6 +53,13 @@ class _TimelineEventViewPollState extends State<TimelineEventViewPoll> {
 
   @override
   Widget build(BuildContext context) {
+    // Null only when the index did not resolve to an event - see
+    // setStateFromIndex. Every field below is read out of that event, and
+    // three of them are `late`, so there is nothing to render without it.
+    if (event == null) {
+      return const SizedBox.shrink();
+    }
+
     int totalVotes = 0;
 
     for (var answer in allowedAnswers) {
@@ -107,12 +119,25 @@ class _TimelineEventViewPollState extends State<TimelineEventViewPoll> {
       polls = widget.timeline.client.getComponent<PollComponent>();
     }
     if (widget.index != oldWidget.index ||
+        widget.updateRevision != oldWidget.updateRevision ||
         widget.timeline != oldWidget.timeline) {
       setStateFromIndex(widget.index);
     }
   }
 
   void setStateFromIndex(int index) {
+    // The owning entry's index is only accurate at the moment it hands it
+    // over, and a revision bump reaches this widget a frame later - by which
+    // time a redaction may have removed events from under it. Clear rather
+    // than keep the previous poll: rendering a neighbouring event is a wrong
+    // message, not a blank one. Same rule as TimelineEventViewReactions.
+    if (index < 0 || index >= widget.timeline.events.length) {
+      setState(() {
+        event = null;
+      });
+      return;
+    }
+
     setState(() {
       final e = widget.timeline.events[index];
       var sender = widget.timeline.room.getMemberOrFallback(e.senderId);

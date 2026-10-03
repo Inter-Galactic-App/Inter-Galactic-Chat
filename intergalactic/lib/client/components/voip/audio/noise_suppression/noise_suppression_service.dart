@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:intergalactic/config/app_globals.dart';
 import 'package:intergalactic/config/platform_utils.dart';
 import 'package:intergalactic/debug/log.dart';
@@ -70,8 +71,15 @@ class NoiseSuppressionService {
   /// threshold, speech grace, and so on). Android's DeepFilterNet does not - its
   /// `configure` call answers `android_configuration_unsupported` - so those
   /// controls must stay hidden there even though suppression itself works.
+  ///
+  /// Widget tests run on Linux CI and need to exercise the supported desktop
+  /// settings path without changing the production platform predicate.
+  @visibleForTesting
+  static bool? debugSupportsRnnoiseTuning;
+
   static bool get supportsRnnoiseTuning =>
-      PlatformUtils.isWindows || PlatformUtils.isMacOS;
+      debugSupportsRnnoiseTuning ??
+      (PlatformUtils.isWindows || PlatformUtils.isMacOS);
 
   static bool get _isNativeRnnoisePlatform => isNativeSuppressionPlatform;
   static bool get _isNativeDeepFilterNetBaselinePlatform =>
@@ -295,6 +303,7 @@ class NoiseSuppressionService {
           'dfBypass=${status.deepFilterNetBypassFrames}; '
           'dfReason=${status.deepFilterNetReason}; '
           'dfProtect=${status.deepFilterNetSpeechProtectedFrames}; '
+          'dfProtectStable=${status.deepFilterNetSpeechProtectHysteresisEnabled}; '
           'dfWet=${(status.deepFilterNetLastSpeechProtectWetMix * 100).toStringAsFixed(0)}%; '
           'dfAtten=${status.deepFilterNetAttenuationLimitDb.toStringAsFixed(0)}dB; '
           'dfClickOn=${status.deepFilterNetTransientSuppressionEnabled}; '
@@ -497,6 +506,24 @@ class NoiseSuppressionService {
     });
   }
 
+  /// Reads the native status and changes nothing else.
+  ///
+  /// [refresh] is NOT a pure observer: on a retryable unavailable state it
+  /// re-initialises the backend, which is right for the health timers it was
+  /// written for and wrong for anything that polls. A 5 s diagnostic tick
+  /// calling [refresh] would re-initialise the backend repeatedly for the
+  /// whole call, and - worse - re-initialisation constructs a fresh
+  /// `ProcessorSharedState` whose `frames_processed` starts at zero, so the
+  /// caller most likely to be polling is the one whose reading it would
+  /// destroy. Poll this instead.
+  Future<NoiseSuppressionNativeStatus> observeStatus() async {
+    return _enqueueOperation(() async {
+      final status = await IntergalacticNoiseSuppression.instance.getStatus();
+      _updateStatus(status);
+      return status;
+    });
+  }
+
   Future<NoiseSuppressionNativeStatus> refresh() async {
     return _enqueueOperation(() async {
       var status = await IntergalacticNoiseSuppression.instance.getStatus();
@@ -691,6 +718,9 @@ class NoiseSuppressionService {
           .value,
       deepFilterNetHushSuppressionEnabled:
           preferences.voipNoiseSuppressionDeepFilterNetHushSuppression.value,
+      deepFilterNetSpeechProtectHysteresisEnabled: preferences
+          .voipNoiseSuppressionDeepFilterNetSpeechProtectHysteresis
+          .value,
     );
   }
 

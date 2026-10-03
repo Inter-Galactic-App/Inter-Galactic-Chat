@@ -14,15 +14,15 @@ import 'package:intergalactic/ui/pages/settings/categories/account/biometric_rec
 import 'package:intergalactic/utils/links/link_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:just_the_tooltip/just_the_tooltip.dart';
 import 'package:provider/provider.dart';
 import 'package:tiamat/tiamat.dart' as tiamat;
 import 'package:tiamat/tiamat.dart';
 
 class AccountManagementSettingsTab extends StatefulWidget {
   const AccountManagementSettingsTab({super.key, required this.clientManager});
-  static ValueKey addAccountKey =
-      const ValueKey("ACCOUNT_MANAGEMENT_SETTINGS_ADD_ACCOUNT_BUTTON");
+  static ValueKey addAccountKey = const ValueKey(
+    "ACCOUNT_MANAGEMENT_SETTINGS_ADD_ACCOUNT_BUTTON",
+  );
   final ClientManager clientManager;
   @override
   State<AccountManagementSettingsTab> createState() =>
@@ -36,17 +36,23 @@ class _AccountManagementSettingsTabState
   final GlobalKey<AnimatedListState> _listKey = GlobalKey<AnimatedListState>();
   late int _numClients;
 
-  String get promptAddAccount => Intl.message("Add Account",
-      desc: "Label for button in settings to add another account",
-      name: "promptAddAccount");
+  String get promptAddAccount => Intl.message(
+    "Add Account",
+    desc: "Label for button in settings to add another account",
+    name: "promptAddAccount",
+  );
 
-  String get promptLogoutSingleAccount => Intl.message("Logout",
-      desc: "Label for button in settings to log out of an account",
-      name: "promptLogoutSingleAccount");
+  String get promptLogoutSingleAccount => Intl.message(
+    "Logout",
+    desc: "Label for button in settings to log out of an account",
+    name: "promptLogoutSingleAccount",
+  );
 
-  String get labelCurrentAccountsHeader => Intl.message("Current Accounts",
-      desc: "Label for header of accounts list",
-      name: "labelCurrentAccountsHeader");
+  String get labelCurrentAccountsHeader => Intl.message(
+    "Current Accounts",
+    desc: "Label for header of accounts list",
+    name: "labelCurrentAccountsHeader",
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -55,26 +61,29 @@ class _AccountManagementSettingsTabState
 
   @override
   void initState() {
-    onClientAddedListener =
-        widget.clientManager.onClientAdded.stream.listen((index) {
+    onClientAddedListener = widget.clientManager.onClientAdded.stream.listen((
+      index,
+    ) {
       _listKey.currentState?.insertItem(index);
       setState(() {
         _numClients++;
       });
     });
 
-    onClientRemovedListener =
-        widget.clientManager.onClientRemoved.stream.listen((info) {
-      _listKey.currentState?.removeItem(
-          info.index,
-          (context, animation) => SizeTransition(
-                sizeFactor: animation,
-                child: accountListItem(
-                    displayName: info.displayName!,
-                    avatar: info.avatar,
-                    detail: info.identifier),
-              ));
-    });
+    onClientRemovedListener = widget.clientManager.onClientRemoved.stream
+        .listen((info) {
+          _listKey.currentState?.removeItem(
+            info.index,
+            (context, animation) => SizeTransition(
+              sizeFactor: animation,
+              child: accountListItem(
+                displayName: info.displayName!,
+                avatar: info.avatar,
+                detail: info.identifier,
+              ),
+            ),
+          );
+        });
 
     _numClients = widget.clientManager.clients.length;
 
@@ -105,7 +114,7 @@ class _AccountManagementSettingsTabState
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   accountListBuilder(context, clientManager),
-                  addAccountButton(context)
+                  addAccountButton(context),
                 ],
               ),
             ),
@@ -129,25 +138,27 @@ class _AccountManagementSettingsTabState
         return SizeTransition(
           sizeFactor: animation,
           child: accountListItem(
-              client: client,
-              displayName: client.self!.displayName,
-              avatar: client.self!.avatar,
-              detail: client.self!.identifier,
-              internalId: client.identifier,
-              onLogoutClicked: () =>
-                  _logoutClient(context, clientmanager, client)),
+            client: client,
+            displayName: client.self!.displayName,
+            avatar: client.self!.avatar,
+            detail: client.self!.identifier,
+            internalId: client.identifier,
+            onLogoutClicked: () =>
+                _logoutClient(context, clientmanager, client),
+          ),
         );
       },
     );
   }
 
-  Widget accountListItem(
-      {required String displayName,
-      Client? client,
-      ImageProvider? avatar,
-      String? detail,
-      String? internalId,
-      Future<void> Function()? onLogoutClicked}) {
+  Widget accountListItem({
+    required String displayName,
+    Client? client,
+    ImageProvider? avatar,
+    String? detail,
+    String? internalId,
+    Future<void> Function()? onLogoutClicked,
+  }) {
     String detailString = detail ?? "";
 
     if (preferences.developerMode.value && internalId != null) {
@@ -167,70 +178,73 @@ class _AccountManagementSettingsTabState
               : [
                   if (_numClients > 1)
                     tiamat.ContextMenuItem(
-                        text: "Set Prefix",
-                        onPressed: () {
-                          setPrefixDialog(client);
-                        })
+                      text: "Set Prefix",
+                      onPressed: () {
+                        setPrefixDialog(client);
+                      },
+                    ),
                 ],
-          child: LayoutBuilder(builder: (context, constraints) {
-            final narrow = constraints.maxWidth < 420;
-            final userPanel = UserPanelView(
-              displayName: displayName,
-              avatar: avatar,
-              detail: detailString,
-            );
-            final logoutButton = tiamat.Button.danger(
-              text: promptLogoutSingleAccount,
-              onTap: () {
-                final logout = onLogoutClicked;
-                if (logout != null) {
-                  unawaited(logout());
-                }
-              },
-            );
-            final accountDeletionButton = client == null
-                ? null
-                : tiamat.Button.secondary(
-                    text: "Account deletion",
-                    onTap: () => showAccountDeletionHelp(context, client),
-                  );
-            final actionButtons = <Widget>[
-              if (accountDeletionButton != null) accountDeletionButton,
-              logoutButton,
-            ];
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final narrow = constraints.maxWidth < 420;
+              final userPanel = UserPanelView(
+                displayName: displayName,
+                avatar: avatar,
+                detail: detailString,
+              );
+              final logoutButton = tiamat.Button.danger(
+                text: promptLogoutSingleAccount,
+                onTap: () {
+                  final logout = onLogoutClicked;
+                  if (logout != null) {
+                    unawaited(logout());
+                  }
+                },
+              );
+              final accountDeletionButton = client == null
+                  ? null
+                  : tiamat.Button.secondary(
+                      text: "Account deletion",
+                      onTap: () => showAccountDeletionHelp(context, client),
+                    );
+              final actionButtons = <Widget>[
+                if (accountDeletionButton != null) accountDeletionButton,
+                logoutButton,
+              ];
 
-            if (narrow) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+              if (narrow) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    userPanel,
+                    const SizedBox(height: 8),
+                    Wrap(
+                      alignment: WrapAlignment.end,
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: actionButtons,
+                    ),
+                  ],
+                );
+              }
+
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  userPanel,
-                  const SizedBox(height: 8),
-                  Wrap(
-                    alignment: WrapAlignment.end,
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: actionButtons,
+                  Expanded(child: userPanel),
+                  const SizedBox(width: 12),
+                  Flexible(
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      alignment: WrapAlignment.end,
+                      children: actionButtons,
+                    ),
                   ),
                 ],
               );
-            }
-
-            return Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(child: userPanel),
-                const SizedBox(width: 12),
-                Flexible(
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    alignment: WrapAlignment.end,
-                    children: actionButtons,
-                  ),
-                ),
-              ],
-            );
-          }),
+            },
+          ),
         ),
       ),
     );
@@ -289,41 +303,40 @@ class _AccountManagementSettingsTabState
       color: Colors.transparent,
       clipBehavior: Clip.hardEdge,
       borderRadius: BorderRadius.circular(8),
-      child: LayoutBuilder(builder: (context, constraints) {
-        final narrow = constraints.maxWidth < 420;
-        final userPanel = UserPanelView(
-          displayName: client.self?.displayName ?? client.identifier,
-          avatar: client.self?.avatar,
-          detail:
-              "${client.self?.identifier ?? client.identifier} - $homeserverLabel",
-        );
-        final handoffButton = tiamat.Button.secondary(
-          text: "Deletion help",
-          onTap: () => showAccountDeletionHelp(context, client),
-        );
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final narrow = constraints.maxWidth < 420;
+          final userPanel = UserPanelView(
+            displayName: client.self?.displayName ?? client.identifier,
+            avatar: client.self?.avatar,
+            detail:
+                "${client.self?.identifier ?? client.identifier} - $homeserverLabel",
+          );
+          final handoffButton = tiamat.Button.secondary(
+            text: "Deletion help",
+            onTap: () => showAccountDeletionHelp(context, client),
+          );
 
-        if (narrow) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          if (narrow) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                userPanel,
+                const SizedBox(height: 8),
+                Align(alignment: Alignment.centerRight, child: handoffButton),
+              ],
+            );
+          }
+
+          return Row(
             children: [
-              userPanel,
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerRight,
-                child: handoffButton,
-              ),
+              Expanded(child: userPanel),
+              const SizedBox(width: 12),
+              handoffButton,
             ],
           );
-        }
-
-        return Row(
-          children: [
-            Expanded(child: userPanel),
-            const SizedBox(width: 12),
-            handoffButton,
-          ],
-        );
-      }),
+        },
+      ),
     );
   }
 
@@ -350,10 +363,7 @@ class _AccountManagementSettingsTabState
     );
   }
 
-  Future<void> showAccountDeletionHelp(
-    BuildContext context,
-    Client client,
-  ) {
+  Future<void> showAccountDeletionHelp(BuildContext context, Client client) {
     final homeserver = homeserverWebsiteFor(client);
     final userId = client.self?.identifier ?? client.identifier;
     final homeserverLabel = homeserver == null
@@ -425,12 +435,13 @@ class _AccountManagementSettingsTabState
     }
 
     final newPrefix = await AdaptiveTextDialog.show(
-        title: "Set Prefix",
-        placeholder: "Enter Prefix",
-        description:
-            "When more than one of your logged in accounts share the same room, you can type this prefix to quickly send messages from this account",
-        context,
-        defaultText: component.clientPrefix);
+      title: "Set Prefix",
+      placeholder: "Enter Prefix",
+      description:
+          "When more than one of your logged in accounts share the same room, you can type this prefix to quickly send messages from this account",
+      context,
+      defaultText: component.clientPrefix,
+    );
     if (newPrefix == null) {
       return;
     }
@@ -442,35 +453,36 @@ class _AccountManagementSettingsTabState
     return Padding(
       padding: const EdgeInsets.fromLTRB(0, 8, 12, 12),
       child: Align(
-          alignment: Alignment.centerRight,
-          child: JustTheTooltip(
-            content: Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: tiamat.Text(promptAddAccount),
-            ),
-            preferredDirection: AxisDirection.down,
-            offset: 5,
-            tailLength: 5,
-            tailBaseWidth: 5,
-            backgroundColor:
-                Theme.of(context).colorScheme.surfaceContainerLowest,
-            child: tiamat.CircleButton(
-              key: AccountManagementSettingsTab.addAccountKey,
-              icon: Icons.add,
-              radius: 20,
-              onPressed: () {
-                Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => LoginPage(
-                          canNavigateBack: true,
-                          onSuccess: (
-                            _,
-                          ) {
-                            Navigator.of(context).pop();
-                          },
-                        )));
-              },
-            ),
-          )),
+        alignment: Alignment.centerRight,
+        // Was a hand-rolled JustTheTooltip carrying exactly the house
+        // component's own parameters - same offset, tail, background and
+        // text style - so this is the same tooltip, built the documented
+        // way. It also GAINS the screen-reader announcement: the atom wraps
+        // itself in Semantics(tooltip:), and the package emits none of its
+        // own, so this button was silent to a reader (DECISIONS.md
+        // 2026-08-18, D7).
+        child: tiamat.Tooltip(
+          text: promptAddAccount,
+          preferredDirection: AxisDirection.down,
+          child: tiamat.CircleButton(
+            key: AccountManagementSettingsTab.addAccountKey,
+            icon: Icons.add,
+            radius: 20,
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => LoginPage(
+                    canNavigateBack: true,
+                    onSuccess: (_) {
+                      Navigator.of(context).pop();
+                    },
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
     );
   }
 }

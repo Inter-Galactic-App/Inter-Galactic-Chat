@@ -1,5 +1,5 @@
 name: intergalactic
-version: 0.8.1+1004
+version: 0.8.2+1008
 publish_to: none
 description: Inter Galactic is a fork of Commet
 environment: 
@@ -79,7 +79,7 @@ dependencies:
   matrix:
     git:
       url: https://github.com/commetchat/matrix-dart-sdk.git
-      ref: upstream-v6.1.1
+      ref: 58e0bd24c6a2d74d727dc92a24dc076144fae43b
   matrix_dart_sdk_drift_db:
     git: 
       url: https://github.com/commetchat/matrix-dart-sdk-drift-db.git
@@ -168,6 +168,13 @@ dependencies:
 dependency_overrides:
   analyzer: ^7.3.0
 
+  # The pinned Drift DB package still names the SDK tag. Resolve both edges
+  # to the same immutable source until that package pins this commit itself.
+  matrix:
+    git:
+      url: https://github.com/commetchat/matrix-dart-sdk.git
+      ref: 58e0bd24c6a2d74d727dc92a24dc076144fae43b
+
   ## Calendar UI in this tree targets the Commet 2.0.0 fork.
   calendar_view:
     git:
@@ -213,6 +220,7 @@ dev_dependencies:
   integration_test: 
     sdk: flutter
   file: any
+  shared_preferences_platform_interface: any
   
 flutter_intl: 
   class_name: T
@@ -267,8 +275,10 @@ flutter:
     # user-accessible the way the Windows install directory is.
     - assets/licenses/
     # Explicit so Flutter's incremental asset pipeline notices the Windows
-    # WebView2 notice when it is added or changed under the directory.
+    # WebView2 and libDF notices when they are added or changed under the
+    # directory.
     - assets/licenses/Microsoft-WebView2-BSD-3-Clause.txt
+    - assets/licenses/deepfilternet-libdf-rust-crates-NOTICE.txt
     - assets/licenses/rust-crates-NOTICE.txt
   shaders: 
     - assets/shader/texture_coordinate.frag
@@ -303,7 +313,7 @@ flutter:
 msix_config: 
   display_name: Inter Galactic
   identity_name: chat.intergalactic.app.windows-832a9c4f
-  msix_version: 0.8.1.1004
+  msix_version: 0.8.2.1008
   toast_activator: 
     clsid: A1F4D8E2-44E5-4A0A-8B91-8D2B18B9D832
     arguments: -ToastActivated

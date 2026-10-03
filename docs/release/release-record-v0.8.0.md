@@ -530,8 +530,8 @@ receipt. REVIEW then compared the released source archive to public tag
   `1f70ae1d5b063c51a531fe94eef6ae20d09c6c3e` were reachable with their license
   files. The public LF license contents reproduce the receipt hashes after the
   same deterministic Windows CRLF normalization.
-- Machine-readable proof is retained in the Matrix_Dev release evidence at
-  `docs/release/evidence/desktop-native-notices/0.8.0+992/source-archive-equivalence.json`.
+- Machine-readable proof is retained in the maintainer's release-evidence
+  archive.
 
 Remaining gates are user-accessible publication of the supplemental notice and
 receipt, plus inclusion and post-package verification of the accepted notice

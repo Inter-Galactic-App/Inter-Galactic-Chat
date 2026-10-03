@@ -9,19 +9,45 @@ import 'package:intergalactic/ui/accessibility/accessibility_scope.dart';
 import 'package:intergalactic/ui/motion/inter_galactic_motion.dart';
 
 class SettingsNavigation {
+  /// Wraps a settings route in the Scaffold its SnackBars are drawn by.
+  ///
+  /// Settings pages report failures through
+  /// `ScaffoldMessenger.maybeOf(context)?.showSnackBar(...)`, and no settings
+  /// route registered a Scaffold, so those messages were queued and drawn
+  /// nowhere. The Scaffold carries no chrome: transparent, so the page keeps
+  /// painting its own background, and `resizeToAvoidBottomInset: false` so the
+  /// keyboard behaves exactly as it did before the wrapper existed.
+  ///
+  /// The local [ScaffoldMessenger] is what keeps the desktop overlay looking
+  /// unchanged. That route is `opaque: false`, so `MainPage`'s Scaffold is
+  /// still mounted and visible behind it, and a messenger presents a SnackBar
+  /// on *every* registered root Scaffold at once - a settings message would
+  /// have drawn a second time, behind the barrier, at the bottom of the
+  /// screen. Scoping the messenger to this route keeps it in this route.
+  static Widget _settingsSnackBarSurface(Widget page) {
+    return ScaffoldMessenger(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        resizeToAvoidBottomInset: false,
+        body: page,
+      ),
+    );
+  }
+
   static Future<T?> show<T>(BuildContext context, Widget page) {
     final reduceMotion = InterGalacticMotion.shouldReduce(context);
+    final surface = _settingsSnackBarSurface(page);
 
     if (!Layout.desktop) {
       if (PlatformUtils.isIOS) {
         return Navigator.of(
           context,
-        ).push<T>(c.CupertinoPageRoute<T>(builder: (_) => page));
+        ).push<T>(c.CupertinoPageRoute<T>(builder: (_) => surface));
       }
 
       return Navigator.of(context).push<T>(
         PageRouteBuilder(
-          pageBuilder: (_, __, ___) => page,
+          pageBuilder: (_, __, ___) => surface,
           transitionDuration: InterGalacticMotion.duration(
             context,
             InterGalacticMotion.mobileRoute,
@@ -66,7 +92,7 @@ class SettingsNavigation {
           InterGalacticMotion.settingsOverlayOut,
         ),
         pageBuilder: (_, __, ___) {
-          return _DesktopSettingsOverlay(child: page);
+          return _DesktopSettingsOverlay(child: surface);
         },
         transitionsBuilder: (_, animation, __, child) {
           if (reduceMotion) {

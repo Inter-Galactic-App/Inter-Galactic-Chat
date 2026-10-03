@@ -44,8 +44,51 @@ enum LivekitMicrophoneSenderAttachment {
 /// drifted: the backend copy could only detach, and its "already in the target
 /// state" guard did not consider whether the sender was carrying *this*
 /// publication's track.
+/// How the join-time microphone is brought up.
+enum InitialMicrophoneJoinMode {
+  /// Publish and send: the normal join.
+  enable,
+
+  /// Publish, but with the RTP sender detached from the start, so the call
+  /// has a local microphone publication (a "You" tile, a mute indicator that
+  /// reads something) while nothing is sent until the Push to Talk key.
+  publishMutedForPushToTalk,
+}
+
 class LivekitMicrophoneSenderGate {
   const LivekitMicrophoneSenderGate._();
+
+  /// BUG-322. With Push to Talk on, the Windows join used to SKIP the
+  /// microphone publish entirely. That kept the mic silent, but it also left
+  /// the call with no local publication: the call surface showed "Waiting
+  /// for streams..." instead of the user's own tile, and the mute indicator
+  /// had no publication to read on the first join. Push to Talk's steady
+  /// state on Windows is "published, sender detached", so the join now
+  /// produces exactly that instead of nothing.
+  static InitialMicrophoneJoinMode initialJoinMode({
+    required bool isWindows,
+    required bool pushToTalkEnabled,
+  }) {
+    return isWindows && pushToTalkEnabled
+        ? InitialMicrophoneJoinMode.publishMutedForPushToTalk
+        : InitialMicrophoneJoinMode.enable;
+  }
+
+  /// Whether a microphone input-device change must republish the microphone.
+  ///
+  /// A changed device always republishes. An UNCHANGED device used to return
+  /// early, which is how "switch to another mic, it works; switch back, it
+  /// is dead again" happened (BUG-320): the join had left the sender detached
+  /// behind an unmuted publication, the switch away republished and
+  /// reattached it, and the switch back compared equal device ids and did
+  /// nothing. If the sender is detached the republish is the repair, whatever
+  /// the device id says.
+  static bool shouldRepublishForDeviceChange({
+    required bool deviceChanged,
+    required bool senderDetached,
+  }) {
+    return deviceChanged || senderDetached;
+  }
 
   /// Resolves real sender attachment for [publication].
   static LivekitMicrophoneSenderAttachment attachmentOf(
@@ -78,6 +121,50 @@ class LivekitMicrophoneSenderGate {
   /// silently detached one.
   static bool isDetached(lk.LocalTrackPublication publication) =>
       attachmentOf(publication) == LivekitMicrophoneSenderAttachment.detached;
+
+  /// What arming a Push to Talk join publication did.
+  static Future<LivekitPushToTalkArmResult> armPushToTalkJoinPublication({
+    required lk.LocalTrackPublication publication,
+    required lk.LocalAudioTrack track,
+    required String source,
+  }) async {
+    final senderMoved = await setDetached(
+      publication,
+      detached: true,
+      reason: 'push_to_talk_join',
+      source: source,
+    );
+    // Re-read the attachment rather than trusting the return value. BUG-322:
+    // `setDetached` answers false in two ways that leave audio able to flow -
+    // the sender was not wired up yet when the publication came back (which
+    // `attachmentOf` reports as `unknown`, the NORMAL state for a publication
+    // still negotiating), and `replaceTrack` threw. Enabling the track in
+    // either of those puts a live microphone on a Push to Talk join behind an
+    // indicator that reads muted, which is worse than the defect this join
+    // path was written to fix.
+    final attachment = attachmentOf(publication);
+    final detached = attachment == LivekitMicrophoneSenderAttachment.detached;
+    if (detached) {
+      await track.enable();
+    } else {
+      // Leaving the track disabled is the safe half of the trade: the
+      // publication still exists, so the tile and the mute state are there,
+      // and the first Push to Talk press reattaches the sender and enables
+      // the track through the normal unmute path.
+      Log.w(
+        'LiveKit initial microphone left disabled after Push to Talk '
+        'publish: reason=sender_not_detached moved=$senderMoved '
+        'sender_attachment=${attachment.name}',
+        category: LogCategory.livekit,
+        source: source,
+      );
+    }
+    return LivekitPushToTalkArmResult(
+      senderMoved: senderMoved,
+      trackEnabled: detached,
+      attachment: attachment,
+    );
+  }
 
   /// Detaches or reattaches the microphone sender and republishes the muted
   /// metadata to match.
@@ -211,4 +298,23 @@ class LivekitMicrophoneSenderGate {
     );
     return true;
   }
+}
+
+/// Outcome of [LivekitMicrophoneSenderGate.armPushToTalkJoinPublication].
+class LivekitPushToTalkArmResult {
+  const LivekitPushToTalkArmResult({
+    required this.senderMoved,
+    required this.trackEnabled,
+    required this.attachment,
+  });
+
+  /// Whether `setDetached` actually moved the sender.
+  final bool senderMoved;
+
+  /// Whether the capture track was re-enabled, which happens only when the
+  /// sender is KNOWN to be carrying nothing.
+  final bool trackEnabled;
+
+  /// The sender attachment observed after the detach attempt.
+  final LivekitMicrophoneSenderAttachment attachment;
 }

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:intergalactic/client/components/voip/voip_component.dart';
 import 'package:intergalactic/client/client_manager.dart';
 import 'package:intergalactic/config/build_config.dart';
@@ -37,6 +38,106 @@ class SettingsCategoryApp implements SettingsCategory {
   static const tabIdSoundboard = 'app.soundboard';
   static const tabIdShortcuts = 'app.shortcuts';
   static const tabIdNotifications = 'app.notifications';
+
+  /// The notifications tab's search index, as a pure function of the platform.
+  ///
+  /// Takes [supportsDesktopOptions] rather than reading the ambient platform so
+  /// BOTH shapes are reachable from a test. A suite that branches on the real
+  /// platform can only ever exercise the host it runs on - on a Windows runner
+  /// every mobile assertion is skipped, and a mutation that breaks the mobile
+  /// index stays green. That was true of the first version of this change.
+  @visibleForTesting
+  static List<SettingsSearchEntry> notificationSearchEntries({
+    required bool supportsDesktopOptions,
+  }) {
+    return [
+      const SettingsSearchEntry(
+        title: "Notification mode",
+        section: "Notifications",
+        keywords: ["all", "mentions", "keywords", "mute"],
+      ),
+      const SettingsSearchEntry(
+        title: "Hide notifications for current room",
+        section: "Notifications",
+        keywords: ["mute room", "current room"],
+      ),
+      // The Appearance section only renders on desktop, so its entries
+      // must be desktop-only too. On mobile they pointed at a section
+      // that never appears - search would land the user on the tab with
+      // nothing matching on screen.
+      if (supportsDesktopOptions) ...[
+        const SettingsSearchEntry(
+          title: "Message body formatting",
+          section: "Appearance",
+          keywords: ["body", "formatting", "preview text"],
+        ),
+        const SettingsSearchEntry(
+          title: "Show images",
+          section: "Appearance",
+          keywords: ["images", "notification images"],
+        ),
+        const SettingsSearchEntry(
+          title: "Preview URLs",
+          section: "Appearance",
+          keywords: ["url previews", "link previews"],
+        ),
+      ],
+      // Mobile exposes only the image control, and under a different
+      // section and title, so it needs its own entry rather than
+      // inheriting the desktop one.
+      if (!supportsDesktopOptions)
+        const SettingsSearchEntry(
+          title: "Show images in notifications",
+          section: "Notification previews",
+          keywords: [
+            "images",
+            "notification images",
+            "image previews",
+            "hide images",
+            "text only",
+            "privacy",
+          ],
+        ),
+      // Same reason as Appearance above: the whole Sounds section is gated on
+      // `supportsDesktopNotificationOptions || supportsCustomSoundFiles`, and
+      // both are the same desktop-only expression this flag mirrors.
+      if (supportsDesktopOptions) ...[
+        const SettingsSearchEntry(
+          title: "Notification volume",
+          section: "Sounds",
+          keywords: ["volume", "notification sound"],
+        ),
+        const SettingsSearchEntry(
+          title: "Notification sound",
+          section: "Sounds",
+          keywords: ["sound", "alert sound"],
+        ),
+        const SettingsSearchEntry(
+          title: "Ringtone",
+          section: "Sounds",
+          keywords: ["call sound", "ringtone"],
+        ),
+      ],
+      const SettingsSearchEntry(
+        title: "Room and space overrides",
+        section: "Overrides",
+        keywords: [
+          "overrides",
+          "room notification overrides",
+          "space notification overrides",
+        ],
+      ),
+    ];
+  }
+
+  /// Mirrors `NotificationSettingsPage.supportsDesktopNotificationOptions`.
+  ///
+  /// The page decides which controls render; this decides which controls are
+  /// INDEXED. If the two disagree, settings search sends people to a control
+  /// that is not on their screen - the failure mode is silent, because both
+  /// halves look correct on their own.
+  static bool get _supportsDesktopNotificationOptions =>
+      PlatformUtils.isLinux || PlatformUtils.isMacOS || PlatformUtils.isWindows;
   static const tabIdDesktopCompanion = 'app.desktop_companion';
   static const tabIdDeveloper = 'app.developer';
   static const tabIdExperiments = 'app.experiments';
@@ -74,7 +175,7 @@ class SettingsCategoryApp implements SettingsCategory {
     desc: "Label for the Window Behaviour settings page",
   );
 
-  String get labelSettingsAppAdvanced => Intl.message(
+  String get labelSettingsTabDeveloper => Intl.message(
     "Developer",
     name: "labelSettingsTabDeveloper",
     desc: "Label for the App Developer settings page",
@@ -878,57 +979,9 @@ class SettingsCategoryApp implements SettingsCategory {
             "room notification overrides",
             "space notification overrides",
           ],
-          searchEntries: const [
-            SettingsSearchEntry(
-              title: "Notification mode",
-              section: "Notifications",
-              keywords: ["all", "mentions", "keywords", "mute"],
-            ),
-            SettingsSearchEntry(
-              title: "Hide notifications for current room",
-              section: "Notifications",
-              keywords: ["mute room", "current room"],
-            ),
-            SettingsSearchEntry(
-              title: "Message body formatting",
-              section: "Appearance",
-              keywords: ["body", "formatting", "preview text"],
-            ),
-            SettingsSearchEntry(
-              title: "Show images",
-              section: "Appearance",
-              keywords: ["images", "notification images"],
-            ),
-            SettingsSearchEntry(
-              title: "Preview URLs",
-              section: "Appearance",
-              keywords: ["url previews", "link previews"],
-            ),
-            SettingsSearchEntry(
-              title: "Notification volume",
-              section: "Sounds",
-              keywords: ["volume", "notification sound"],
-            ),
-            SettingsSearchEntry(
-              title: "Notification sound",
-              section: "Sounds",
-              keywords: ["sound", "alert sound"],
-            ),
-            SettingsSearchEntry(
-              title: "Ringtone",
-              section: "Sounds",
-              keywords: ["call sound", "ringtone"],
-            ),
-            SettingsSearchEntry(
-              title: "Room and space overrides",
-              section: "Overrides",
-              keywords: [
-                "overrides",
-                "room notification overrides",
-                "space notification overrides",
-              ],
-            ),
-          ],
+          searchEntries: notificationSearchEntries(
+            supportsDesktopOptions: _supportsDesktopNotificationOptions,
+          ),
           pageBuilder: (context) {
             return const NotificationSettingsPage();
           },
@@ -987,7 +1040,7 @@ class SettingsCategoryApp implements SettingsCategory {
         ),
       SettingsTab(
         id: tabIdDeveloper,
-        label: labelSettingsAppAdvanced,
+        label: labelSettingsTabDeveloper,
         icon: m.Icons.code,
         searchKeywords: const [
           "proxy",

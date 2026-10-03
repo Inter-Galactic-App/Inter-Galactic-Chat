@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:intergalactic/client/components/activity/activity_models.dart';
 import 'package:intergalactic/client/components/activity/sources/steam/steam_activity_source.dart';
 import 'package:intergalactic/client/components/activity/sources/steam/steam_api_client.dart';
+import 'package:intergalactic/debug/log.dart';
 
 void main() {
   group('SteamPlayerSummaryParser', () {
@@ -219,6 +222,32 @@ void main() {
         isNull,
       );
     });
+
+    test(
+      'marks handled optional requests outside generic zone diagnostics',
+      () async {
+        Object? zoneMarker;
+        final client = SteamApiClient(
+          httpClient: MockClient((request) async {
+            zoneMarker = Zone.current[Log.handledOptionalNetworkRequestZoneKey];
+            throw StateError('optional Steam endpoint unavailable');
+          }),
+        );
+
+        await expectLater(
+          client.getPlayerSummary(
+            endpoint: Uri.https(
+              'activity.example.test',
+              '/steam/player-summary',
+            ),
+            steamId: 'steam-id',
+          ),
+          throwsA(isA<SteamActivityNetworkException>()),
+        );
+
+        expect(zoneMarker, isTrue);
+      },
+    );
   });
 
   group('SteamActivitySource', () {

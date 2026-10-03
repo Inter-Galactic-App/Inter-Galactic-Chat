@@ -12,6 +12,7 @@ import 'package:intergalactic/client/room.dart';
 import 'package:intergalactic/debug/log.dart';
 import 'package:intergalactic/main.dart';
 import 'package:intergalactic/utils/custom_uri.dart';
+import 'package:intergalactic/utils/database/database_release_trigger.dart';
 import 'package:intergalactic/utils/event_bus.dart';
 
 typedef NotificationResponseAcknowledger =
@@ -158,6 +159,7 @@ class NotificationResponseHandler {
         category: LogCategory.notifications,
         source: 'notification-response',
       );
+      await _awaitDatabaseEstablished('local response');
 
       final snoozeDuration =
           RoomNotificationSnoozeDurationOption.fromNotificationActionId(
@@ -290,6 +292,7 @@ class NotificationResponseHandler {
   }) async {
     try {
       _logPayloadReceived(source, payload);
+      await _awaitDatabaseEstablished(source);
       final directUri = _parseUri(_stringValue(payload));
       if (directUri is OpenStoryURI) {
         _openNotificationStoryRoute(
@@ -1525,6 +1528,30 @@ class NotificationResponseHandler {
       );
       return InlineReplyOutcome.failed;
     }
+  }
+
+  /// Waits for the account database if B5 released it before suspension.
+  ///
+  /// A notification tap is a resume: the response arrives BEFORE the release
+  /// trigger's own observer has scheduled the re-establish, and the room the
+  /// route opens starts its timeline against a released connection, which
+  /// throws by design (observed on the iPhone on 2026-09-04). The trigger arms
+  /// its gate when it releases, so waiting is order-independent; it is already
+  /// complete when nothing was released, and there is no trigger at all before
+  /// attach (a cold launch, where nothing can be released yet).
+  ///
+  /// Delegates to [DatabaseReleaseTrigger.waitForDatabase], which is the shared
+  /// implementation of this wait - this handler was one of the three copies it
+  /// was extracted from. The label is sanitised BEFORE it crosses over, because
+  /// `waitForDatabase` logs its `source` verbatim and the values here are
+  /// caller-supplied strings that reach the redaction rules for notifications.
+  ///
+  /// The result is deliberately discarded: a failed re-establish is logged by
+  /// the trigger and the tap STILL dispatches, because the pending-navigation
+  /// retry is the recovery path and a tap that does nothing is worse than one
+  /// that routes into a room which retries.
+  static Future<void> _awaitDatabaseEstablished(String source) async {
+    await DatabaseReleaseTrigger.waitForDatabase(_diagnosticLabel(source));
   }
 
   static Future<void> _ensureClientManagerReady() async {

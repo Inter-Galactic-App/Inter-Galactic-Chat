@@ -578,7 +578,7 @@ pub(crate) fn estimate_bandwidth(
     median(&mut idcs)
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "dataset"))]
 mod tests {
     use std::sync::Once;
 

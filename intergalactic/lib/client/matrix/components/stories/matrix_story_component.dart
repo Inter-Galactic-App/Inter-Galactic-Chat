@@ -10,7 +10,6 @@ import 'package:intergalactic/client/components/push_notification/notification_m
 import 'package:intergalactic/client/components/room_component.dart';
 import 'package:intergalactic/client/components/stories/story_component.dart';
 import 'package:intergalactic/client/matrix/components/matrix_sync_listener.dart';
-import 'package:intergalactic/client/matrix/extensions/matrix_client_extensions.dart';
 import 'package:intergalactic/client/matrix/matrix_client.dart';
 import 'package:intergalactic/client/matrix/matrix_mxc_image_provider.dart';
 import 'package:intergalactic/client/matrix/matrix_room.dart';
@@ -19,6 +18,68 @@ import 'package:intergalactic/main.dart';
 import 'package:intergalactic/utils/image/lod_image.dart';
 import 'package:intergalactic/utils/local_file.dart';
 import 'package:matrix/matrix.dart' as matrix;
+import 'package:http/http.dart' as http;
+
+const Duration _storyMediaDownloadTimeout = Duration(seconds: 20);
+
+/// Reads Matrix media incrementally so an absent or dishonest event `info.size`
+/// cannot make a story allocate an unbounded response body.
+///
+/// The Matrix SDK's `getContentFromUri` returns only after buffering its whole
+/// response. Story media must instead consume the client-owned stream here,
+/// where the byte limit can be enforced as each chunk arrives.
+Future<Uint8List> downloadBoundedMatrixStoryMedia(
+  matrix.Client client,
+  Uri mediaUri, {
+  required int maxBytes,
+}) async {
+  final downloadUri = await matrix.MxcUriExtension(
+    mediaUri,
+  ).getDownloadUri(client);
+  return downloadBoundedMatrixStoryMediaResponse(
+    client.httpClient,
+    downloadUri,
+    accessToken: client.accessToken,
+    maxBytes: maxBytes,
+  );
+}
+
+/// Stream reader kept separate from MXC URL resolution so it can exercise the
+/// actual-byte boundary with a controlled HTTP response in focused tests.
+Future<Uint8List> downloadBoundedMatrixStoryMediaResponse(
+  http.Client client,
+  Uri downloadUri, {
+  required String? accessToken,
+  required int maxBytes,
+}) async {
+  final request = http.Request('GET', downloadUri);
+  if (accessToken != null && accessToken.isNotEmpty) {
+    request.headers['authorization'] = 'Bearer $accessToken';
+  }
+
+  final response = await client
+      .send(request)
+      .timeout(_storyMediaDownloadTimeout);
+  if (response.statusCode < 200 || response.statusCode >= 300) {
+    throw StateError('Story media download failed with ${response.statusCode}');
+  }
+  if (response.contentLength != null && response.contentLength! > maxBytes) {
+    throw StateError('Story media exceeds the byte limit');
+  }
+
+  final bytes = BytesBuilder(copy: false);
+  var received = 0;
+  await for (final chunk in response.stream.timeout(
+    _storyMediaDownloadTimeout,
+  )) {
+    received += chunk.length;
+    if (received > maxBytes) {
+      throw StateError('Story media exceeds the byte limit');
+    }
+    bytes.add(chunk);
+  }
+  return bytes.takeBytes();
+}
 
 class MatrixStoryComponent extends StoryComponent<MatrixClient>
     implements NeedsPostLoginInit, DisposableComponent {
@@ -1857,12 +1918,22 @@ class _MatrixStoryMediaLoader {
       }
     }
 
-    final response = await client.getContentFromUri(uri);
-    var bytes = response.data;
+    final maxBytes = parsed.mediaType == StoryMediaType.video
+        ? storyMaxVideoBytes
+        : storyMaxImageBytes;
+    var bytes = await downloadBoundedMatrixStoryMedia(
+      client,
+      uri,
+      maxBytes: maxBytes,
+    );
 
     final encryptedFile = _encryptedFile(parsed, thumbnail: thumbnail);
     if (encryptedFile != null) {
       bytes = await _decryptStoryMediaBytes(client, encryptedFile, bytes);
+    }
+
+    if (bytes.length > maxBytes) {
+      throw StateError('Decrypted story media exceeds the byte limit');
     }
 
     await fileCache?.putFile(identifier, bytes);

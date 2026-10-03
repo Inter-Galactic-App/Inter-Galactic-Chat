@@ -4,12 +4,14 @@ import 'dart:ui';
 import 'package:intergalactic/client/client.dart';
 import 'package:intergalactic/client/client_manager.dart';
 import 'package:intergalactic/client/favorite_room_categories.dart';
+import 'package:intergalactic/client/favorite_rooms.dart';
 import 'package:intergalactic/client/space_room_categories.dart';
 import 'package:intergalactic/config/layout_config.dart';
 import 'package:intergalactic/debug/log.dart';
 import 'package:intergalactic/main.dart';
 import 'package:intergalactic/ui/accessibility/accessible_interactive_region.dart';
 import 'package:intergalactic/ui/atoms/adaptive_context_menu.dart';
+import 'package:intergalactic/ui/atoms/favorite_room_actions.dart';
 import 'package:intergalactic/ui/atoms/scaled_safe_area.dart';
 import 'package:intergalactic/ui/atoms/room_text_button.dart';
 import 'package:intergalactic/ui/atoms/room_panel.dart';
@@ -19,6 +21,7 @@ import 'package:intergalactic/ui/pages/settings/categories/favorites/settings_ca
 import 'package:intergalactic/ui/pages/settings/settings_navigation.dart';
 import 'package:intergalactic/utils/event_bus.dart';
 import 'package:intergalactic/utils/preference_image_data.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:implicitly_animated_list/implicitly_animated_list.dart';
@@ -60,8 +63,13 @@ class _FavoriteRoomsListState extends State<FavoriteRoomsList> {
   bool orderChanged = false;
   bool orderChangeLoading = false;
   List<String>? reorderedFavoriteIds;
-  SpaceRoomCategoryState favoriteCategoryState = SpaceRoomCategoryState.empty;
+  Map<Client, SpaceRoomCategoryState> favoriteCategoryStates = {};
+  Map<String, _FavoriteCategoryGroup> _favoriteGroupsById = {};
   bool favoriteCategoryStateLoaded = false;
+  String? _cachedFavoritesBannerImageData;
+  ImageProvider? _cachedFavoritesBannerImage;
+  String? _cachedFavoritesIconImageData;
+  ImageProvider? _cachedFavoritesIconImage;
 
   @override
   void initState() {
@@ -80,9 +88,6 @@ class _FavoriteRoomsListState extends State<FavoriteRoomsList> {
             if (!orderChanged) {
               reorderedFavoriteIds = null;
             }
-            favoriteCategoryState = favoriteCategoryState.normalizedForRoomIds(
-              favoriteRooms.map((room) => room.favoriteStorageId),
-            );
           });
         }
       }),
@@ -101,9 +106,14 @@ class _FavoriteRoomsListState extends State<FavoriteRoomsList> {
           setState(() {});
         }
       }),
-      spaceRoomCategoryStore.onChanged
-          .where((event) => event.spaceLocalId == favoriteRoomCategoriesLocalId)
-          .listen(_onFavoriteCategoryStateChanged),
+      favoriteRoomCategoryStore.onChanged.listen(
+        _onFavoriteCategoryStateChanged,
+      ),
+      favoriteRoomStore.onChanged.listen((_) => _reconcileFavorites()),
+      // Membership lives in m.tag account data now, so a favourite added or
+      // removed on another device arrives in a sync and touches no local
+      // preference. onSettingChanged above cannot see it.
+      widget.clientManager.onSync.stream.listen((_) => _reconcileFavorites()),
     ];
     unawaited(_loadFavoriteCategoryState());
   }
@@ -116,28 +126,48 @@ class _FavoriteRoomsListState extends State<FavoriteRoomsList> {
     super.dispose();
   }
 
-  List<Room> get favoriteRooms {
-    final favoriteIds =
-        reorderedFavoriteIds ?? preferences.getFavoriteRoomIds();
-    final order = <String, int>{
-      for (var i = 0; i < favoriteIds.length; i++) favoriteIds[i]: i,
-    };
+  Set<String> _lastFavoriteIds = {};
+  void _reconcileFavorites() {
+    if (!mounted) {
+      return;
+    }
 
+    final ids = favoriteRooms.map((room) => room.favoriteStorageId).toSet();
+    if (setEquals(ids, _lastFavoriteIds)) {
+      return;
+    }
+
+    setState(() {
+      _lastFavoriteIds = ids;
+    });
+    unawaited(_loadFavoriteCategoryState());
+  }
+
+  List<Room> get favoriteRooms {
     final rooms = widget.clientManager.rooms.where((room) {
       if (widget.filterClient != null && room.client != widget.filterClient) {
         return false;
       }
 
-      return preferences.isRoomFavorite(
-        room.favoriteStorageId,
-        legacyRoomId: room.localId,
-      );
+      return favoriteRoomStore.isFavorite(room);
     }).toList();
+
+    // A drag in progress. Its order is not persisted anywhere yet, so it has
+    // to win over both the tag order and the stored list until it is saved or
+    // reset.
+    final pendingIds = reorderedFavoriteIds;
+    if (pendingIds == null) {
+      return favoriteRoomStore.sortFavorites(rooms);
+    }
+
+    final order = <String, int>{
+      for (var i = 0; i < pendingIds.length; i++) pendingIds[i]: i,
+    };
 
     int sortOrder(Room room) {
       final stableOrder = order[room.favoriteStorageId];
       final legacyOrder = order[room.localId];
-      if (stableOrder == null) return legacyOrder ?? favoriteIds.length;
+      if (stableOrder == null) return legacyOrder ?? pendingIds.length;
       if (legacyOrder == null) return stableOrder;
       return stableOrder < legacyOrder ? stableOrder : legacyOrder;
     }
@@ -148,36 +178,47 @@ class _FavoriteRoomsListState extends State<FavoriteRoomsList> {
   }
 
   bool get _shouldUseFavoriteCategories =>
-      favoriteCategoryStateLoaded && favoriteCategoryState.hasCategories;
+      favoriteCategoryStateLoaded &&
+      favoriteCategoryStates.values.any((state) => state.hasCategories);
 
   Future<void> _loadFavoriteCategoryState() async {
-    final favoriteRoomIds = favoriteRooms
-        .map((room) => room.favoriteStorageId)
-        .toList(growable: false);
-    final state = await loadFavoriteRoomCategoryState(
-      favoriteRoomIds: favoriteRoomIds,
-    );
+    final roomsByClient = <Client, List<Room>>{};
+    for (final room in favoriteRooms) {
+      (roomsByClient[room.client] ??= []).add(room);
+    }
+    final states = <Client, SpaceRoomCategoryState>{};
+    for (final entry in roomsByClient.entries) {
+      states[entry.key] =
+          (await favoriteRoomCategoryStore.load(
+            client: entry.key,
+            favoriteRoomIds: entry.value.map((room) => room.favoriteStorageId),
+          )).normalizedForRoomIds(
+            entry.value.map((room) => room.favoriteStorageId),
+          );
+    }
     if (!mounted) {
       return;
     }
 
     setState(() {
-      favoriteCategoryState = state.normalizedForRoomIds(
-        favoriteRooms.map((room) => room.favoriteStorageId),
-      );
+      favoriteCategoryStates = states;
       favoriteCategoryStateLoaded = true;
     });
   }
 
-  void _onFavoriteCategoryStateChanged(SpaceRoomCategoryChanged event) {
+  void _onFavoriteCategoryStateChanged(FavoriteRoomCategoryChanged event) {
     if (!mounted) {
       return;
     }
 
     setState(() {
-      favoriteCategoryState = event.state.normalizedForRoomIds(
-        favoriteRooms.map((room) => room.favoriteStorageId),
-      );
+      final roomIds = favoriteRooms
+          .where((room) => room.client == event.client)
+          .map((room) => room.favoriteStorageId);
+      favoriteCategoryStates = {
+        ...favoriteCategoryStates,
+        event.client: event.state.normalizedForRoomIds(roomIds),
+      };
       favoriteCategoryStateLoaded = true;
     });
   }
@@ -479,17 +520,29 @@ class _FavoriteRoomsListState extends State<FavoriteRoomsList> {
   }
 
   ImageProvider? _favoritesBannerImage() {
-    final bytes = decodePreferenceImageData(
-      preferences.favoritesBannerImageData.value,
-    );
-    return bytes == null ? null : MemoryImage(bytes);
+    final imageData = preferences.favoritesBannerImageData.value;
+    if (_cachedFavoritesBannerImageData == imageData) {
+      return _cachedFavoritesBannerImage;
+    }
+
+    _cachedFavoritesBannerImageData = imageData;
+    final bytes = decodePreferenceImageData(imageData);
+    return _cachedFavoritesBannerImage = bytes == null
+        ? null
+        : MemoryImage(bytes);
   }
 
   ImageProvider? _favoritesIconImage() {
-    final bytes = decodePreferenceImageData(
-      preferences.favoritesIconImageData.value,
-    );
-    return bytes == null ? null : MemoryImage(bytes);
+    final imageData = preferences.favoritesIconImageData.value;
+    if (_cachedFavoritesIconImageData == imageData) {
+      return _cachedFavoritesIconImage;
+    }
+
+    _cachedFavoritesIconImageData = imageData;
+    final bytes = decodePreferenceImageData(imageData);
+    return _cachedFavoritesIconImage = bytes == null
+        ? null
+        : MemoryImage(bytes);
   }
 
   Widget _buildSidebarFavoritesBody(List<Room> rooms) {
@@ -563,15 +616,7 @@ class _FavoriteRoomsListState extends State<FavoriteRoomsList> {
             onCollapsedChanged: (collapsed) {
               unawaited(_setFavoriteGroupCollapsed(group, collapsed));
             },
-            children: [
-              for (final room in group.rooms)
-                RoomTextButton(
-                  room,
-                  onTap: widget.onRoomSelected,
-                  highlight: selectedRoom == room,
-                  trailingIndicatorInset: widget.roomIndicatorTrailingInset,
-                ),
-            ],
+            children: [_buildMobileSidebarFavoriteCategoryOrderList(group)],
           ),
       ];
 
@@ -604,6 +649,52 @@ class _FavoriteRoomsListState extends State<FavoriteRoomsList> {
             onTap: widget.onRoomSelected,
             highlight: selectedRoom == room,
             trailingIndicatorInset: widget.roomIndicatorTrailingInset,
+            enableContextMenu: false,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMobileSidebarFavoriteCategoryOrderList(
+    _FavoriteCategoryGroup group,
+  ) {
+    return ReorderableListView.builder(
+      key: ValueKey('favorites-mobile-sidebar-category:${group.id}'),
+      itemCount: group.rooms.length,
+      shrinkWrap: true,
+      buildDefaultDragHandles: false,
+      padding: EdgeInsets.zero,
+      physics: const NeverScrollableScrollPhysics(),
+      proxyDecorator: _reorderProxyDecorator,
+      onReorderStart: (_) => HapticFeedback.mediumImpact(),
+      onReorder: (oldIndex, newIndex) {
+        if (!orderChangeLoading) {
+          unawaited(
+            _onFavoriteCategoryReorder(
+              group.id,
+              group.rooms,
+              oldIndex,
+              newIndex,
+            ),
+          );
+        }
+      },
+      itemBuilder: (context, index) {
+        final room = group.rooms[index];
+        return ReorderableDelayedDragStartListener(
+          key: ValueKey(
+            'favorites-mobile-sidebar-category-room:'
+            '${group.id}:${room.favoriteStorageId}',
+          ),
+          index: index,
+          enabled: !orderChangeLoading,
+          child: RoomTextButton(
+            room,
+            onTap: widget.onRoomSelected,
+            highlight: selectedRoom == room,
+            trailingIndicatorInset: widget.roomIndicatorTrailingInset,
+            enableContextMenu: false,
           ),
         );
       },
@@ -688,7 +779,13 @@ class _FavoriteRoomsListState extends State<FavoriteRoomsList> {
             );
             final child = Padding(
               padding: EdgeInsets.fromLTRB(6, 2, showHandles ? 48 : 6, 2),
-              child: _buildSummaryFavoriteRoom(room),
+              // Space rows reserve a mobile long press for reordering. Keep
+              // Favorites on that same gesture contract instead of letting its
+              // desktop context menu claim the pointer first.
+              child: _buildSummaryFavoriteRoom(
+                room,
+                enableContextMenu: !Layout.mobile,
+              ),
             );
 
             if (Layout.mobile) {
@@ -713,38 +810,60 @@ class _FavoriteRoomsListState extends State<FavoriteRoomsList> {
     );
   }
 
-  List<SpaceRoomCategoryGroup<Room>> _buildFavoriteCategoryGroups(
-    List<Room> rooms,
-  ) {
-    return buildSpaceRoomCategoryGroups<Room>(
-      state: favoriteCategoryState,
-      rooms: rooms,
-      roomId: (room) => room.favoriteStorageId,
-      uncategorizedLabel: 'Uncategorized',
-    );
+  List<_FavoriteCategoryGroup> _buildFavoriteCategoryGroups(List<Room> rooms) {
+    final roomsByClient = <Client, List<Room>>{};
+    for (final room in rooms) {
+      (roomsByClient[room.client] ??= []).add(room);
+    }
+    final showAccountLabel = roomsByClient.length > 1;
+    final groups = <_FavoriteCategoryGroup>[];
+    for (final entry in roomsByClient.entries) {
+      final state = favoriteCategoryStates[entry.key];
+      if (state == null) continue;
+      for (final group in buildSpaceRoomCategoryGroups<Room>(
+        state: state,
+        rooms: entry.value,
+        roomId: (room) => room.favoriteStorageId,
+        uncategorizedLabel: 'Uncategorized',
+      )) {
+        groups.add(
+          _FavoriteCategoryGroup(
+            client: entry.key,
+            category: group,
+            showAccountLabel: showAccountLabel,
+          ),
+        );
+      }
+    }
+    _favoriteGroupsById = {for (final group in groups) group.id: group};
+    return groups;
   }
 
-  String _categorySummaryLabel(SpaceRoomCategoryGroup<Room> group) {
+  String _categorySummaryLabel(_FavoriteCategoryGroup group) {
     final count = group.rooms.length;
     return '${group.name}  ${count == 1 ? '1 room' : '$count rooms'}';
   }
 
   Future<void> _setFavoriteGroupCollapsed(
-    SpaceRoomCategoryGroup<Room> group,
+    _FavoriteCategoryGroup group,
     bool collapsed,
   ) async {
-    if (group.isUncategorized) {
-      await spaceRoomCategoryStore.setUncategorizedCollapsed(
-        favoriteRoomCategoriesLocalId,
-        collapsed,
-      );
-      return;
-    }
-
-    await spaceRoomCategoryStore.setCategoryCollapsed(
-      favoriteRoomCategoriesLocalId,
-      group.id,
-      collapsed,
+    final state = favoriteCategoryStates[group.client];
+    if (state == null) return;
+    final updated = group.isUncategorized
+        ? state.copyWith(uncategorizedCollapsed: collapsed)
+        : state.copyWith(
+            categories: [
+              for (final category in state.categories)
+                if (category.id == group.category.id)
+                  category.copyWith(collapsed: collapsed)
+                else
+                  category,
+            ],
+          );
+    await favoriteRoomCategoryStore.saveLocalView(
+      client: group.client,
+      state: updated,
     );
   }
 
@@ -761,18 +880,31 @@ class _FavoriteRoomsListState extends State<FavoriteRoomsList> {
     final orderedRooms = List<Room>.from(rooms);
     final room = orderedRooms.removeAt(oldIndex);
     orderedRooms.insert(newIndex, room);
-    final updatedState = favoriteCategoryState.withExplicitRoomOrder(
-      groupId,
+    final group = _favoriteGroupsById[groupId];
+    if (group == null) return;
+    final state = favoriteCategoryStates[group.client];
+    if (state == null) return;
+    final updatedState = state.withExplicitRoomOrder(
+      group.category.id,
       orderedRooms.map((room) => room.favoriteStorageId).toList(),
     );
 
     setState(() {
-      favoriteCategoryState = updatedState;
+      favoriteCategoryStates = {
+        ...favoriteCategoryStates,
+        group.client: updatedState,
+      };
     });
-    await saveFavoriteRoomCategoryState(updatedState);
+    await favoriteRoomCategoryStore.save(
+      client: group.client,
+      state: updatedState,
+    );
   }
 
-  Widget _buildSummaryFavoriteRoom(Room room) {
+  Widget _buildSummaryFavoriteRoom(
+    Room room, {
+    required bool enableContextMenu,
+  }) {
     final masked = dmLockController.shouldMaskRoomPreview(room);
     final lastEvent = room.lastEvent;
 
@@ -802,10 +934,9 @@ class _FavoriteRoomsListState extends State<FavoriteRoomsList> {
         text: "Remove from Favorites",
         icon: Icons.star_outline,
         onPressed: () async {
-          await preferences.setRoomFavorite(
-            room.favoriteStorageId,
-            false,
-            legacyRoomId: room.localId,
+          await runFavoriteWrite(
+            context,
+            favoriteRoomStore.setFavorite(room, false),
           );
           if (mounted) {
             setState(() {});
@@ -821,7 +952,9 @@ class _FavoriteRoomsListState extends State<FavoriteRoomsList> {
         ),
     ];
 
-    result = AdaptiveContextMenu(items: items, child: result);
+    if (enableContextMenu) {
+      result = AdaptiveContextMenu(items: items, child: result);
+    }
 
     return result;
   }
@@ -899,12 +1032,20 @@ class _FavoriteRoomsListState extends State<FavoriteRoomsList> {
 
   Future<void> _saveMobileSidebarFavoriteOrder(List<String> orderedIds) async {
     try {
-      await preferences.setFavoriteRoomOrder(orderedIds);
+      final result = await favoriteRoomStore.setFavoriteOrder(
+        orderedStorageIds: orderedIds,
+        knownRooms: widget.clientManager.rooms,
+      );
       if (mounted) {
         setState(() {
           orderChangeLoading = false;
           reorderedFavoriteIds = null;
         });
+        if (result == FavoriteWriteResult.failed) {
+          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+            const SnackBar(content: Text('Favorite order could not be saved.')),
+          );
+        }
       }
     } catch (error, stackTrace) {
       Log.onError(
@@ -953,8 +1094,17 @@ class _FavoriteRoomsListState extends State<FavoriteRoomsList> {
     });
 
     try {
-      await preferences.setFavoriteRoomOrder(orderedIds);
+      final result = await favoriteRoomStore.setFavoriteOrder(
+        orderedStorageIds: orderedIds,
+        knownRooms: widget.clientManager.rooms,
+      );
       if (!mounted) {
+        return;
+      }
+      if (result == FavoriteWriteResult.failed) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          const SnackBar(content: Text('Favorite order could not be saved.')),
+        );
         return;
       }
       setState(() {
@@ -1136,6 +1286,29 @@ class _FavoriteSummaryHeader extends StatelessWidget {
       ),
     );
   }
+}
+
+class _FavoriteCategoryGroup {
+  const _FavoriteCategoryGroup({
+    required this.client,
+    required this.category,
+    required this.showAccountLabel,
+  });
+
+  final Client client;
+  final SpaceRoomCategoryGroup<Room> category;
+  final bool showAccountLabel;
+
+  String get id => '${client.identifier}:${category.id}';
+  String get name {
+    if (!showAccountLabel) return category.name;
+    final account = client.self?.identifier ?? client.identifier;
+    return '$account · ${category.name}';
+  }
+
+  bool get collapsed => category.collapsed;
+  bool get isUncategorized => category.isUncategorized;
+  List<Room> get rooms => category.rooms;
 }
 
 class _FavoriteSpaceSection extends StatelessWidget {

@@ -10,6 +10,8 @@ import 'package:intergalactic/config/build_config.dart';
 import 'package:intergalactic/debug/diagnostic_log_store.dart';
 import 'package:intergalactic/debug/log_redactor.dart';
 import 'package:intergalactic/debug/matrix_decrypt_log_summarizer.dart';
+import 'package:intergalactic/debug/resolver_native_probe.dart';
+import 'package:intergalactic/debug/resolver_retry_probe.dart';
 import 'package:intergalactic/debug/runtime_diagnostics_options.dart';
 import 'package:intergalactic/main.dart';
 import 'package:intergalactic/utils/notifying_list.dart';
@@ -58,6 +60,30 @@ class LogEntryException extends LogEntry {
 }
 
 class Log {
+  /// Marks a request whose failure is already handled by its optional caller.
+  ///
+  /// The zone callback still sees such failures while they travel through the
+  /// asynchronous runtime, even when the originating caller catches them.
+  /// Keep this key private to in-memory zone state: it must never become a
+  /// hostname, endpoint, or payload diagnostic.
+  static final Object handledOptionalNetworkRequestZoneKey = Object();
+  static final Object resolverDiagnosticOriginZoneKey = Object();
+
+  /// Carries one of the explicitly allow-listed Matrix operation classes to
+  /// the zone callback. A zone can be inherited by asynchronous SDK work, so
+  /// operation names must describe their actual scope.
+  static final Object matrixNetworkOperationZoneKey = Object();
+  static const String matrixSdkLifecycleOperation = 'matrix_sdk_lifecycle';
+  static const String matrixSyncDispatchOperation = 'matrix_sync_dispatch';
+  static const String matrixPresenceUpdateOperation = 'matrix_presence_update';
+  static const String matrixHttpSyncOperation = 'matrix_http_sync';
+  static const String matrixHttpPresenceOperation = 'matrix_http_presence';
+  static const String matrixHttpMediaOperation = 'matrix_http_media';
+  static const String matrixHttpKeysOperation = 'matrix_http_keys';
+  static const String matrixHttpTimelineOperation = 'matrix_http_timeline';
+  static const String matrixHttpClientApiOperation = 'matrix_http_client_api';
+  static const String matrixHttpOtherOperation = 'matrix_http_other';
+
   static final NotifyingList<LogEntry> log = NotifyingList.empty(
     growable: true,
   );
@@ -73,11 +99,16 @@ class Log {
   static bool Function(Object, StackTrace)? _previousPlatformErrorHandler;
   static bool _flutterErrorHandlerInstalled = false;
   static bool _platformErrorHandlerInstalled = false;
+  static Stopwatch? _startupStopwatch;
+  static String _startupPhase = 'unknown';
+  static const Duration networkDiagnosticWindow = Duration(minutes: 45);
+  static const Duration _resolverRetryProbeInterval = Duration(minutes: 1);
   static const Duration _callMemberPrintLogInterval = Duration(minutes: 5);
   static final MatrixDecryptLogSummarizer _matrixDecryptPrintSummarizer =
       MatrixDecryptLogSummarizer(sourceLabel: 'sdk-print');
   static DateTime? _lastCallMemberPrintLogAt;
   static int _suppressedCallMemberPrintLogCount = 0;
+  static final Map<String, DateTime> _lastResolverRetryProbeAt = {};
 
   static bool get _developerModeEnabled =>
       preferences.isInit && preferences.developerMode.value == true;
@@ -111,6 +142,215 @@ class Log {
 
   static void configureRuntimeOptions(RuntimeDiagnosticsOptions options) {
     runtimeOptions = options;
+  }
+
+  /// Starts the process-local clock used only to contextualize early startup
+  /// network diagnostics. It intentionally stores neither host names nor
+  /// interface details.
+  static void beginStartupTelemetry() {
+    _startupStopwatch ??= Stopwatch()..start();
+    _startupPhase = 'entry';
+  }
+
+  /// Records the coarse application stage around startup-only diagnostics.
+  static void recordStartupPhase(String phase) {
+    _startupPhase = phase;
+  }
+
+  static int? get startupElapsedMilliseconds =>
+      _startupStopwatch?.elapsedMilliseconds;
+
+  static String get startupPhase => _startupPhase;
+
+  /// Bounded, redacted context for transient network failures surfaced by the
+  /// root zone before a Matrix HTTP request wrapper can observe them.
+  @visibleForTesting
+  static String startupNetworkDiagnosticFields(Object error, {Zone? zone}) {
+    final elapsedMilliseconds = startupElapsedMilliseconds;
+    if (elapsedMilliseconds == null ||
+        elapsedMilliseconds > networkDiagnosticWindow.inMilliseconds) {
+      return '';
+    }
+
+    final resolverOutcome =
+        error.toString().toLowerCase().contains('errno = 11004')
+        ? 'nodata'
+        : 'other';
+    final resolverTarget = resolverTargetClass(error);
+    final matrixOperation = resolverTarget == 'matrix'
+        ? _matrixNetworkOperation(zone ?? Zone.current)
+        : null;
+    return ' startup_ms=$elapsedMilliseconds startup_phase=$startupPhase '
+        'resolver_outcome=$resolverOutcome resolver_target=$resolverTarget'
+        '${matrixOperation == null ? '' : ' matrix_operation=$matrixOperation'}';
+  }
+
+  @visibleForTesting
+  static bool shouldLogTransientNetworkZoneError(Object error, Zone zone) =>
+      isTransientNetworkZoneError(error) &&
+      zone[handledOptionalNetworkRequestZoneKey] != true;
+
+  static String? _matrixNetworkOperation(Zone zone) {
+    final operation = zone[matrixNetworkOperationZoneKey];
+    return switch (operation) {
+      matrixSdkLifecycleOperation ||
+      matrixSyncDispatchOperation ||
+      matrixPresenceUpdateOperation ||
+      matrixHttpSyncOperation ||
+      matrixHttpPresenceOperation ||
+      matrixHttpMediaOperation ||
+      matrixHttpKeysOperation ||
+      matrixHttpTimelineOperation ||
+      matrixHttpClientApiOperation ||
+      matrixHttpOtherOperation => operation as String,
+      _ => null,
+    };
+  }
+
+  /// Returns a fixed diagnostic host only for the existing allow-list. This
+  /// prevents an exception message from becoming a new lookup target.
+  @visibleForTesting
+  static String? resolverRetryProbeHost(Object error) {
+    final normalized = error.toString().toLowerCase();
+    if (normalized.contains('matrix.ourgalaxy.space')) {
+      return 'matrix.ourgalaxy.space';
+    }
+    if (normalized.contains('app.ourgalaxy.space'))
+      return 'app.ourgalaxy.space';
+    if (normalized.contains('www.tiktok.com')) return 'www.tiktok.com';
+    if (normalized.contains('ourgalaxy.space')) return 'ourgalaxy.space';
+    return null;
+  }
+
+  /// Redacts a transient error stack to the smallest caller family useful for
+  /// choosing a future, idempotent recovery layer. Never return stack text,
+  /// source paths, symbols, hosts, or payloads.
+  @visibleForTesting
+  static String transientNetworkCallerClass(StackTrace? stackTrace) {
+    final normalized = stackTrace?.toString().toLowerCase() ?? '';
+    if (normalized.contains('package:intergalactic/client/matrix/')) {
+      return 'matrix_client';
+    }
+    if (normalized.contains('package:matrix/')) return 'matrix_sdk';
+    if (normalized.contains('spotify')) return 'spotify';
+    if (normalized.contains('package:intergalactic/')) return 'app_other';
+    return 'unknown';
+  }
+
+  @visibleForTesting
+  static String resolverLookupStackClass(StackTrace? trace) {
+    final frames = RegExp(
+      // VM frame names can contain spaces in <anonymous closure>. Capture
+      // only this line, up to the complete allow-listed SDK source location.
+      r'^#\d+[ \t]+([^\r\n]+?)[ \t]+\(dart:io(?:-patch)?/socket_patch\.dart:\d+:\d+\)[ \t]*\r?$',
+      multiLine: true,
+    ).allMatches(trace?.toString() ?? '').map((match) => match.group(1)).toSet();
+    if (frames.contains('_NativeSocket.staggeredLookup.lookupAddresses') ||
+        frames.contains(
+          '_NativeSocket.staggeredLookup.<anonymous closure>.lookupAddresses',
+        )) {
+      return 'staggered_family_lookup';
+    }
+    // The private lookup closure alone is common to both paths, not proof
+    // of a direct lookup. Require the public direct-lookup frame.
+    if (frames.contains('InternetAddress.lookup') &&
+        !frames.any(
+          (frame) =>
+              frame?.startsWith('_NativeSocket.staggeredLookup') ?? false,
+        )) {
+      return 'direct_lookup';
+    }
+    return 'unknown';
+  }
+
+  static void _scheduleResolverRetryProbe(Object error, StackTrace? trace) {
+    if (!verboseDiagnosticsEnabled ||
+        kIsWeb ||
+        defaultTargetPlatform != TargetPlatform.windows ||
+        Zone.current[resolverDiagnosticOriginZoneKey] == true)
+      return;
+
+    final startupFields = startupNetworkDiagnosticFields(error);
+    if (startupFields.isEmpty) return;
+
+    final host = resolverRetryProbeHost(error);
+    if (host == null) return;
+
+    final now = DateTime.now();
+    final lastAttempt = _lastResolverRetryProbeAt[host];
+    if (lastAttempt != null &&
+        now.difference(lastAttempt) < _resolverRetryProbeInterval) {
+      return;
+    }
+    _lastResolverRetryProbeAt[host] = now;
+
+    final initialOutcome =
+        error.toString().toLowerCase().contains('errno = 11004')
+        ? 'nodata'
+        : 'other';
+    final target = resolverTargetClass(error);
+    runOptionalResolverDiagnostic(
+      () => _recordResolverRetryProbe(
+        host: host,
+        target: target,
+        initialOutcome: initialOutcome,
+        startupFields: startupFields,
+        stackClass: resolverLookupStackClass(trace),
+      ),
+    );
+  }
+
+  /// The paired lookup is optional evidence. Its own failure must never enter
+  /// the root error callback that started it (or launch another probe).
+  @visibleForTesting
+  static void runOptionalResolverDiagnostic(Future<void> Function() operation) {
+    runZoned(() {
+      unawaited(
+        Future<void>.sync(
+          operation,
+        ).then<void>((_) {}, onError: (Object _, StackTrace __) {}),
+      );
+    }, zoneValues: {resolverDiagnosticOriginZoneKey: true});
+  }
+
+  static Future<void> _recordResolverRetryProbe({
+    required String host,
+    required String target,
+    required String initialOutcome,
+    required String startupFields,
+    required String stackClass,
+  }) async {
+    final families = probeResolverFamilies(host);
+    if (families == null) return;
+    final results = await Future.wait([
+      probeResolverRetry(host),
+      probeNativeResolver(host),
+      families,
+    ]);
+    final result = results[0] as ResolverRetryProbeResult;
+    final nativeResult = results[1] as NativeResolverProbeResult;
+    add(
+      LogEntry(
+        LogType.warning,
+        'Resolver retry probe initial_outcome=$initialOutcome '
+        'resolver_target=$target retry_outcome=${result.outcome} '
+        'retry_ms=${result.elapsed.inMilliseconds}'
+        '${nativeResolverProbeFields(nativeResult)}'
+        '${resolverFamilyProbeFields(results[2] as ResolverFamilyProbeResult)}'
+        ' lookup_stack=$stackClass$startupFields',
+        category: LogCategory.app,
+        source: 'zone-network-retry-probe',
+      ),
+    );
+  }
+
+  /// Fixed-field native probe context. It intentionally has no host, address,
+  /// interface, or provider data.
+  @visibleForTesting
+  static String nativeResolverProbeFields(NativeResolverProbeResult result) {
+    final errorCode = result.errorCode?.toString() ?? 'none';
+    return ' native_outcome=${result.outcome} native_code=$errorCode '
+        'native_ms=${result.elapsed.inMilliseconds}';
   }
 
   static void installFlutterErrorHandler() {
@@ -196,13 +436,23 @@ class Log {
       }
     },
     errorCallback: (self, parent, zone, error, stackTrace) {
+      // This observes error introduction, not just uncaught errors. Probe
+      // work must not masquerade as another original failure or recurse.
+      if (zone[resolverDiagnosticOriginZoneKey] == true) return null;
       final requestPath = matrixRequestPathHint(error);
       if (isTransientNetworkZoneError(error)) {
+        if (!shouldLogTransientNetworkZoneError(error, zone)) {
+          return null;
+        }
         final message = error.toString();
+        final startupFields = startupNetworkDiagnosticFields(error, zone: zone);
+        final callerClass = transientNetworkCallerClass(stackTrace);
+        _scheduleResolverRetryProbe(error, stackTrace);
         add(
           LogEntry(
             LogType.warning,
-            'Transient async network error: $message request_path=$requestPath',
+            'Transient async network error: $message request_path=$requestPath'
+            '$startupFields caller_class=$callerClass',
             category: _categoryForMessage(message),
             source: 'zone-network-callback',
           ),
@@ -442,7 +692,7 @@ class Log {
       buffer.writeln('--- File logs ---');
       buffer.write(redactSensitiveInfo(diskLogs));
     }
-    return _tailByUtf8Bytes(buffer.toString(), maxBytes);
+    return _tailByUtf8Bytes(redactSensitiveInfo(buffer.toString()), maxBytes);
   }
 
   static void _onFlutterError(FlutterErrorDetails details) {
@@ -708,6 +958,31 @@ class Log {
       return 'http-keepalive';
     }
     return 'socket';
+  }
+
+  /// Maps the fixed, redacted request-path vocabulary to the only endpoint
+  /// operation labels permitted at the root network callback.
+  static String matrixHttpOperationForRequestPath(String requestPath) {
+    return switch (requestPath) {
+      'sync' => matrixHttpSyncOperation,
+      'presence' => matrixHttpPresenceOperation,
+      'media' => matrixHttpMediaOperation,
+      'keys' => matrixHttpKeysOperation,
+      'timeline' => matrixHttpTimelineOperation,
+      'client-api' => matrixHttpClientApiOperation,
+      _ => matrixHttpOtherOperation,
+    };
+  }
+
+  /// Returns an allow-listed diagnostic target class, never a hostname.
+  @visibleForTesting
+  static String resolverTargetClass(Object error) {
+    final normalized = error.toString().toLowerCase();
+    if (normalized.contains('matrix.ourgalaxy.space')) return 'matrix';
+    if (normalized.contains('app.ourgalaxy.space')) return 'app';
+    if (normalized.contains('ourgalaxy.space')) return 'root';
+    if (normalized.contains('www.tiktok.com')) return 'third_party';
+    return 'other';
   }
 
   static String? _sourceForPrefix() {

@@ -11,6 +11,7 @@ import 'package:intergalactic/client/matrix/components/emoticon/matrix_emoticon.
 import 'package:intergalactic/client/matrix/components/emoticon/matrix_image_pack_compatibility.dart';
 import 'package:intergalactic/client/matrix/matrix_client.dart';
 import 'package:intergalactic/client/room.dart';
+import 'package:intergalactic/config/app_globals.dart';
 import 'package:intergalactic/debug/log.dart';
 import 'package:intergalactic/utils/debounce.dart';
 import 'package:intergalactic/utils/emoji/unicode_emoji.dart';
@@ -39,6 +40,7 @@ class MatrixRecentEmoticonComponent
   List<RecentEmoji> _reactionEmoji = List.empty(growable: true);
   List<RecentEmoji> _typedEmoji = List.empty(growable: true);
   List<RecentEmoji> _quickReactionEmoji = List.empty(growable: true);
+  List<RecentEmoji> _stickerEmoji = List.empty(growable: true);
 
   Debouncer reactionDebouncer = Debouncer(delay: const Duration(seconds: 5));
   Debouncer typedDebouncer = Debouncer(delay: const Duration(seconds: 5));
@@ -72,6 +74,16 @@ class MatrixRecentEmoticonComponent
   }
 
   @override
+  List<Emoticon> getRecentStickerEmoticon(Room? room) {
+    return toEmoticons(
+      room,
+      _stickerEmoji,
+      sortByCount: false,
+      addFallbackUnicode: false,
+    );
+  }
+
+  @override
   List<Emoticon> getQuickReactionEmoticon(Room? room) {
     return normalizeQuickReactionEmoticons(
       toEmoticons(
@@ -86,6 +98,15 @@ class MatrixRecentEmoticonComponent
   @override
   void postLoginInit() {
     _loadRecentEmoji();
+    _loadRecentStickers();
+  }
+
+  void _loadRecentStickers() {
+    _stickerEmoji = preferences
+        .getRecentStickers(client.identifier)
+        .map(RecentEmoji.fromjson)
+        .whereType<RecentEmoji>()
+        .toList();
   }
 
   void _loadRecentEmoji() {
@@ -326,6 +347,34 @@ class MatrixRecentEmoticonComponent
 
     _typedEmoji = addToList(emoji, _typedEmoji);
     typedDebouncer.run(() => storeRecentlyTyped(emoji));
+  }
+
+  @override
+  Future<void> stickerEmoticon(Room room, Emoticon emoticon) async {
+    final sticker = toRecentEmoji(room, emoticon);
+    if (sticker == null || !emoticon.isSticker) return;
+
+    _stickerEmoji = recordRecentSticker(
+      existing: _stickerEmoji,
+      sticker: sticker,
+    );
+    await preferences.setRecentStickers(
+      client.identifier,
+      _stickerEmoji.map((entry) => entry.toJson()).toList(),
+    );
+  }
+
+  @visibleForTesting
+  static List<RecentEmoji> recordRecentSticker({
+    required Iterable<RecentEmoji> existing,
+    required RecentEmoji sticker,
+  }) {
+    final updated = existing
+        .where((entry) => entry != sticker)
+        .map(cloneRecentEmoji)
+        .toList();
+    updated.insert(0, cloneRecentEmoji(sticker));
+    return updated.take(30).toList();
   }
 
   @override
@@ -584,11 +633,13 @@ class MatrixRecentEmoticonComponent
   Future<void> clear() async {
     _reactionEmoji = List.empty(growable: true);
     _typedEmoji = List.empty(growable: true);
+    _stickerEmoji = List.empty(growable: true);
     _quickReactionEmoji = normalizeQuickReactionRecents([]);
 
     await storeRecentReactions();
     await storeRecentlyTyped();
     await storeQuickReactions();
+    await preferences.setRecentStickers(client.identifier, const []);
     await _clearStandardRecents();
     await _clearElementRecents();
   }

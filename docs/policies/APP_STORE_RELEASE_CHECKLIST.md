@@ -1,8 +1,6 @@
 # App Store Release Checklist
 
-Status: release-readiness checklist. This is an engineering record and not legal
-advice. *(Corrected 2026-08-09: this previously made legal items conditional on
-an outstanding review, which left them permanently unclosable.)*
+Status: release-readiness checklist
 
 ## Release Gate Checklist
 

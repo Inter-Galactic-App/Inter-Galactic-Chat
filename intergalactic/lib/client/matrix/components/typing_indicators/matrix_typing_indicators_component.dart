@@ -8,6 +8,7 @@ import 'package:intergalactic/client/matrix/matrix_client.dart';
 import 'package:intergalactic/client/matrix/matrix_member.dart';
 import 'package:intergalactic/client/matrix/matrix_room.dart';
 import 'package:intergalactic/client/member.dart';
+import 'package:intergalactic/debug/log.dart';
 import 'package:matrix/matrix_api_lite/model/sync_update.dart';
 
 class MatrixTypingIndicatorsComponent
@@ -28,10 +29,23 @@ class MatrixTypingIndicatorsComponent
   final StreamController<void> _controller = StreamController.broadcast();
   bool _disposed = false;
 
+  /// Mirrors the SDK's own typing expiry so the UI cannot outlive it.
+  ///
+  /// `Room.setEphemeral` starts a `client.typingIndicatorTimeout` timer on
+  /// every `m.typing` update and, when it fires, silently drops the ephemeral.
+  /// Nothing observes that: [typingUsers] reads empty from then on, but this
+  /// stream only fires on sync, so a listener that last heard "X is typing"
+  /// keeps showing it until the next typing update for the room - which, if
+  /// the stop update was missed, is whenever someone next types. Firing once
+  /// more when the SDK clears makes the indicator leave on its own.
+  Timer? _expiryNotification;
+
   @override
   bool? get typingIndicatorEnabledForRoom {
-    var publicTypingIndicatorForRoom = room.matrixRoom
-        .roomAccountData[publicTypingIndicatorKey]?.content["enabled"];
+    var publicTypingIndicatorForRoom = room
+        .matrixRoom
+        .roomAccountData[publicTypingIndicatorKey]
+        ?.content["enabled"];
     return publicTypingIndicatorForRoom is bool
         ? publicTypingIndicatorForRoom
         : null;
@@ -59,10 +73,48 @@ class MatrixTypingIndicatorsComponent
     }
 
     if (ephemeral.any((e) => e.type == "m.typing")) {
-      if (!_controller.isClosed) {
-        _controller.add(null);
-      }
+      final typingCount = typingUsers.length;
+      Log.d(
+        'Typing update received users=$typingCount',
+        category: LogCategory.matrix,
+        source: 'typing-indicators',
+      );
+      _notifyTypingUsersUpdated();
+      _scheduleExpiryNotification(typingCount);
     }
+  }
+
+  void _notifyTypingUsersUpdated() {
+    if (!_controller.isClosed) {
+      _controller.add(null);
+    }
+  }
+
+  void _scheduleExpiryNotification(int typingCount) {
+    _expiryNotification?.cancel();
+    _expiryNotification = null;
+    if (typingCount == 0) {
+      return;
+    }
+
+    // Just after the SDK's timer, never before it: firing early would re-read
+    // the same non-empty list and change nothing.
+    _expiryNotification = Timer(
+      client.matrixClient.typingIndicatorTimeout +
+          const Duration(milliseconds: 100),
+      () {
+        _expiryNotification = null;
+        if (_disposed) {
+          return;
+        }
+        Log.d(
+          'Typing indicator expired locally users=${typingUsers.length}',
+          category: LogCategory.matrix,
+          source: 'typing-indicators',
+        );
+        _notifyTypingUsersUpdated();
+      },
+    );
   }
 
   @override
@@ -95,6 +147,8 @@ class MatrixTypingIndicatorsComponent
     }
 
     _disposed = true;
+    _expiryNotification?.cancel();
+    _expiryNotification = null;
     if (!_controller.isClosed) {
       await _controller.close();
     }

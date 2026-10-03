@@ -101,15 +101,15 @@ infer it from silence (added 2026-08-17):
   and prior artifacts are retained for that reason. Nothing here automates it.
 
 Whether that division is acceptable is a release decision, not an architecture
-one, and it belongs to Release Pipeline and the owner. What this section fixes
+one, and it belongs to the release maintainer and the project owner. What this section fixes
 is that the map previously described a download chain without saying which of
 these three it did and did not cover, so a reader could not tell absence from
 omission.
 
 Boundary ownership outside this tracked architecture:
 
-- Release Pipeline owns release orchestration; S&C owns security/compliance
-  interpretation.
+- Release orchestration and security/compliance interpretation are separate
+  responsibilities, owned by whoever the project currently assigns them to.
 - Credentials and other secret material remain outside tracked documentation.
 - Store submission and approval workflow (Google Play, Apple Store Connect, and
   other store/channels) is owner-defined and not encoded in this document.

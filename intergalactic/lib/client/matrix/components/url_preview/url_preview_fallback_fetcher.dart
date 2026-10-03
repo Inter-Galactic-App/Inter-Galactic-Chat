@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:intergalactic/client/components/url_preview/url_preview_component.dart';
@@ -10,6 +11,25 @@ import 'package:flutter/widgets.dart';
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html_parser;
 import 'package:http/http.dart' as http;
+
+/// A resolved site icon.
+///
+/// Public only so a test can construct one and inject it through
+/// [UrlPreviewFallbackFetcher.fetchPreview]; the internal fetch path builds it
+/// from the same validated bytes as any other preview image.
+class UrlPreviewSiteIcon {
+  const UrlPreviewSiteIcon({
+    required this.provider,
+    required this.uri,
+    this.width,
+    this.height,
+  });
+
+  final ImageProvider provider;
+  final Uri uri;
+  final int? width;
+  final int? height;
+}
 
 class UrlPreviewFallbackFetcher {
   static const Duration _requestTimeout = Duration(seconds: 4);
@@ -43,7 +63,18 @@ class UrlPreviewFallbackFetcher {
     return !_isPrivateIpv4Host(host) && !_isPrivateIpv6Host(host);
   }
 
-  static Future<UrlPreviewData?> fetchPreview(Uri uri) async {
+  /// [providerFetcher] and [siteIconFetcher] are TEST SEAMS and are null in
+  /// production. They exist because the site-icon fallback sits behind two real
+  /// HTTP fetches, which left its call site unreachable from any test: deleting
+  /// the fallback from this method entirely used to leave the suite green
+  /// (REVIEW, at the merge of PR #282). They deliberately inject INTO this
+  /// method rather than duplicating it, so a test exercises this exact call
+  /// site and removing the call turns that test red.
+  static Future<UrlPreviewData?> fetchPreview(
+    Uri uri, {
+    Future<UrlPreviewData?> Function(Uri uri)? providerFetcher,
+    Future<UrlPreviewSiteIcon?> Function(Uri uri)? siteIconFetcher,
+  }) async {
     if (!_isHttpUri(uri)) {
       return null;
     }
@@ -57,6 +88,115 @@ class UrlPreviewFallbackFetcher {
       return null;
     }
 
+    return _withSiteIconFallback(
+      uri,
+      await (providerFetcher ?? _fetchProviderPreview)(uri),
+      siteIconFetcher ?? fetchSiteIcon,
+    );
+  }
+
+  /// Last-resort thumbnail: the provider's own site icon.
+  ///
+  /// Only applied when the preview has NO image of any kind. That condition is
+  /// the whole safety property - a site icon can never displace a real
+  /// thumbnail, which is what made the earlier blanket fallback unwanted. When
+  /// a provider blocks the thumbnail or omits it, the card previously rendered
+  /// as text only; this gives it the provider's mark instead.
+  ///
+  /// Scope is deliberately the provider adapters and nothing else. Fetching an
+  /// arbitrary host's icon would re-open exactly the client-side
+  /// arbitrary-host fetch that 90f75c96 closed on 2026-05-20; these hosts are
+  /// already permitted to be fetched by `shouldPreferDirectFetch`, so this adds
+  /// no new host to the reachable set.
+  ///
+  /// REVIEW 2026-09-09: that was the whole permission check when this was
+  /// written, because `shouldPreferDirectFetch` unconditionally permitted a
+  /// direct fetch to these hosts. It no longer does - permission is now ALSO
+  /// conditional on `preferences.shouldAllowDirectUrlPreviewFallback`, and
+  /// THIS METHOD DOES NOT CHECK IT. It is only safe today because its one
+  /// caller, `fetchPreview`, is only reached from
+  /// `MatrixUrlPreviewComponent._fetchDirectPreview`, which is itself only
+  /// called after that consent check has already passed. A new caller of
+  /// `fetchPreview` (or of `_withSiteIconFallback` directly) that skips that
+  /// check would reopen the exact disclosure a sibling call site
+  /// (`MatrixUrlPreviewComponent._withProviderSiteIcon`) was found doing.
+  static Future<UrlPreviewData?> _withSiteIconFallback(
+    Uri uri,
+    UrlPreviewData? data,
+    Future<UrlPreviewSiteIcon?> Function(Uri uri) fetchIcon,
+  ) async {
+    if (data == null || kIsWeb) {
+      return data;
+    }
+
+    if (!shouldUseSiteIconFallback(data)) {
+      return data;
+    }
+
+    final icon = await fetchIcon(uri);
+    if (icon == null) {
+      return data;
+    }
+
+    return data.copyWith(
+      image: icon.provider,
+      imageUri: icon.uri,
+      imageWidth: icon.width,
+      imageHeight: icon.height,
+    );
+  }
+
+  /// Whether a preview is eligible for the site-icon fallback.
+  ///
+  /// The ONLY eligible case is a preview with no image of any kind. This is the
+  /// property that keeps the fallback from "taking over": it is structurally
+  /// incapable of replacing a real thumbnail, rather than merely ordered after
+  /// one.
+  ///
+  /// Not test-only: MatrixUrlPreviewComponent applies the same predicate to
+  /// previews assembled from homeserver metadata, which never reach this
+  /// class's own fetch path. It was annotated @visibleForTesting when the
+  /// fallback lived only here; the analyzer flagged the production use as soon
+  /// as the component started sharing it.
+  static bool shouldUseSiteIconFallback(UrlPreviewData? data) {
+    return data != null && data.image == null && data.imageUri == null;
+  }
+
+  /// Well-known icon paths on the provider's own origin.
+  ///
+  /// Deliberately does NOT parse the page for `<link rel="icon">`: reaching the
+  /// icon that way needs the page fetch that has usually already failed or been
+  /// blocked, which is the case this fallback exists for. `apple-touch-icon` is
+  /// tried first because it is a large square mark rather than a 16px favicon.
+  static Future<UrlPreviewSiteIcon?> fetchSiteIcon(Uri uri) async {
+    final origin = Uri(
+      scheme: uri.scheme,
+      host: uri.host,
+      port: uri.hasPort ? uri.port : null,
+    );
+    for (final path in const [
+      '/apple-touch-icon.png',
+      '/apple-touch-icon-precomposed.png',
+      '/favicon.ico',
+    ]) {
+      final icon = await _fetchImage(
+        origin.resolve(path).toString(),
+        baseUri: origin,
+      );
+      if (icon != null) {
+        return UrlPreviewSiteIcon(
+          provider: icon.provider,
+          uri: icon.uri,
+          width: icon.width,
+          height: icon.height,
+        );
+      }
+    }
+
+    return null;
+  }
+
+  static Future<UrlPreviewData?> _fetchProviderPreview(Uri uri) async {
     try {
       if (_isTikTok(uri)) {
         final tiktok = kIsWeb
@@ -87,11 +227,7 @@ class UrlPreviewFallbackFetcher {
 
       return await _fetchGenericPreview(uri);
     } catch (error) {
-      _logOptionalFetchFailure(
-        uri,
-        'direct URL preview fallback',
-        error,
-      );
+      _logOptionalFetchFailure(uri, 'direct URL preview fallback', error);
       return null;
     }
   }
@@ -102,33 +238,63 @@ class UrlPreviewFallbackFetcher {
       accept: "application/json",
     );
 
-    final thumbnailUrl = _resolveUrl(
-      _stringValue(oEmbed?["thumbnail_url"]),
-      uri,
-    );
+    // `oEmbed["thumbnail_url"]` is deliberately NOT read here. See the image
+    // block below for why this path yields no image on web.
 
     final title = normalizeUrlPreviewText(_stringValue(oEmbed?["title"]));
 
-    final authorUniqueId = normalizeUrlPreviewText(_stringValue(
-      oEmbed?["author_unique_id"],
-    ));
+    final authorUniqueId = normalizeUrlPreviewText(
+      _stringValue(oEmbed?["author_unique_id"]),
+    );
     final authorHandle = authorUniqueId == null
         ? null
         : authorUniqueId.startsWith("@")
-            ? authorUniqueId
-            : "@$authorUniqueId";
-    final authorName =
-        normalizeUrlPreviewText(_stringValue(oEmbed?["author_name"]));
-    final postingAccount = normalizeUrlPreviewPostingAccount(_firstNonEmpty([
-      if (authorName != null && authorHandle != null)
-        "$authorName ($authorHandle)",
-      authorHandle,
-      authorName,
-      _extractTikTokUsername(uri),
-    ]));
+        ? authorUniqueId
+        : "@$authorUniqueId";
+    final authorName = normalizeUrlPreviewText(
+      _stringValue(oEmbed?["author_name"]),
+    );
+    final postingAccount = normalizeUrlPreviewPostingAccount(
+      _firstNonEmpty([
+        if (authorName != null && authorHandle != null)
+          "$authorName ($authorHandle)",
+        authorHandle,
+        authorName,
+        _extractTikTokUsername(uri),
+      ]),
+    );
 
-    final image =
-        thumbnailUrl != null ? NetworkImage(thumbnailUrl.toString()) : null;
+    // NO IMAGE FROM THIS PATH ON WEB, deliberately, and it is the same rule
+    // the server path already enforces.
+    //
+    // This used to be `NetworkImage(oEmbed["thumbnail_url"])`, which handed the
+    // browser a TikTok CDN URL to fetch directly. Two things were wrong with
+    // that, and only one of them is about privacy:
+    //
+    // 1. `MatrixUrlPreviewComponent._safeTikTokWebFallbackImage` ALREADY
+    //    refuses exactly these hosts - tiktok, tiktokcdn, byteoversea,
+    //    ibyteimg, ibytedtos - when the SERVER supplies the image on web,
+    //    because TikTok serves non-image anti-bot payloads from those CDN URLs
+    //    in a browser and they explode as ImageCodecException. This path
+    //    produced an image the neighbouring rule would have rejected.
+    // 2. Every other platform reaches its thumbnail through `_fetchImage`,
+    //    which downloads the bytes under `_maxImageBytes` and validates them
+    //    before wrapping them in a `MemoryImage`. A bare `NetworkImage` is
+    //    fetched by the renderer, so it is subject to neither the cap nor the
+    //    validation, and the request goes straight from the viewer's browser
+    //    to the provider CDN.
+    //
+    // The byte-fetching route is not available here - a cross-origin image
+    // fetch is blocked on web the same way the oEmbed request is - so there is
+    // no validated form of this image to substitute. The preview service
+    // supplies web thumbnails instead; see the server fallback in
+    // `_buildPreviewData`, which is the path `_safeTikTokWebFallbackImage`
+    // guards.
+    //
+    // Width and height are still reported: they describe the ORIGINAL media
+    // and are used for layout, so they stay useful when the server supplies
+    // the image.
+    const ImageProvider? image = null;
     final imageWidth = _positiveIntValue(oEmbed?["thumbnail_width"]);
     final imageHeight = _positiveIntValue(oEmbed?["thumbnail_height"]);
 
@@ -142,7 +308,12 @@ class UrlPreviewFallbackFetcher {
       title: title,
       description: null,
       image: image,
-      imageUri: thumbnailUrl,
+      // Null for the same reason as [image], and it has to move WITH it:
+      // `shouldUseSiteIconFallback` requires BOTH to be null before it will
+      // offer the site icon. Nulling the provider alone would leave a card
+      // that has no image and is also ineligible for the fallback - strictly
+      // worse than either outcome.
+      imageUri: null,
       imageWidth: imageWidth,
       imageHeight: imageHeight,
       postingAccount: postingAccount,
@@ -156,8 +327,9 @@ class UrlPreviewFallbackFetcher {
       accept: "application/json",
     );
     final document = await _fetchDocument(uri);
-    final metadata =
-        document != null ? _extractMetaTags(document) : <String, String>{};
+    final metadata = document != null
+        ? _extractMetaTags(document)
+        : <String, String>{};
 
     final image = await _fetchImage(
       _firstNonEmpty([
@@ -169,59 +341,66 @@ class UrlPreviewFallbackFetcher {
         metadata["twitter:image:src"],
       ]),
       baseUri: uri,
-      width: _positiveIntValue(oEmbed?["thumbnail_width"]) ??
-          _extractInt(
-            document?.outerHtml,
-            [RegExp(r'"thumbnailWidth":(\d+)')],
-          ),
-      height: _positiveIntValue(oEmbed?["thumbnail_height"]) ??
-          _extractInt(
-            document?.outerHtml,
-            [RegExp(r'"thumbnailHeight":(\d+)')],
-          ),
+      width:
+          _positiveIntValue(oEmbed?["thumbnail_width"]) ??
+          _extractInt(document?.outerHtml, [RegExp(r'"thumbnailWidth":(\d+)')]),
+      height:
+          _positiveIntValue(oEmbed?["thumbnail_height"]) ??
+          _extractInt(document?.outerHtml, [
+            RegExp(r'"thumbnailHeight":(\d+)'),
+          ]),
     );
 
-    final title = normalizeUrlPreviewText(_firstNonEmpty([
-      _stringValue(oEmbed?["title"]),
-      metadata["og:title"],
-      metadata["twitter:title"],
-      document?.querySelector("title")?.text,
-      "TikTok video",
-    ]));
+    final title = normalizeUrlPreviewText(
+      _firstNonEmpty([
+        _stringValue(oEmbed?["title"]),
+        metadata["og:title"],
+        metadata["twitter:title"],
+        document?.querySelector("title")?.text,
+        "TikTok video",
+      ]),
+    );
 
-    final authorUniqueId = normalizeUrlPreviewText(_stringValue(
-      oEmbed?["author_unique_id"],
-    ));
+    final authorUniqueId = normalizeUrlPreviewText(
+      _stringValue(oEmbed?["author_unique_id"]),
+    );
     final authorHandle = authorUniqueId == null
         ? null
         : authorUniqueId.startsWith("@")
-            ? authorUniqueId
-            : "@$authorUniqueId";
-    final authorName =
-        normalizeUrlPreviewText(_stringValue(oEmbed?["author_name"]));
-    final postingAccount = normalizeUrlPreviewPostingAccount(_firstNonEmpty([
-      if (authorName != null && authorHandle != null)
-        "$authorName ($authorHandle)",
-      authorHandle,
-      authorName,
-      _extractMatch(document?.outerHtml, [
-        RegExp(r'"uniqueId":"([^"]+)"'),
-        RegExp(r'"authorName":"([^"]+)"'),
+        ? authorUniqueId
+        : "@$authorUniqueId";
+    final authorName = normalizeUrlPreviewText(
+      _stringValue(oEmbed?["author_name"]),
+    );
+    final postingAccount = normalizeUrlPreviewPostingAccount(
+      _firstNonEmpty([
+        if (authorName != null && authorHandle != null)
+          "$authorName ($authorHandle)",
+        authorHandle,
+        authorName,
+        _extractMatch(document?.outerHtml, [
+          RegExp(r'"uniqueId":"([^"]+)"'),
+          RegExp(r'"authorName":"([^"]+)"'),
+        ]),
+        _extractTikTokUsername(uri),
       ]),
-      _extractTikTokUsername(uri),
-    ]));
+    );
 
-    final description = trimUrlPreviewDescription(_firstNonEmpty([
-      _extractTikTokDescription(document, metadata, title),
-      _stringValue(oEmbed?["title"]),
-    ]));
-
-    final publishedAt = _parseDate(_firstNonEmpty([
-      metadata["article:published_time"],
-      _extractMatch(document?.outerHtml, [
-        RegExp(r'"createTime":"?(\d{10,13})"?'),
+    final description = trimUrlPreviewDescription(
+      _firstNonEmpty([
+        _extractTikTokDescription(document, metadata, title),
+        _stringValue(oEmbed?["title"]),
       ]),
-    ]));
+    );
+
+    final publishedAt = _parseDate(
+      _firstNonEmpty([
+        metadata["article:published_time"],
+        _extractMatch(document?.outerHtml, [
+          RegExp(r'"createTime":"?(\d{10,13})"?'),
+        ]),
+      ]),
+    );
 
     final stats = buildUrlPreviewStatsLine(
       likes: _extractInt(document?.outerHtml, [
@@ -240,7 +419,8 @@ class UrlPreviewFallbackFetcher {
 
     return UrlPreviewData(
       uri,
-      siteName: normalizeUrlPreviewText(
+      siteName:
+          normalizeUrlPreviewText(
             _firstNonEmpty([
               _stringValue(oEmbed?["provider_name"]),
               metadata["og:site_name"],
@@ -261,18 +441,17 @@ class UrlPreviewFallbackFetcher {
   static Future<UrlPreviewData?> _fetchInstagramPreview(Uri uri) async {
     final permalink = _parseInstagramPermalink(uri);
     final oEmbed = await _fetchJson(
-      Uri.https(
-          "www.instagram.com", "/api/v1/oembed/", {"url": uri.toString()}),
+      Uri.https("www.instagram.com", "/api/v1/oembed/", {
+        "url": uri.toString(),
+      }),
       accept: "application/json",
     );
     final document = await _fetchDocument(uri);
-    final metadata =
-        document != null ? _extractMetaTags(document) : <String, String>{};
+    final metadata = document != null
+        ? _extractMetaTags(document)
+        : <String, String>{};
     final htmlSources = await _fetchInstagramHtmlSources(uri, permalink);
-    final textSources = <String?>[
-      document?.outerHtml,
-      ...htmlSources,
-    ];
+    final textSources = <String?>[document?.outerHtml, ...htmlSources];
     final imageCandidates = <String?>[
       _stringValue(oEmbed?["thumbnail_url"]),
       metadata["og:image:secure_url"],
@@ -286,27 +465,31 @@ class UrlPreviewFallbackFetcher {
     final image = await _fetchImage(
       _firstNonEmpty(imageCandidates),
       baseUri: uri,
-      width: _positiveIntValue(oEmbed?["thumbnail_width"]) ??
+      width:
+          _positiveIntValue(oEmbed?["thumbnail_width"]) ??
           _toPositiveInt(metadata["og:image:width"]),
-      height: _positiveIntValue(oEmbed?["thumbnail_height"]) ??
+      height:
+          _positiveIntValue(oEmbed?["thumbnail_height"]) ??
           _toPositiveInt(metadata["og:image:height"]),
     );
 
     final title = _fallbackInstagramTitle(uri);
 
-    final postingAccount = normalizeUrlPreviewPostingAccount(_firstNonEmpty([
-      _stringValue(oEmbed?["author_name"]),
-      _extractMatch(metadata["og:title"], [
-        RegExp(r"^([^:]+?) on Instagram"),
-      ]),
-      metadata["profile:username"],
-      metadata["twitter:creator"],
-      for (final source in textSources)
-        _extractMatch(source, [
-          RegExp(r'"owner"\s*:\s*\{[\s\S]*?"username"\s*:\s*"([^"]+)"'),
-          RegExp(r'"username"\s*:\s*"([^"]+)"\s*,\s*"full_name"'),
+    final postingAccount = normalizeUrlPreviewPostingAccount(
+      _firstNonEmpty([
+        _stringValue(oEmbed?["author_name"]),
+        _extractMatch(metadata["og:title"], [
+          RegExp(r"^([^:]+?) on Instagram"),
         ]),
-    ]));
+        metadata["profile:username"],
+        metadata["twitter:creator"],
+        for (final source in textSources)
+          _extractMatch(source, [
+            RegExp(r'"owner"\s*:\s*\{[\s\S]*?"username"\s*:\s*"([^"]+)"'),
+            RegExp(r'"username"\s*:\s*"([^"]+)"\s*,\s*"full_name"'),
+          ]),
+      ]),
+    );
 
     final descriptionSource = _firstNonEmpty([
       _stringValue(oEmbed?["title"]),
@@ -315,7 +498,8 @@ class UrlPreviewFallbackFetcher {
       for (final source in textSources)
         _extractMatch(source, [
           RegExp(
-              r'"edge_media_to_caption"[\s\S]*?"text"\s*:\s*"((?:\\.|[^"])*)"'),
+            r'"edge_media_to_caption"[\s\S]*?"text"\s*:\s*"((?:\\.|[^"])*)"',
+          ),
           RegExp(r'"caption":"((?:\\.|[^"])*)"'),
           RegExp(r'"accessibility_caption":"((?:\\.|[^"])*)"'),
         ])?.replaceAll(r"\/", "/"),
@@ -352,7 +536,8 @@ class UrlPreviewFallbackFetcher {
     );
     final post = await _fetchRedditPost(uri);
 
-    final canonicalUri = _resolveUrl(
+    final canonicalUri =
+        _resolveUrl(
           _stringValue(post?["permalink"]) != null
               ? "https://www.reddit.com${post!["permalink"]}"
               : null,
@@ -366,9 +551,11 @@ class UrlPreviewFallbackFetcher {
         _stringValue(oEmbed?["thumbnail_url"]),
       ]),
       baseUri: canonicalUri,
-      width: _pickRedditImageDimension(post, "width") ??
+      width:
+          _pickRedditImageDimension(post, "width") ??
           _positiveIntValue(oEmbed?["thumbnail_width"]),
-      height: _pickRedditImageDimension(post, "height") ??
+      height:
+          _pickRedditImageDimension(post, "height") ??
           _positiveIntValue(oEmbed?["thumbnail_height"]),
       userAgent: "matrix-bot/1.0",
     );
@@ -387,7 +574,8 @@ class UrlPreviewFallbackFetcher {
 
     final publishedAt = _parseDate(post?["created_utc"]?.toString());
     final stats = buildUrlPreviewStatsLine(
-      likes: _toPositiveInt(post?["ups"]?.toString()) ??
+      likes:
+          _toPositiveInt(post?["ups"]?.toString()) ??
           _toPositiveInt(post?["score"]?.toString()),
       comments: _toPositiveInt(post?["num_comments"]?.toString()),
       publishedAt: publishedAt,
@@ -396,10 +584,9 @@ class UrlPreviewFallbackFetcher {
     final title = normalizeUrlPreviewText(
       _stringValue(post?["title"]) ?? _stringValue(oEmbed?["title"]),
     );
-    final description = trimUrlPreviewDescription(_firstNonEmpty([
-      _stringValue(post?["selftext"]),
-      title,
-    ]));
+    final description = trimUrlPreviewDescription(
+      _firstNonEmpty([_stringValue(post?["selftext"]), title]),
+    );
 
     if (title == null && description == null && image == null) {
       return null;
@@ -409,7 +596,7 @@ class UrlPreviewFallbackFetcher {
       canonicalUri,
       siteName:
           normalizeUrlPreviewText(_stringValue(oEmbed?["provider_name"])) ??
-              "Reddit",
+          "Reddit",
       title: title,
       description: description,
       image: image?.provider,
@@ -428,11 +615,9 @@ class UrlPreviewFallbackFetcher {
     }
 
     final metadata = _extractMetaTags(document);
-    final canonicalUrl = _resolveUrl(
-          _firstNonEmpty([
-            metadata["og:url"],
-            _extractCanonicalLink(document),
-          ]),
+    final canonicalUrl =
+        _resolveUrl(
+          _firstNonEmpty([metadata["og:url"], _extractCanonicalLink(document)]),
           uri,
         ) ??
         uri;
@@ -446,31 +631,39 @@ class UrlPreviewFallbackFetcher {
         metadata["twitter:image:src"],
       ]),
       baseUri: canonicalUrl,
-      width: _toPositiveInt(metadata["og:image:width"]) ??
+      width:
+          _toPositiveInt(metadata["og:image:width"]) ??
           _toPositiveInt(metadata["twitter:image:width"]),
-      height: _toPositiveInt(metadata["og:image:height"]) ??
+      height:
+          _toPositiveInt(metadata["og:image:height"]) ??
           _toPositiveInt(metadata["twitter:image:height"]),
     );
 
-    final title = normalizeUrlPreviewText(_firstNonEmpty([
-      metadata["og:title"],
-      metadata["twitter:title"],
-      document.querySelector("title")?.text,
-    ]));
+    final title = normalizeUrlPreviewText(
+      _firstNonEmpty([
+        metadata["og:title"],
+        metadata["twitter:title"],
+        document.querySelector("title")?.text,
+      ]),
+    );
 
-    final description = trimUrlPreviewDescription(_firstNonEmpty([
-      metadata["og:description"],
-      metadata["twitter:description"],
-      metadata["description"],
-      _extractJsonLdValue(document, "description"),
-    ]));
+    final description = trimUrlPreviewDescription(
+      _firstNonEmpty([
+        metadata["og:description"],
+        metadata["twitter:description"],
+        metadata["description"],
+        _extractJsonLdValue(document, "description"),
+      ]),
+    );
 
-    final postingAccount = normalizeUrlPreviewPostingAccount(_firstNonEmpty([
-      metadata["twitter:creator"],
-      metadata["profile:username"],
-      metadata["author"],
-      metadata["article:author"],
-    ]));
+    final postingAccount = normalizeUrlPreviewPostingAccount(
+      _firstNonEmpty([
+        metadata["twitter:creator"],
+        metadata["profile:username"],
+        metadata["author"],
+        metadata["article:author"],
+      ]),
+    );
 
     if (title == null && description == null && image == null) {
       return null;
@@ -478,10 +671,13 @@ class UrlPreviewFallbackFetcher {
 
     return UrlPreviewData(
       canonicalUrl,
-      siteName: normalizeUrlPreviewText(_firstNonEmpty([
-            metadata["og:site_name"],
-            metadata["twitter:site"],
-          ])) ??
+      siteName:
+          normalizeUrlPreviewText(
+            _firstNonEmpty([
+              metadata["og:site_name"],
+              metadata["twitter:site"],
+            ]),
+          ) ??
           inferUrlPreviewSource(canonicalUrl),
       title: title,
       description: description,
@@ -496,10 +692,12 @@ class UrlPreviewFallbackFetcher {
           metadata["twitter:description"],
           metadata["description"],
         ]),
-        publishedAt: _parseDate(_firstNonEmpty([
-          metadata["article:published_time"],
-          metadata["og:updated_time"],
-        ])),
+        publishedAt: _parseDate(
+          _firstNonEmpty([
+            metadata["article:published_time"],
+            metadata["og:updated_time"],
+          ]),
+        ),
       ),
     );
   }
@@ -595,7 +793,16 @@ class UrlPreviewFallbackFetcher {
         return null;
       }
 
-      final bytes = await response.stream.toBytes();
+      final bytesBuilder = BytesBuilder(copy: false);
+      var receivedBytes = 0;
+      await for (final chunk in response.stream) {
+        receivedBytes += chunk.length;
+        if (receivedBytes > _maxImageBytes) {
+          throw StateError('Preview image exceeded the byte limit');
+        }
+        bytesBuilder.add(chunk);
+      }
+      final bytes = bytesBuilder.takeBytes();
       if (bytes.isEmpty || bytes.length > _maxImageBytes) {
         return null;
       }
@@ -724,8 +931,9 @@ class UrlPreviewFallbackFetcher {
   }
 
   static String? _extractJsonLdValue(dom.Document document, String key) {
-    for (final script
-        in document.querySelectorAll('script[type="application/ld+json"]')) {
+    for (final script in document.querySelectorAll(
+      'script[type="application/ld+json"]',
+    )) {
       final raw = script.text.trim();
       if (raw.isEmpty) {
         continue;
@@ -787,20 +995,16 @@ class UrlPreviewFallbackFetcher {
     ]);
   }
 
-  static String? _buildStatsFromFreeText(String? value,
-      {DateTime? publishedAt}) {
-    final likes = _extractInt(
-        value,
-        [
-          RegExp(r"(\d[\d.,]*\s*[KMBkmb]?)\s+likes?", caseSensitive: false),
-        ],
-        allowCompactSuffixes: true);
-    final comments = _extractInt(
-        value,
-        [
-          RegExp(r"(\d[\d.,]*\s*[KMBkmb]?)\s+comments?", caseSensitive: false),
-        ],
-        allowCompactSuffixes: true);
+  static String? _buildStatsFromFreeText(
+    String? value, {
+    DateTime? publishedAt,
+  }) {
+    final likes = _extractInt(value, [
+      RegExp(r"(\d[\d.,]*\s*[KMBkmb]?)\s+likes?", caseSensitive: false),
+    ], allowCompactSuffixes: true);
+    final comments = _extractInt(value, [
+      RegExp(r"(\d[\d.,]*\s*[KMBkmb]?)\s+comments?", caseSensitive: false),
+    ], allowCompactSuffixes: true);
     return buildUrlPreviewStatsLine(
       likes: likes,
       comments: comments,
@@ -824,8 +1028,9 @@ class UrlPreviewFallbackFetcher {
         continue;
       }
 
-      final parsed =
-          allowCompactSuffixes ? _parseCompactNumber(raw) : int.tryParse(raw);
+      final parsed = allowCompactSuffixes
+          ? _parseCompactNumber(raw)
+          : int.tryParse(raw);
       if (parsed != null) {
         return parsed;
       }
@@ -874,8 +1079,9 @@ class UrlPreviewFallbackFetcher {
 
   static int? _parseCompactNumber(String value) {
     final normalized = value.replaceAll(",", "").trim();
-    final match =
-        RegExp(r"^(\d+(?:\.\d+)?)\s*([KMBkmb])?$").firstMatch(normalized);
+    final match = RegExp(
+      r"^(\d+(?:\.\d+)?)\s*([KMBkmb])?$",
+    ).firstMatch(normalized);
     if (match == null) {
       return int.tryParse(normalized);
     }
@@ -917,7 +1123,8 @@ class UrlPreviewFallbackFetcher {
     final headers = <String, String>{
       "User-Agent": userAgent ?? _browserUserAgent,
       "Accept-Language": "en-US,en;q=0.9",
-      "Accept": accept ??
+      "Accept":
+          accept ??
           "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     };
 
@@ -925,20 +1132,26 @@ class UrlPreviewFallbackFetcher {
   }
 
   static bool _isTikTok(Uri uri) {
-    final host =
-        uri.host.replaceFirst(RegExp(r"^www\.", caseSensitive: false), "");
+    final host = uri.host.replaceFirst(
+      RegExp(r"^www\.", caseSensitive: false),
+      "",
+    );
     return host == "tiktok.com" || host.endsWith(".tiktok.com");
   }
 
   static bool _isInstagram(Uri uri) {
-    final host =
-        uri.host.replaceFirst(RegExp(r"^www\.", caseSensitive: false), "");
+    final host = uri.host.replaceFirst(
+      RegExp(r"^www\.", caseSensitive: false),
+      "",
+    );
     return host == "instagram.com" || host.endsWith(".instagram.com");
   }
 
   static bool _isReddit(Uri uri) {
-    final host =
-        uri.host.replaceFirst(RegExp(r"^www\.", caseSensitive: false), "");
+    final host = uri.host.replaceFirst(
+      RegExp(r"^www\.", caseSensitive: false),
+      "",
+    );
     return host == "redd.it" ||
         host == "reddit.com" ||
         host.endsWith(".reddit.com");
@@ -1023,10 +1236,9 @@ class UrlPreviewFallbackFetcher {
       }
     }
 
-    final firstHextet = host.split(":").firstWhere(
-          (part) => part.isNotEmpty,
-          orElse: () => "0",
-        );
+    final firstHextet = host
+        .split(":")
+        .firstWhere((part) => part.isNotEmpty, orElse: () => "0");
     final first = int.tryParse(firstHextet, radix: 16);
     if (first == null) {
       return false;
@@ -1260,11 +1472,14 @@ class UrlPreviewFallbackFetcher {
   }
 
   static Uri _buildRedditJsonUri(Uri uri) {
-    final host =
-        uri.host.replaceFirst(RegExp(r"^www\.", caseSensitive: false), "");
+    final host = uri.host.replaceFirst(
+      RegExp(r"^www\.", caseSensitive: false),
+      "",
+    );
     if (host == "redd.it") {
-      final postId =
-          uri.pathSegments.where((segment) => segment.isNotEmpty).join();
+      final postId = uri.pathSegments
+          .where((segment) => segment.isNotEmpty)
+          .join();
       return Uri.parse(
         "https://www.reddit.com/comments/$postId.json?raw_json=1",
       );
@@ -1287,8 +1502,9 @@ class UrlPreviewFallbackFetcher {
         if (first is Map<String, dynamic>) {
           final source = first["source"];
           if (source is Map<String, dynamic>) {
-            final candidate =
-                _sanitizeRedditImageUrl(_stringValue(source["url"]));
+            final candidate = _sanitizeRedditImageUrl(
+              _stringValue(source["url"]),
+            );
             if (candidate != null) {
               return candidate;
             }
@@ -1353,7 +1569,9 @@ class UrlPreviewFallbackFetcher {
   }
 
   static int? _pickRedditImageDimension(
-      Map<String, dynamic>? post, String axis) {
+    Map<String, dynamic>? post,
+    String axis,
+  ) {
     if (post == null) {
       return null;
     }

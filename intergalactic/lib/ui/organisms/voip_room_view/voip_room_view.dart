@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:intergalactic/client/components/voip/voip_session.dart';
 import 'package:intergalactic/client/components/voip_room/voip_room_component.dart';
 import 'package:intergalactic/client/matrix/components/voip_room/matrix_livekit_backend.dart';
-import 'package:intergalactic/config/build_config.dart';
 import 'package:intergalactic/debug/log.dart';
 import 'package:intergalactic/main.dart';
 import 'package:intergalactic/ui/accessibility/accessibility_scope.dart';
@@ -122,17 +121,43 @@ class _VoipRoomViewState extends State<VoipRoomView> {
       mainAxisAlignment: MainAxisAlignment.center,
       mainAxisSize: MainAxisSize.max,
       children: [
-        Expanded(
-          child: widget.voip.room.isE2EE && BuildConfig.RELEASE
-              ? e2eeUnsupportedView()
-              : joinCallView(),
-        ),
+        // BUG-335, and this was the owner's actual obstruction. Until now a
+        // RELEASE build replaced the entire join view with "Sorry, End-to-end
+        // encrypted voice rooms are not yet supported" whenever the ROOM was
+        // encrypted, so there was no Join control at all - not a displaced one.
+        // A dev build took the other branch, which is why the same room showed
+        // different text on the owner's phone and their desktop.
+        //
+        // The block is removed rather than relocated. It gated on `isE2EE`,
+        // which is the room's TIMELINE encryption, and a call in an encrypted
+        // room is neither more nor less supported than one in an unencrypted
+        // room: this app has no call-media E2EE on either path, so there was
+        // nothing for the block to protect anyone from.
+        Expanded(child: joinCallView()),
         Align(
           alignment: AlignmentGeometry.bottomLeft,
           child: tiamat.Tooltip(
+            // BUG-335. This used to read "This room is encrypted, your call is
+            // secure and private" for an encrypted room, which is the strongest
+            // and most direct of the three false claims this surface carried:
+            // call media is NOT end-to-end encrypted on either path. The
+            // unencrypted variant was wrong by implication in the same
+            // direction, since "may be accessible by the server operator" reads
+            // as something an encrypted room would avoid, and it does not.
+            //
+            // The padlock still reflects the ROOM's encryption, which is true
+            // and is what the icon has always meant; only the call claim is
+            // corrected. Wording reviewed by S&C - it deliberately does not
+            // name whose server, because the focus is whatever
+            // `livekit_service_url` the room advertises
+            // (matrix_livekit_backend.dart:299), not necessarily our own.
             text: widget.voip.room.isE2EE
-                ? "This room is encrypted, your call is secure and private"
-                : "This room is not encrypted, your call may be accessible by the server operator",
+                ? "Messages in this room are encrypted. Calls are not "
+                      "end-to-end encrypted - the call server that relays them "
+                      "can access them."
+                : "This room is not encrypted, and calls are not end-to-end "
+                      "encrypted - the call server that relays them can access "
+                      "them.",
             child: Padding(
               padding: const EdgeInsets.all(8.0),
               child: Row(
@@ -201,13 +226,25 @@ class _VoipRoomViewState extends State<VoipRoomView> {
               ),
             ),
           ),
-        if (widget.voip.room.isE2EE)
-          Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: tiamat.Text.error(
-              "End-to-end encrypted calls are still under development, and may contain bugs or security issues. Use at your own risk.",
-            ),
-          ),
+        // BUG-335. An inherited warning used to sit here whenever the ROOM was
+        // encrypted: "End-to-end encrypted calls are still under development,
+        // and may contain bugs or security issues."
+        //
+        // It was removed rather than relocated, because it was wrong in the
+        // direction that OVERSTATES security - it asserts the calls ARE
+        // end-to-end encrypted and merely immature. This app has no call-media
+        // E2EE at all: no `e2eeOptions` reaches `lk.Room`
+        // (matrix_livekit_room_factory_io.dart), and
+        // `matrix_voip_component.dart:291` declines the Matrix SDK's group-call
+        // key hook outright with `throw UnimplementedError()`. The condition
+        // was wrong too - `room.isE2EE` is the room's TIMELINE encryption, and
+        // call media is exposed identically either way, so this warned where
+        // nothing had changed and stayed silent where the exposure was the
+        // same.
+        //
+        // The true statement now lives in room security settings, where the
+        // expectation is formed. It is NOT restated here: this surface is the
+        // one the owner could not get past on mobile, which is the bug.
         if (participants.isEmpty)
           Expanded(
             child: Padding(
@@ -394,16 +431,5 @@ class _VoipRoomViewState extends State<VoipRoomView> {
       'HttpException',
     };
     return networkErrorTypes.contains(error.runtimeType.toString());
-  }
-
-  e2eeUnsupportedView() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: tiamat.Text.label(
-          "Sorry, End-to-end encrypted voice rooms are not yet supported.",
-        ),
-      ),
-    );
   }
 }

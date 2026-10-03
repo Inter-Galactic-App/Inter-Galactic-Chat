@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tiamat/tiamat.dart' as tiamat;
 
 class MarkdownSelectionToolbarAction {
   const MarkdownSelectionToolbarAction({
@@ -109,9 +110,7 @@ class _MarkdownSelectionToolbarBubble extends StatelessWidget {
 }
 
 class _MarkdownSelectionToolbarButton extends StatelessWidget {
-  const _MarkdownSelectionToolbarButton({
-    required this.action,
-  });
+  const _MarkdownSelectionToolbarButton({required this.action});
 
   final MarkdownSelectionToolbarAction action;
 
@@ -119,8 +118,8 @@ class _MarkdownSelectionToolbarButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    return Tooltip(
-      message: action.label,
+    return tiamat.Tooltip(
+      text: action.label,
       child: Material(
         color: Colors.transparent,
         child: InkWell(
@@ -133,11 +132,7 @@ class _MarkdownSelectionToolbarButton extends StatelessWidget {
               color: scheme.surfaceContainerHigh.withValues(alpha: 0.65),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(
-              action.icon,
-              size: 18,
-              color: scheme.onSurface,
-            ),
+            child: Icon(action.icon, size: 18, color: scheme.onSurface),
           ),
         ),
       ),

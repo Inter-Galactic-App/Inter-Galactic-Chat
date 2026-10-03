@@ -16,10 +16,16 @@ class TimelineEventViewReactions extends StatefulWidget {
   const TimelineEventViewReactions({
     required this.index,
     required this.timeline,
+    this.updateRevision = 0,
     super.key,
   });
 
   final int index;
+
+  /// Bumped by the owning timeline entry whenever the event at [index] is
+  /// refreshed in place - a reaction added to an already-reacted message
+  /// changes the event, not its index.
+  final int updateRevision;
   final Timeline timeline;
 
   @override
@@ -51,6 +57,7 @@ class _TimelineEventViewReactionsState
       currentUserIdentifier = widget.timeline.client.self?.identifier;
     }
     if (widget.index != oldWidget.index ||
+        widget.updateRevision != oldWidget.updateRevision ||
         widget.timeline != oldWidget.timeline) {
       setStateFromIndex(widget.index);
     }

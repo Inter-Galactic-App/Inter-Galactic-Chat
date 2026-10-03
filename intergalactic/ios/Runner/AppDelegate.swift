@@ -12,7 +12,9 @@ import UserNotifications
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
+  private let appGroupStorageChannelName = "chat.intergalactic.app/app_group_storage"
   private let appIconChannelName = "chat.intergalactic.app/app_icon"
+  private let backgroundAssertionChannelName = "chat.intergalactic.app/background_assertion"
   private let biometricsChannelName = "chat.intergalactic.app/biometrics"
   private let callAudioChannelName = "chat.intergalactic.app/call_audio"
   private let cameraMediaPickerChannelName = "chat.intergalactic.app/ios_camera_media_picker"
@@ -64,6 +66,32 @@ import UserNotifications
   /// matches the assertions it is paired with.
   private var pendingNotificationResponses: [[String: Any]] = []
 
+  /// Silent-wake bookkeeping (`didReceiveRemoteNotification`): one entry per
+  /// wake iOS handed us, keyed by a wake id, holding the completion handler
+  /// and the background assertion that keeps the process alive while Dart
+  /// catches up. Wake ids that Dart has not yet taken wait in
+  /// `pendingRemoteWakes` for a cold-launched engine to drain.
+  private struct RemoteWake {
+    let assertionToken: String?
+    let completionHandler: (UIBackgroundFetchResult) -> Void
+    /// APNs routing identifiers are retained only while this wake is pending.
+    /// Dart uses them for the developer-only E10 backup measurement and never
+    /// logs or persists them.
+    let route: [String: String]?
+    /// When iOS handed us this wake, on the same monotonic clock the
+    /// deadline below is scheduled against. Dart needs it because its own
+    /// budget must be what is LEFT of the deadline, and on a cold launch
+    /// the engine boot happens between these two points.
+    let startedAt: DispatchTime
+  }
+  private var remoteWakes: [String: RemoteWake] = [:]
+  private var pendingRemoteWakes: [String] = []
+  private static let remoteWakeDeadline: TimeInterval = 25
+  /// The legacy SharedPreferences Foundation backend stores Dart preference
+  /// keys in the standard defaults suite with this prefix. Missing values are
+  /// deliberately false: E10 route metadata is developer-only.
+  private static let developerModePreferenceKey = "flutter.developer_mode"
+
   /// Far above any real burst of notification actions; a backstop against a
   /// pathological loop rather than a working limit.
   private static let maxPendingNotificationResponses = 16
@@ -94,7 +122,9 @@ import UserNotifications
     GeneratedPluginRegistrant.register(with: self)
 
     if let controller = window?.rootViewController as? FlutterViewController {
+      configureAppGroupStorageChannel(binaryMessenger: controller.binaryMessenger)
       configureAppIconChannel(binaryMessenger: controller.binaryMessenger)
+      configureBackgroundAssertionChannel(binaryMessenger: controller.binaryMessenger)
       configureBiometricsChannel(binaryMessenger: controller.binaryMessenger)
       configureCallAudioChannel(binaryMessenger: controller.binaryMessenger)
       configureCameraMediaPickerChannel(binaryMessenger: controller.binaryMessenger)
@@ -221,6 +251,189 @@ import UserNotifications
     super.application(application, didFailToRegisterForRemoteNotificationsWithError: error)
   }
 
+  /// A push rendered by the Notification Service Extension arriving while
+  /// the app is in the foreground is NOT presented. The app's own notifier
+  /// covers the foreground - it knows the active room, the snoozes and the
+  /// preview choice - and the dedupe modifier only sees notifications that
+  /// were presented, so presenting the extension's copy here would put a
+  /// banner over the very room the user is reading. Before this override the
+  /// same outcome held by accident: the local-notifications plugin returns
+  /// without calling the completion handler for notifications it did not
+  /// post. Everything without our routing ids goes to super as before.
+  override func userNotificationCenter(
+    _ center: UNUserNotificationCenter,
+    willPresent notification: UNNotification,
+    withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+  ) {
+    let userInfo = notification.request.content.userInfo
+    let isIntergalacticRemote =
+      notificationString(userInfo, keys: ["room_id", "roomId", "roomID"]) != nil
+      && notificationString(userInfo, keys: ["client_id", "clientId", "clientID"]) != nil
+      && notification.request.trigger is UNPushNotificationTrigger
+    if isIntergalacticRemote {
+      NSLog("intergalactic_ios_notification_foreground source=apns presented=false")
+      completionHandler([])
+      return
+    }
+    super.userNotificationCenter(center, willPresent: notification, withCompletionHandler: completionHandler)
+  }
+
+  /// The `content-available` wake. Until this override existed the engine's
+  /// default forwarded the wake to plugins, none handled it, and the
+  /// completion was answered with no data at once: the app woke and did
+  /// nothing, which is why room keys arrived only when the owner next opened
+  /// the app. Now the wake is handed to Dart under a background assertion;
+  /// Dart re-establishes the released databases, drains one short sync per
+  /// account so pending to-device room keys are stored, releases again, and
+  /// completes the wake. A hard deadline completes it regardless, so iOS is
+  /// never left waiting and the assertion never leaks. Pushes without our
+  /// routing shape go to super as before.
+  override func application(
+    _ application: UIApplication,
+    didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+    fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+  ) {
+    let aps = userInfo["aps"] as? [AnyHashable: Any]
+    let contentAvailable = (aps?["content-available"] as? Int) == 1
+    let ours = notificationString(userInfo, keys: ["client_id", "clientId", "clientID"]) != nil
+    guard contentAvailable, ours else {
+      super.application(application, didReceiveRemoteNotification: userInfo, fetchCompletionHandler: completionHandler)
+      return
+    }
+    let wakeId = UUID().uuidString
+    let token = beginBackgroundAssertion(name: "intergalactic.remote-wake") { [weak self] in
+      self?.endRemoteWake(wakeId: wakeId, result: .noData, reason: "expired")
+    }
+    remoteWakes[wakeId] = RemoteWake(
+      assertionToken: token,
+      completionHandler: completionHandler,
+      // This guard is intentionally native and precedes route extraction.
+      // Developer-mode policy is a data-boundary rule, not merely a decision
+      // about whether Dart eventually runs its diagnostic probe.
+      route: developerModeEnabledForE10Measurement() ? remoteWakeRoute(userInfo) : nil,
+      startedAt: .now()
+    )
+    pendingRemoteWakes.append(wakeId)
+    NSLog(
+      "intergalactic_ios_remote_wake result=began app_state=%@ channel=%@",
+      application.applicationState == .active ? "active" : "background",
+      notificationsChannel == nil ? "absent" : "present"
+    )
+    notificationsChannel?.invokeMethod(
+      "remoteWakeReceived",
+      arguments: remoteWakePayload(wakeId)
+    )
+    DispatchQueue.main.asyncAfter(deadline: .now() + Self.remoteWakeDeadline) { [weak self] in
+      self?.endRemoteWake(wakeId: wakeId, result: .noData, reason: "deadline")
+    }
+  }
+
+  private func endRemoteWake(wakeId: String, result: UIBackgroundFetchResult, reason: String) {
+    guard let wake = remoteWakes.removeValue(forKey: wakeId) else { return }
+    pendingRemoteWakes.removeAll { $0 == wakeId }
+    NSLog("intergalactic_ios_remote_wake result=ended reason=%@", reason)
+    // Order matters: tell iOS the work is done, then release the assertion.
+    wake.completionHandler(result)
+    if let token = wake.assertionToken {
+      endBackgroundAssertion(token: token, reason: reason)
+    }
+  }
+
+  /// Hands out a queued wake id and REMOVES it, so the cold-launch drain and a
+  /// `remoteWakeReceived` push cannot both take the same one. Double-handling
+  /// was harmless - the release trigger serialises and `endRemoteWake` is
+  /// idempotent - but it spent a second catch-up out of a budget that matters.
+  private func handleTakePendingRemoteWake(result: @escaping FlutterResult) {
+    guard let wakeId = pendingRemoteWakes.first else {
+      result(nil)
+      return
+    }
+    pendingRemoteWakes.removeFirst()
+    // A map, not the bare id: this is the cold-launch path, so the engine
+    // boot has already spent part of the deadline and only native can say
+    // how much.
+    result(remoteWakePayload(wakeId))
+  }
+
+  private func remoteWakePayload(_ wakeId: String) -> [String: Any] {
+    var payload: [String: Any] = [
+      "wake_id": wakeId,
+      "native_elapsed_ms": remoteWakeElapsedMs(wakeId)
+    ]
+    if let route = remoteWakes[wakeId]?.route {
+      payload["route"] = route
+    }
+    return payload
+  }
+
+  private func remoteWakeRoute(_ userInfo: [AnyHashable: Any]) -> [String: String]? {
+    guard let clientId = notificationString(userInfo, keys: ["client_id", "clientId", "clientID"]),
+      let roomId = notificationString(userInfo, keys: ["room_id", "roomId", "roomID"]),
+      let eventId = notificationString(userInfo, keys: ["event_id", "eventId", "eventID"])
+    else {
+      return nil
+    }
+    return ["client_id": clientId, "room_id": roomId, "event_id": eventId]
+  }
+
+  /// Reads the persisted Flutter Developer Mode setting directly because a
+  /// silent wake can arrive before Dart has initialized. The false default
+  /// prevents client, room, and event identifiers crossing the native-to-Dart
+  /// bridge for ordinary notification delivery.
+  private func developerModeEnabledForE10Measurement() -> Bool {
+    UserDefaults.standard.bool(forKey: Self.developerModePreferenceKey)
+  }
+
+  /// Answers "how long have you been holding this wake?" at the moment Dart
+  /// asks, which is not the moment native told Dart about it.
+  ///
+  /// The value stamped into `remoteWakeReceived` is measured when native
+  /// SENDS. On a cold background launch the channel already exists - plugin
+  /// registration runs long before Dart's own startup - so the wake takes the
+  /// channel path, not `takePendingRemoteWake`, and Flutter buffers the
+  /// message until the Dart handler is set. The engine boot then falls between
+  /// native's stamp and Dart's stopwatch, and is charged to neither. Asking
+  /// again here is the only way to see it. `nil` means the wake is already
+  /// finished, so Dart keeps whatever it was told.
+  private func handleRemoteWakeElapsed(call: FlutterMethodCall, result: @escaping FlutterResult) {
+    guard let arguments = call.arguments as? [String: Any],
+      let wakeId = arguments["wake_id"] as? String, !wakeId.isEmpty,
+      remoteWakes[wakeId] != nil
+    else {
+      result(nil)
+      return
+    }
+    result(remoteWakeElapsedMs(wakeId))
+  }
+
+  /// Milliseconds since iOS handed us this wake, 0 if it is already gone.
+  private func remoteWakeElapsedMs(_ wakeId: String) -> Int {
+    guard let wake = remoteWakes[wakeId] else { return 0 }
+    let now = DispatchTime.now().uptimeNanoseconds
+    let started = wake.startedAt.uptimeNanoseconds
+    guard now > started else { return 0 }
+    return Int((now - started) / 1_000_000)
+  }
+
+  private func handleCompleteRemoteWake(call: FlutterMethodCall, result: @escaping FlutterResult) {
+    guard let arguments = call.arguments as? [String: Any],
+      let wakeId = arguments["wake_id"] as? String, !wakeId.isEmpty
+    else {
+      result(false)
+      return
+    }
+    let outcome = (arguments["result"] as? String) ?? "no_data"
+    let fetchResult: UIBackgroundFetchResult
+    switch outcome {
+    case "new_data": fetchResult = .newData
+    case "failed": fetchResult = .failed
+    default: fetchResult = .noData
+    }
+    let known = remoteWakes[wakeId] != nil
+    endRemoteWake(wakeId: wakeId, result: fetchResult, reason: "dart_" + outcome)
+    result(known)
+  }
+
   override func userNotificationCenter(
     _ center: UNUserNotificationCenter,
     didReceive response: UNNotificationResponse,
@@ -255,6 +468,98 @@ import UserNotifications
       didReceive: response,
       withCompletionHandler: completionHandler
     )
+  }
+
+  /// The event ids of remote notifications still in Notification Center.
+  /// The Notification Service Extension renders a push into a notification
+  /// whose userInfo keeps the gateway's routing ids, so the app's own
+  /// notifier can tell which events the extension already showed and not
+  /// show them a second time. Local notifications carry no event id and are
+  /// not listed. Ids only: nothing from the content is returned.
+  private func handleDeliveredRemoteEventIds(result: @escaping FlutterResult) {
+    UNUserNotificationCenter.current().getDeliveredNotifications { notifications in
+      var eventIds: [String] = []
+      for notification in notifications {
+        let content = notification.request.content
+        // Remote (push-triggered) only: the app's own local notifications use
+        // the same rich category, so the category alone does not name the
+        // producer - the trigger does. Then only what the extension RENDERED:
+        // a generic fallback (the gateway's own content, no category) must not
+        // stop the app from showing the decrypted message once it has the
+        // room key; the app removes that fallback when it posts its own (see
+        // removeDeliveredRemoteNotification).
+        guard notification.request.trigger is UNPushNotificationTrigger,
+          content.categoryIdentifier == self.extensionRenderedCategory
+        else { continue }
+        if let eventId = self.notificationString(content.userInfo, keys: ["event_id", "eventId", "eventID"]) {
+          eventIds.append(eventId)
+        }
+      }
+      DispatchQueue.main.async {
+        result(eventIds)
+      }
+    }
+  }
+
+  /// The category the Notification Service Extension sets on content it
+  /// rendered itself (NotificationService.swift, richMessageCategory).
+  private let extensionRenderedCategory = "chat.intergalactic.rich_message.v1"
+
+  /// Removes the remote notifications for one event, rendered or generic,
+  /// because the app is about to post its own for it. Ids only; nothing is
+  /// read from the content.
+  private func handleRemoveDeliveredRemoteNotification(call: FlutterMethodCall, result: @escaping FlutterResult) {
+    guard let arguments = call.arguments as? [String: Any],
+      let eventId = arguments["event_id"] as? String, !eventId.isEmpty
+    else {
+      result(false)
+      return
+    }
+    let center = UNUserNotificationCenter.current()
+    center.getDeliveredNotifications { notifications in
+      let identifiers = notifications.compactMap { notification -> String? in
+        guard notification.request.trigger is UNPushNotificationTrigger else { return nil }
+        let userInfo = notification.request.content.userInfo
+        guard self.notificationString(userInfo, keys: ["event_id", "eventId", "eventID"]) == eventId else { return nil }
+        return notification.request.identifier
+      }
+      if !identifiers.isEmpty {
+        center.removeDeliveredNotifications(withIdentifiers: identifiers)
+      }
+      DispatchQueue.main.async {
+        result(!identifiers.isEmpty)
+      }
+    }
+  }
+
+  /// A room becomes read only after the timeline reaches its newest event.
+  /// Remove that room's delivered APNs alerts, including generic fallbacks;
+  /// Flutter's local-notification enumeration cannot see these requests.
+  private func handleRemoveDeliveredRemoteNotificationsForRoom(call: FlutterMethodCall, result: @escaping FlutterResult) {
+    guard let arguments = call.arguments as? [String: Any],
+      let clientId = arguments["client_id"] as? String, !clientId.isEmpty,
+      let roomId = arguments["room_id"] as? String, !roomId.isEmpty
+    else {
+      result(0)
+      return
+    }
+    let center = UNUserNotificationCenter.current()
+    center.getDeliveredNotifications { notifications in
+      let identifiers = notifications.compactMap { notification -> String? in
+        guard notification.request.trigger is UNPushNotificationTrigger else { return nil }
+        let userInfo = notification.request.content.userInfo
+        guard self.notificationString(userInfo, keys: ["client_id", "clientId", "clientID"]) == clientId,
+          self.notificationString(userInfo, keys: ["room_id", "roomId", "roomID"]) == roomId
+        else { return nil }
+        return notification.request.identifier
+      }
+      if !identifiers.isEmpty {
+        center.removeDeliveredNotifications(withIdentifiers: identifiers)
+      }
+      DispatchQueue.main.async {
+        result(identifiers.count)
+      }
+    }
   }
 
   private func configureAppIconChannel(binaryMessenger: FlutterBinaryMessenger) {
@@ -1000,6 +1305,201 @@ import UserNotifications
         result(FlutterMethodNotImplemented)
       }
     }
+  }
+
+  // MARK: - App Group storage (NSE Phase B)
+
+  /// The shared container the Matrix account database moves into, and the
+  /// data-protection class it relies on once it lives there (S&C condition
+  /// B1: set on files AND directories, verified by read-back, re-asserted on
+  /// every launch, and the move aborted when it cannot be set).
+  ///
+  /// Three methods: `getContainerPath`, `protectItem`, `readProtectionClass`.
+  /// `protectItem` sets a file attribute on a caller-supplied path, so it is
+  /// bounded the same way `handleNotificationPreviewFileProtection` is - it
+  /// accepts nothing outside the App Group container. `readProtectionClass`
+  /// additionally accepts the app's own Application Support tree, and only
+  /// reads, so the class of the not-yet-moved database can be measured. Both
+  /// roots and the candidate are compared with symlinks resolved, because on
+  /// device the container is reported under `/private/var` and handed around
+  /// as `/var`.
+  ///
+  /// Logging here carries an event and an error class. Never the path: the
+  /// Dart side owes S&C condition B4 (no container path, no account, no
+  /// listing in diagnostics) and this side keeps to the same rule.
+  private func configureAppGroupStorageChannel(binaryMessenger: FlutterBinaryMessenger) {
+    let channel = FlutterMethodChannel(
+      name: appGroupStorageChannelName,
+      binaryMessenger: binaryMessenger
+    )
+    channel.setMethodCallHandler { [weak self] call, result in
+      guard let self = self else {
+        result(FlutterError(
+          code: "app_group_storage_unavailable",
+          message: "App Group storage bridge unavailable.",
+          details: nil
+        ))
+        return
+      }
+
+      let arguments = call.arguments as? [String: Any]
+      switch call.method {
+      case "getContainerPath":
+        let container = self.appGroupContainerURL()
+        if container == nil {
+          NSLog("intergalactic_ios_app_group_storage event=no_app_group")
+        }
+        result(container?.path)
+      case "protectItem":
+        self.handleAppGroupProtectItem(path: arguments?["path"] as? String, result: result)
+      case "readProtectionClass":
+        self.handleAppGroupReadProtectionClass(
+          path: arguments?["path"] as? String,
+          result: result
+        )
+      case "excludeFromBackup":
+        self.handleAppGroupExcludeFromBackup(
+          path: arguments?["path"] as? String,
+          result: result
+        )
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+  }
+
+  /// Marks an item inside the App Group container as excluded from backup
+  /// (S&C D3 / C3 for the policy snapshot). Container-only, like
+  /// `protectItem`; answers with what the resource reports afterwards.
+  private func handleAppGroupExcludeFromBackup(path: String?, result: @escaping FlutterResult) {
+    guard let target = appGroupStorageAllowedPath(path, allowApplicationSupport: false) else {
+      result(FlutterError(
+        code: "path_not_allowed",
+        message: "Only items inside the App Group container can be excluded from backup.",
+        details: nil
+      ))
+      return
+    }
+    var url = URL(fileURLWithPath: target)
+    var values = URLResourceValues()
+    values.isExcludedFromBackup = true
+    do {
+      try url.setResourceValues(values)
+    } catch {
+      NSLog(
+        "intergalactic_ios_app_group_storage event=exclude_backup_failed code=%ld",
+        (error as NSError).code
+      )
+      result(false)
+      return
+    }
+    let readBack = try? url.resourceValues(forKeys: [.isExcludedFromBackupKey])
+    result(readBack?.isExcludedFromBackup ?? false)
+  }
+
+  private func appGroupContainerURL() -> URL? {
+    // The same group the inbound-share staging area uses; there is one App
+    // Group on every target of this app.
+    FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: inboundShareAppGroup)
+  }
+
+  private func resolvedPath(_ url: URL) -> String {
+    url.standardizedFileURL.resolvingSymlinksInPath().path
+  }
+
+  private func isPath(_ candidate: String, under root: String) -> Bool {
+    candidate == root || candidate.hasPrefix(root + "/")
+  }
+
+  /// The candidate's symlink-resolved path when it is inside the App Group
+  /// container, or - when `allowApplicationSupport` - inside the app's own
+  /// Application Support directory. Nil otherwise, and nil for a missing item.
+  private func appGroupStorageAllowedPath(
+    _ path: String?,
+    allowApplicationSupport: Bool
+  ) -> String? {
+    guard let path, !path.isEmpty else {
+      return nil
+    }
+
+    var roots: [String] = []
+    if let container = appGroupContainerURL() {
+      roots.append(resolvedPath(container))
+    }
+    if allowApplicationSupport {
+      roots += NSSearchPathForDirectoriesInDomains(
+        .applicationSupportDirectory, .userDomainMask, true
+      ).map { resolvedPath(URL(fileURLWithPath: $0, isDirectory: true)) }
+    }
+
+    let candidate = resolvedPath(URL(fileURLWithPath: path))
+    guard roots.contains(where: { isPath(candidate, under: $0) }),
+      FileManager.default.fileExists(atPath: candidate)
+    else {
+      return nil
+    }
+    return candidate
+  }
+
+  private func appGroupProtectionClassRawValue(atPath path: String) -> String? {
+    guard let attributes = try? FileManager.default.attributesOfItem(atPath: path) else {
+      return nil
+    }
+    if let type = attributes[.protectionKey] as? FileProtectionType {
+      return type.rawValue
+    }
+    if let raw = attributes[.protectionKey] as? String {
+      return raw
+    }
+    return nil
+  }
+
+  private func handleAppGroupProtectItem(path: String?, result: @escaping FlutterResult) {
+    guard let target = appGroupStorageAllowedPath(path, allowApplicationSupport: false) else {
+      NSLog("intergalactic_ios_app_group_storage event=protect_rejected reason=path_not_allowed")
+      result(FlutterError(
+        code: "path_not_allowed",
+        message: "Only items inside the App Group container can be protected.",
+        details: nil
+      ))
+      return
+    }
+
+    do {
+      try FileManager.default.setAttributes(
+        [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+        ofItemAtPath: target
+      )
+    } catch {
+      // The error's description names the path. The class of failure is
+      // enough to act on.
+      NSLog(
+        "intergalactic_ios_app_group_storage event=protect_failed code=%ld",
+        (error as NSError).code
+      )
+      result(FlutterError(
+        code: "protection_set_failed",
+        message: "Could not set the data-protection class.",
+        details: nil
+      ))
+      return
+    }
+
+    // Read back, and hand Dart what the filesystem says rather than what was
+    // asked for. Dart compares; a mismatch or a nil is a failed B1 check.
+    result(appGroupProtectionClassRawValue(atPath: target))
+  }
+
+  private func handleAppGroupReadProtectionClass(path: String?, result: @escaping FlutterResult) {
+    guard let target = appGroupStorageAllowedPath(path, allowApplicationSupport: true) else {
+      result(FlutterError(
+        code: "path_not_allowed",
+        message: "Only items inside the App Group container or Application Support can be read.",
+        details: nil
+      ))
+      return
+    }
+    result(appGroupProtectionClassRawValue(atPath: target))
   }
 
   // MARK: - Inbound share (U4)
@@ -1945,6 +2445,18 @@ import UserNotifications
         self.openAppSettings(result: result)
       case "setBadgeCount":
         self.handleSetBadgeCount(call: call, result: result)
+      case "deliveredRemoteEventIds":
+        self.handleDeliveredRemoteEventIds(result: result)
+      case "takePendingRemoteWake":
+        self.handleTakePendingRemoteWake(result: result)
+      case "remoteWakeElapsed":
+        self.handleRemoteWakeElapsed(call: call, result: result)
+      case "completeRemoteWake":
+        self.handleCompleteRemoteWake(call: call, result: result)
+      case "removeDeliveredRemoteNotification":
+        self.handleRemoveDeliveredRemoteNotification(call: call, result: result)
+      case "removeDeliveredRemoteNotificationsForRoom":
+        self.handleRemoveDeliveredRemoteNotificationsForRoom(call: call, result: result)
       default:
         result(FlutterMethodNotImplemented)
       }
@@ -2460,6 +2972,15 @@ import UserNotifications
     // containment guard is the point: this method sets a file-protection
     // attribute on a caller-supplied path, so it must never accept an arbitrary
     // one.
+    // Containment compares RESOLVED paths on both sides (S&C 2026-09-05):
+    // `standardizedFileURL` folds `.` and `..` but leaves symlinks alone, so
+    // a link inside the preview directory pointing outside it would have
+    // passed the prefix check and had its target's attribute changed.
+    // `resolvingSymlinksInPath` follows links on the root (the caches
+    // directory is itself reached through `/private` on device) and on the
+    // candidate, so the comparison is between the real locations. A missing
+    // candidate still fails: it resolves to itself and then fails the
+    // existence check, as before.
     let previewDirectoryName = "intergalactic-notification-previews"
     let allowedRoots =
       ([NSTemporaryDirectory()]
@@ -2467,9 +2988,9 @@ import UserNotifications
       .map {
         URL(fileURLWithPath: $0, isDirectory: true)
           .appendingPathComponent(previewDirectoryName, isDirectory: true)
-          .standardizedFileURL.path + "/"
+          .standardizedFileURL.resolvingSymlinksInPath().path + "/"
       }
-    let candidate = URL(fileURLWithPath: path).standardizedFileURL
+    let candidate = URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath()
     guard allowedRoots.contains(where: { candidate.path.hasPrefix($0) }),
       FileManager.default.fileExists(atPath: candidate.path)
     else {
@@ -2553,10 +3074,118 @@ import UserNotifications
     result(false)
   }
 
+  // MARK: - Background execution assertions
+
+  /// One `beginBackgroundTask` assertion, keyed by an opaque token.
+  ///
+  /// The general primitive. It was extracted from the notification-response
+  /// path below, which is now one consumer of it; the database release
+  /// trigger (B5) is the other, through the `background_assertion` channel.
+  /// Both need the same bounded window of execution after the app is
+  /// backgrounded, and one registry means the two cannot drift apart in how
+  /// they begin, end, or expire.
+  private struct BackgroundAssertion {
+    let identifier: UIBackgroundTaskIdentifier
+    let name: String
+    /// Called when iOS reclaims the time, BEFORE the assertion is ended, so a
+    /// consumer can finish its own bookkeeping.
+    let onExpired: (() -> Void)?
+  }
+
+  private var backgroundAssertions: [String: BackgroundAssertion] = [:]
+
+  /// Returns the token, or nil when iOS declined (`.invalid`). A declined
+  /// assertion is a normal outcome the caller must handle by proceeding
+  /// without one, not an error.
+  private func beginBackgroundAssertion(
+    name: String,
+    onExpired: (() -> Void)? = nil
+  ) -> String? {
+    let token = UUID().uuidString
+    var identifier = UIBackgroundTaskIdentifier.invalid
+    identifier = UIApplication.shared.beginBackgroundTask(withName: name) { [weak self] in
+      self?.expireBackgroundAssertion(token: token)
+    }
+
+    guard identifier != .invalid else {
+      NSLog("intergalactic_ios_background_assertion result=unavailable name=%@", name)
+      return nil
+    }
+
+    backgroundAssertions[token] = BackgroundAssertion(
+      identifier: identifier,
+      name: name,
+      onExpired: onExpired
+    )
+    NSLog("intergalactic_ios_background_assertion result=began name=%@", name)
+    return token
+  }
+
+  private func endBackgroundAssertion(token: String, reason: String) {
+    guard let assertion = backgroundAssertions.removeValue(forKey: token) else {
+      return
+    }
+
+    NSLog(
+      "intergalactic_ios_background_assertion result=ended name=%@ reason=%@",
+      assertion.name,
+      reason
+    )
+    UIApplication.shared.endBackgroundTask(assertion.identifier)
+  }
+
+  private func expireBackgroundAssertion(token: String) {
+    guard let assertion = backgroundAssertions[token] else {
+      return
+    }
+    // The consumer's handler may end the assertion itself (the notification
+    // path does, through its own end routine). Ending again afterwards is a
+    // no-op because the entry is already gone.
+    assertion.onExpired?()
+    endBackgroundAssertion(token: token, reason: "expired")
+  }
+
+  private func configureBackgroundAssertionChannel(binaryMessenger: FlutterBinaryMessenger) {
+    let channel = FlutterMethodChannel(
+      name: backgroundAssertionChannelName,
+      binaryMessenger: binaryMessenger
+    )
+    channel.setMethodCallHandler { [weak self] call, result in
+      guard let self = self else {
+        result(FlutterError(
+          code: "background_assertion_unavailable",
+          message: "Background assertion bridge unavailable.",
+          details: nil
+        ))
+        return
+      }
+
+      let arguments = call.arguments as? [String: Any]
+      switch call.method {
+      case "begin":
+        let name = arguments?["name"] as? String ?? "intergalactic.background-work"
+        result(self.beginBackgroundAssertion(name: name))
+      case "end":
+        guard let token = arguments?["token"] as? String, !token.isEmpty else {
+          result(FlutterError(
+            code: "background_assertion_bad_token",
+            message: "A background assertion token is required to end it.",
+            details: nil
+          ))
+          return
+        }
+        self.endBackgroundAssertion(token: token, reason: "ended")
+        result(nil)
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+  }
+
   // MARK: - Notification response background assertion
 
   private struct NotificationResponseTask {
-    let identifier: UIBackgroundTaskIdentifier
+    let assertionToken: String
     let completionHandler: () -> Void
   }
 
@@ -2567,6 +3196,9 @@ import UserNotifications
   /// assertion. `pendingNotificationResponses` is now a queue keyed the same
   /// way, so the two agree: an entry in either is removed by response id, and
   /// the acknowledgement is a safe end condition for both.
+  ///
+  /// The assertion itself lives in the general registry above; this map only
+  /// pairs it with the completion handler iOS is waiting on.
   private var notificationResponseTasks: [String: NotificationResponseTask] = [:]
 
   private func beginNotificationResponseTask(
@@ -2583,9 +3215,8 @@ import UserNotifications
     // A response id arriving twice would strand the first assertion.
     endNotificationResponseTask(responseId: responseId, reason: "superseded")
 
-    var identifier = UIBackgroundTaskIdentifier.invalid
-    identifier = UIApplication.shared.beginBackgroundTask(
-      withName: "intergalactic.notification-response"
+    let token = beginBackgroundAssertion(
+      name: "intergalactic.notification-response"
     ) { [weak self] in
       // iOS is reclaiming the time. Deliver the completion handler and drop the
       // assertion; the reply itself falls back to the resume drain, which is
@@ -2593,14 +3224,14 @@ import UserNotifications
       self?.endNotificationResponseTask(responseId: responseId, reason: "expired")
     }
 
-    guard identifier != .invalid else {
+    guard let token else {
       NSLog("intergalactic_ios_notification_response_task result=unavailable")
       completionHandler()
       return
     }
 
     notificationResponseTasks[responseId] = NotificationResponseTask(
-      identifier: identifier,
+      assertionToken: token,
       completionHandler: completionHandler
     )
     NSLog("intergalactic_ios_notification_response_task result=began")
@@ -2617,7 +3248,7 @@ import UserNotifications
     )
     // Order matters: tell iOS the work is done, then release the assertion.
     task.completionHandler()
-    UIApplication.shared.endBackgroundTask(task.identifier)
+    endBackgroundAssertion(token: task.assertionToken, reason: reason)
   }
 
   #if DEBUG || IOS_NOTIFICATION_DEBUG_HARNESS

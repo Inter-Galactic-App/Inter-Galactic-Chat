@@ -1,4 +1,10 @@
 {
+  "notificationAttachmentSentImage": "تم إرسال صورة",
+  "notificationAttachmentSentVideo": "تم إرسال فيديو",
+  "notificationAttachmentSentAudio": "تم إرسال رسالة صوتية",
+  "notificationAttachmentSentFile": "تم إرسال ملف",
+  "notificationAttachmentSharedLocation": "تمت مشاركة موقع",
+  "notificationAttachmentSentSticker": "تم إرسال ملصق",
   "promptHomeserver": "الخادوم الرئيسي",
   "@promptHomeserver": {
     "description": "Placeholder text for homeserver field on login form",

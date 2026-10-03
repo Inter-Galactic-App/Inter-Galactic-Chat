@@ -213,18 +213,27 @@ class _VoipDeveloperSettingsState
                       unawaited(_onNoiseSuppressionHookModeChanged(mode));
                     },
                   ),
-                  // These two ride in `NoiseSuppressionNativeConfig`, which is
-                  // delivered by the `configure` channel call - the one Android
-                  // rejects. Its Kotlin plugin has no transient-guard or Hush
-                  // stage at all, so on Android these toggles would flip a
-                  // preference that no native code ever reads. Gate them on the
-                  // platform accepting a configuration contract, not on it
-                  // merely having a backend. What stays visible around them on
+                  // The transient guard rides in `NoiseSuppressionNativeConfig`, which is
+                  // delivered by the `configure` channel call - the one
+                  // Android rejects. Its Kotlin plugin has no transient-guard
+                  // stage, so on Android its toggle would flip a preference
+                  // that no native code ever reads. Gate it on the platform
+                  // accepting a configuration contract, not on it
+                  // merely having a backend. What stays visible around it on
                   // Android: the hook-mode picker above and the tap-order
                   // picker, capture-frontend controls and status readouts
                   // below. The stage-capture tool is NOT among them - it lives
                   // in the RNNoise-tuning section because Android does not
                   // implement its channel either.
+                  //
+                  // REVIEW, 2026-09-12 (queue row "Hush is the only defence
+                  // against TV dialogue..."): the Hush toggle that used to sit
+                  // here moved to the normal (non-developer) settings build
+                  // below, per an owner decision - it is the only mechanism
+                  // that removes other people's voices or a television from a
+                  // call, and it was reachable only behind Developer mode.
+                  // Hush and loud-speech guard stability are user-facing;
+                  // only the transient experiment remains here.
                   if (supportsRnnoiseTuning) ...[
                     BooleanPreferenceToggle(
                       preference: preferences
@@ -232,16 +241,6 @@ class _VoipDeveloperSettingsState
                       title: 'Transient click guard',
                       description:
                           'Experimental post-DeepFilterNet layer for short keyboard and mouse spikes. Leave off to compare Enhanced DeepFilterNet alone.',
-                      onChanged: (_) {
-                        unawaited(_applyNoiseSuppressionSettings());
-                      },
-                    ),
-                    BooleanPreferenceToggle(
-                      preference: preferences
-                          .voipNoiseSuppressionDeepFilterNetHushSuppression,
-                      title: 'Hush voice isolation',
-                      description:
-                          'Experimental post-DeepFilterNet support layer for background voices and speaker bleed. Leave off to compare Enhanced DeepFilterNet alone.',
                       onChanged: (_) {
                         unawaited(_applyNoiseSuppressionSettings());
                       },
@@ -861,6 +860,47 @@ abstract class _VoipSettingsPageBase<T extends StatefulWidget>
     desc: "Description for the affected-user RNNoise compatibility toggle",
   );
 
+  String get labelVoipNoiseSuppressionHush => Intl.message(
+    "Hush voice isolation",
+    name: "labelVoipNoiseSuppressionHush",
+    desc: "Title for the Hush background-voice suppression toggle",
+  );
+
+  String get labelVoipLoudSpeechGuardStability => Intl.message(
+    'Loud-speech guard stability',
+    name: 'labelVoipLoudSpeechGuardStability',
+    desc: 'Title for the opt-in Windows loud-speech guard stability toggle',
+  );
+
+  String get labelVoipLoudSpeechGuardStabilityDescription => Intl.message(
+    'Helps prevent flutter or popping when loud sounds make Enhanced noise suppression repeatedly switch speech protection on and off. Off keeps the current behavior. Turn it off if voices sound worse.',
+    name: 'labelVoipLoudSpeechGuardStabilityDescription',
+    desc:
+        'Description for the opt-in Windows loud-speech guard stability toggle',
+  );
+
+  // REVIEW, 2026-09-12 (queue row "Hush is the only defence against TV
+  // dialogue, and it is off by default"): Enhanced DeepFilterNet alone does
+  // not remove other people's speech, or a television, from a call - it is
+  // right not to, since that IS speech. Hush is the only mechanism that
+  // does, and until now it was reachable only behind Developer mode, so
+  // nobody without it enabled got the benefit. Wording is AUDIO's, who has
+  // the measurements: on the affected user's capture, Enhanced alone passed
+  // TV dialogue at about -32 dB against the speaker at -20 dB, and Hush took
+  // it to -77 dB. Cost: roughly double the noise-suppression work per 10ms
+  // of microphone audio - lab 10.6ms against a 10ms budget with 124 misses,
+  // versus 3.7-4.4ms and zero for Enhanced alone; that user's own 20-minute
+  // call logged 162 missed frames (0.13%) while screen-sharing at 1080p60.
+  // The user separately reported choppy, robotic audio under heavier
+  // gaming+streaming load, but AUDIO has not yet reproduced that with a
+  // capture - the description below says "can", not "will", on purpose.
+  // This is a visibility change only: the preference's default stays off.
+  String get labelVoipNoiseSuppressionHushDescription => Intl.message(
+    "Removes other people's voices - a TV, people talking nearby, sound from your speakers - that Enhanced noise suppression lets through. Uses noticeably more CPU: on a busy computer, such as while gaming or streaming, it can make your own audio choppy. Best left off unless there is a lot of background talk near your microphone.",
+    name: "labelVoipNoiseSuppressionHushDescription",
+    desc: "Description for the Hush background-voice suppression toggle",
+  );
+
   String get labelVoipNoiseSuppressionFallbackNotice => Intl.message(
     "Native noise suppression is not active on this device right now, so calls will continue without the extra suppression layer.",
     name: "labelVoipNoiseSuppressionFallbackNotice",
@@ -1106,6 +1146,14 @@ abstract class _VoipSettingsPageBase<T extends StatefulWidget>
         if (preferences.streamAdaptiveFallbackEnabled.value) {
           unawaited(preferences.streamAdaptiveFallbackEnabled.set(false));
         }
+        // REVIEW, 2026-09-12 (queue row "Hush is the only defence against TV
+        // dialogue..."): Hush moved to normal settings and is no longer one
+        // of the "hidden developer diagnostics" this reset exists for - it
+        // used to be listed here too, which meant a normal user turning Hush
+        // on with Developer mode off had it silently reset back off on the
+        // very next preference-changed broadcast (the one the toggle itself
+        // fires). Removed from both this trigger and
+        // _resetHiddenDeveloperNoiseSuppressionDiagnostics below.
         if (preferences.voipAudioCaptureDebugOverride.value ||
             preferences.voipAudioCaptureTapOrderScenario.value !=
                 NoiseSuppressionTapOrderScenario.manual ||
@@ -1113,9 +1161,6 @@ abstract class _VoipSettingsPageBase<T extends StatefulWidget>
                 NoiseSuppressionService.diagnosticEnhancedBackendModeKey ||
             preferences
                 .voipNoiseSuppressionDeepFilterNetTransientSuppression
-                .value ||
-            preferences
-                .voipNoiseSuppressionDeepFilterNetHushSuppression
                 .value) {
           unawaited(_resetHiddenDeveloperNoiseSuppressionDiagnostics());
         }
@@ -1261,6 +1306,38 @@ abstract class _VoipSettingsPageBase<T extends StatefulWidget>
                     title: labelVoipNoiseSuppressionCompatibilityMode,
                     description:
                         labelVoipNoiseSuppressionCompatibilityModeDescription,
+                    onChanged: (_) async {
+                      await _applyNoiseSuppressionSettings(
+                        refreshMicCheckCapture: true,
+                      );
+                    },
+                  ),
+                // Same platform gate as the developer-only controls just
+                // below it in this file: Hush rides in
+                // NoiseSuppressionNativeConfig, delivered by the `configure`
+                // channel call Android rejects, so it stays off Android's
+                // toggle set entirely rather than flip a preference no
+                // native code reads.
+                if (supportsRnnoiseTuning &&
+                    preferences.voipNoiseSuppressionEnabled.value)
+                  BooleanPreferenceToggle(
+                    preference: preferences
+                        .voipNoiseSuppressionDeepFilterNetHushSuppression,
+                    title: labelVoipNoiseSuppressionHush,
+                    description: labelVoipNoiseSuppressionHushDescription,
+                    onChanged: (_) async {
+                      await _applyNoiseSuppressionSettings(
+                        refreshMicCheckCapture: true,
+                      );
+                    },
+                  ),
+                if (PlatformUtils.isWindows &&
+                    preferences.voipNoiseSuppressionEnabled.value)
+                  BooleanPreferenceToggle(
+                    preference: preferences
+                        .voipNoiseSuppressionDeepFilterNetSpeechProtectHysteresis,
+                    title: labelVoipLoudSpeechGuardStability,
+                    description: labelVoipLoudSpeechGuardStabilityDescription,
                     onChanged: (_) async {
                       await _applyNoiseSuppressionSettings(
                         refreshMicCheckCapture: true,
@@ -1872,23 +1949,20 @@ abstract class _VoipSettingsPageBase<T extends StatefulWidget>
         NoiseSuppressionService.diagnosticEnhancedBackendModeKey,
       );
     }
-    // The optional post-DeepFilterNet layers are developer-only experiments
-    // that persist in preferences and are applied natively without a developer
-    // gate. Leaving developer mode must return the microphone to the Enhanced
-    // DeepFilterNet-only baseline so an abandoned dev override cannot keep
-    // distorting speech with no easy way to reset it.
+    // The transient-click guard is a developer-only experiment that persists
+    // in preferences. Leaving developer mode must restore the Enhanced
+    // DeepFilterNet baseline so an abandoned override cannot keep
+    // distorting speech with no easy way to reset it. Hush used to be reset
+    // here too, until it moved to normal settings (REVIEW, 2026-09-12,
+    // queue row "Hush is the only defence against TV dialogue...") - it is a
+    // user-facing preference now and must survive developer mode being off,
+    // the same as every other normal-settings toggle in this file.
     var resetEnhancedSupportLayers = false;
     if (preferences
         .voipNoiseSuppressionDeepFilterNetTransientSuppression
         .value) {
       await preferences.voipNoiseSuppressionDeepFilterNetTransientSuppression
           .set(false);
-      resetEnhancedSupportLayers = true;
-    }
-    if (preferences.voipNoiseSuppressionDeepFilterNetHushSuppression.value) {
-      await preferences.voipNoiseSuppressionDeepFilterNetHushSuppression.set(
-        false,
-      );
       resetEnhancedSupportLayers = true;
     }
     await NoiseSuppressionService.instance.applyDiagnosticHookMode(null);

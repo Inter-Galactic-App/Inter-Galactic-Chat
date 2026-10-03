@@ -3,13 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:intergalactic/ui/onboarding/tutorial_anchor.dart';
 
-enum TutorialArrowDirection {
-  none,
-  left,
-  right,
-  up,
-  down,
-}
+enum TutorialArrowDirection { none, left, right, up, down }
 
 class TutorialFocusSpec {
   const TutorialFocusSpec({
@@ -42,10 +36,7 @@ class TutorialFocusSpec {
 }
 
 class TutorialFocusOverlay extends StatelessWidget {
-  const TutorialFocusOverlay({
-    required this.focus,
-    super.key,
-  });
+  const TutorialFocusOverlay({required this.focus, super.key});
 
   final TutorialFocusSpec focus;
 
@@ -64,8 +55,9 @@ class TutorialFocusOverlay extends StatelessWidget {
         return _TutorialFocusLayout(
           focus: focus,
           scheme: scheme,
-          measuredRect:
-              focus.anchorId == null ? null : registry.rectFor(focus.anchorId!),
+          measuredRect: focus.anchorId == null
+              ? null
+              : registry.rectFor(focus.anchorId!),
         );
       },
     );
@@ -89,8 +81,18 @@ class _TutorialFocusLayout extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final canvas = Size(constraints.maxWidth, constraints.maxHeight);
-          final measured =
-              measuredRect == null ? null : _withPadding(measuredRect!);
+          final measured = measuredRect == null
+              ? null
+              : _withPadding(measuredRect!);
+
+          // Anchored scenes wait for their concrete surface to report a
+          // rectangle. Falling back to static mobile geometry while a panel is
+          // animating produces a visibly wrong spotlight, which is worse than
+          // one frame without a highlight.
+          if (focus.anchorId != null && measured == null) {
+            return const SizedBox.expand();
+          }
+
           final rect = measured == null
               ? _rectForFocus(canvas, focus)
               : _clampRectToCanvas(measured, canvas);
@@ -183,10 +185,13 @@ class _TutorialFocusLayout extends StatelessWidget {
     if (hasStart || hasEnd) {
       final resolvedStart = start ?? marginStart;
       final resolvedEnd = end ?? marginEnd;
-      final available =
-          math.max(0.0, canvasExtent - resolvedStart - resolvedEnd);
-      final resolvedExtent =
-          hasStart && hasEnd ? available : math.min(extent, available);
+      final available = math.max(
+        0.0,
+        canvasExtent - resolvedStart - resolvedEnd,
+      );
+      final resolvedExtent = hasStart && hasEnd
+          ? available
+          : math.min(extent, available);
       final offset = hasStart
           ? resolvedStart
           : math.max(0.0, canvasExtent - resolvedEnd - resolvedExtent);
@@ -297,11 +302,7 @@ class _TutorialArrow extends StatelessWidget {
         ),
         child: Padding(
           padding: const EdgeInsets.all(8),
-          child: Icon(
-            icon,
-            color: scheme.onSurface,
-            size: 28,
-          ),
+          child: Icon(icon, color: scheme.onSurface, size: 28),
         ),
       ),
     );
@@ -309,15 +310,23 @@ class _TutorialArrow extends StatelessWidget {
 
   Offset _positionForDirection(TutorialArrowDirection direction, Rect rect) {
     return switch (direction) {
-      TutorialArrowDirection.left =>
-        Offset(rect.right + 14, rect.center.dy - 22),
-      TutorialArrowDirection.right =>
-        Offset(rect.left - 58, rect.center.dy - 22),
-      TutorialArrowDirection.up =>
-        Offset(rect.center.dx - 22, rect.bottom + 14),
+      TutorialArrowDirection.left => Offset(
+        rect.right + 14,
+        rect.center.dy - 22,
+      ),
+      TutorialArrowDirection.right => Offset(
+        rect.left - 58,
+        rect.center.dy - 22,
+      ),
+      TutorialArrowDirection.up => Offset(
+        rect.center.dx - 22,
+        rect.bottom + 14,
+      ),
       TutorialArrowDirection.down => Offset(rect.center.dx - 22, rect.top - 58),
-      TutorialArrowDirection.none =>
-        Offset(rect.right + 14, rect.center.dy - 22),
+      TutorialArrowDirection.none => Offset(
+        rect.right + 14,
+        rect.center.dy - 22,
+      ),
     };
   }
 

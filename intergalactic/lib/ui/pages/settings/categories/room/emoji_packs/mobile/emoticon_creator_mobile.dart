@@ -235,8 +235,8 @@ class _EmoticonCreatorMobileState extends State<EmoticonCreatorMobile> {
             child: EmoticonImagePickTile(
               image: controller.image,
               tooltip: hasSource
-                  ? EmoticonCreatorStrings.promptChangePhoto
-                  : EmoticonCreatorStrings.promptSelectPhoto,
+                  ? EmoticonCreatorStrings.promptEmoticonCreatorChangePhoto
+                  : EmoticonCreatorStrings.promptEmoticonCreatorSelectPhoto,
               onTap: _pickSourceImage,
             ),
           ),
@@ -263,7 +263,7 @@ class _EmoticonCreatorMobileState extends State<EmoticonCreatorMobile> {
                       vertical: 6,
                     ),
                     child: Text(
-                      EmoticonCreatorStrings.promptCropPhoto,
+                      EmoticonCreatorStrings.promptEmoticonCreatorCropPhoto,
                       style: Theme.of(context).textTheme.labelSmall,
                     ),
                   ),
@@ -363,7 +363,7 @@ class _EmoticonCreatorMobileState extends State<EmoticonCreatorMobile> {
               const SizedBox(width: 8),
               Flexible(
                 child: Text(
-                  '${EmoticonCreatorStrings.promptAdvancedEdit} — cutout & brush',
+                  '${EmoticonCreatorStrings.promptEmoticonCreatorAdvancedEdit} — cutout & brush',
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.labelLarge?.copyWith(
                     color: theme.colorScheme.onSurface,

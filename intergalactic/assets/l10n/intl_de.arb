@@ -1,4 +1,10 @@
 {
+  "notificationAttachmentSentImage": "Ein Bild gesendet",
+  "notificationAttachmentSentVideo": "Ein Video gesendet",
+  "notificationAttachmentSentAudio": "Eine Audionachricht gesendet",
+  "notificationAttachmentSentFile": "Eine Datei gesendet",
+  "notificationAttachmentSharedLocation": "Einen Standort geteilt",
+  "notificationAttachmentSentSticker": "Einen Sticker gesendet",
   "messagePlaceholderUserJoinedRoom": "{user} ist dem Raum beigetreten!",
   "@messagePlaceholderUserJoinedRoom": {
     "description": "Message body for when a user joins the room",

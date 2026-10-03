@@ -125,18 +125,57 @@ class TimelineViewEntryState extends State<TimelineViewEntry>
     threads = widget.timeline.room.client.getComponent<ThreadsComponent>();
     polls = widget.timeline.client.getComponent<PollComponent>();
 
+    // Guarded separately from `loadState`, and BEFORE it: this read runs first
+    // and would throw on a fresh mount at a stale index, so the guard inside
+    // `loadState` never gets the chance. A row whose index does not resolve is
+    // not a thread reply, which is also what an absent `threads` component
+    // yields.
+    final initialIndexResolves =
+        widget.initialIndex >= 0 &&
+        widget.initialIndex < widget.timeline.events.length;
     isThreadReply =
-        threads?.isEventInResponseToThread(
-          widget.timeline.events[widget.initialIndex],
-          widget.timeline,
-        ) ??
-        false;
+        initialIndexResolves &&
+        (threads?.isEventInResponseToThread(
+              widget.timeline.events[widget.initialIndex],
+              widget.timeline,
+            ) ??
+            false);
 
     loadState(widget.initialIndex);
     super.initState();
   }
 
   void loadState(int eventIndex) {
+    // Not for the `update()` path: that loop is bounded by
+    // `timeline.events.length` in `onRoomUpdated`, so the index it passes is
+    // always in range.
+    //
+    // CORRECTED. This comment previously said the window was
+    // `Timeline.removeEvent` calling `onRemove.add(index)` and having the
+    // listener run on a LATER MICROTASK while `events.removeAt(index)` had
+    // already shortened the list. That is wrong: all three controllers are
+    // `StreamController.broadcast(sync: true)` (timeline.dart:66-68), so the
+    // listener runs BEFORE the removal. `onEventRemoved`'s own
+    // `assert(timeline.events[index].eventId == removed.$2)` proves it - that
+    // assertion only holds while the list is still long.
+    //
+    // The real mechanism is staleness, not a race. This class has no
+    // `didUpdateWidget`, so `index` is refreshed only by `initState` and
+    // `update()`. `onEventRemoved` shrinks `eventKeys` and `recentItemsCount`
+    // and calls `setState`, but never calls `update()`. So after a removal
+    // every mounted entry below the removed row keeps an index one too large,
+    // and the entry that was last ends up with exactly `index ==
+    // events.length` - which it then hands to the event views below.
+    //
+    // `redacted` is what `build` already short-circuits on, so reusing it is
+    // the whole remedy: an index with no event renders as an empty row rather
+    // than as the neighbouring message, the same choice the views below make.
+    if (eventIndex < 0 || eventIndex >= widget.timeline.events.length) {
+      redacted = true;
+      index = eventIndex;
+      return;
+    }
+
     var event = widget.timeline.events[eventIndex];
     redacted = widget.timeline.isEventRedacted(event);
 
@@ -450,15 +489,7 @@ class TimelineViewEntryState extends State<TimelineViewEntry>
 
     result = DecoratedBox(
       decoration: highlighted
-          ? BoxDecoration(
-              border: Border(
-                left: BorderSide(
-                  color: Theme.of(context).colorScheme.primary,
-                  width: 3,
-                ),
-              ),
-              color: Theme.of(context).colorScheme.surfaceContainer,
-            )
+          ? highlightDecoration(Theme.of(context).colorScheme)
           : const BoxDecoration(),
       child: result,
     );
@@ -594,7 +625,11 @@ class TimelineViewEntryState extends State<TimelineViewEntry>
       );
 
     if (_widgetType == TimelineEventWidgetDisplayType.poll) {
-      return TimelineEventViewPoll(index: index, timeline: widget.timeline);
+      return TimelineEventViewPoll(
+        index: index,
+        timeline: widget.timeline,
+        updateRevision: eventUpdateRevision,
+      );
     }
 
     if (_widgetType == TimelineEventWidgetDisplayType.hidden) {
@@ -638,6 +673,31 @@ class TimelineViewEntryState extends State<TimelineViewEntry>
       });
   }
 
+  /// Decoration for the row a jump-to-message landed on.
+  ///
+  /// Two constraints, and they pull against each other.
+  ///
+  /// The fill must be TRANSLUCENT. A custom message background image is painted
+  /// behind the whole timeline, so the opaque `surfaceContainer` this used to
+  /// carry did not tint the highlighted row - it replaced the user's wallpaper
+  /// for that row with the default theme colour.
+  ///
+  /// The fill must come off the SURFACE RAMP, not from `primary`. Every colour
+  /// role here is independently user-authored in a custom theme
+  /// (`previewThemeForCustomDraft`) and nothing in this app validates contrast,
+  /// so a `primary` wash under body text has no bound anyone can reason about.
+  /// The surface roles at least share the job `onSurface` text is already read
+  /// against. `surfaceContainerHighest` at 0.4 lands within a few thousandths
+  /// of the old opaque fill's luminance delta in every bundled theme while
+  /// letting 60% of the wallpaper through.
+  ///
+  /// The accent border stays fully opaque: it is the part of the cue that
+  /// survives any wallpaper, which is why the fill does not have to be strong.
+  static BoxDecoration highlightDecoration(ColorScheme colors) => BoxDecoration(
+    border: Border(left: BorderSide(color: colors.primary, width: 3)),
+    color: colors.surfaceContainerHighest.withValues(alpha: 0.4),
+  );
+
   void setHighlighted(bool value) {
     if (mounted)
       setState(() {
@@ -680,8 +740,8 @@ class _TimelineQuickReactionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: label,
+    return tiamat.Tooltip(
+      text: label,
       excludeFromSemantics: true,
       child: Semantics(
         button: true,

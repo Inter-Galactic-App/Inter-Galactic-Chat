@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intergalactic/client/demo/demo_client.dart';
+import 'package:intergalactic/config/layout_config.dart';
 import 'package:intergalactic/ui/onboarding/tutorial_anchor.dart';
 import 'package:intergalactic/ui/onboarding/tutorial_focus_overlay.dart';
 
@@ -59,10 +60,19 @@ enum TutorialCardPlacement {
   bottomRight,
 }
 
-enum TutorialDemoSidePanel {
-  defaultView,
-  thread,
-}
+enum TutorialDemoSidePanel { defaultView, thread }
+
+/// Which side of the mobile shell's `OverlappingPanels` a scene reveals.
+///
+/// Desktop shows everything on one screen, so its scenes never had to say
+/// where the user is looking. Mobile is a three-panel shell, and a step that
+/// spotlights the room list is meaningless with the chat revealed.
+enum TutorialMobilePanel { navigation, main, roomPanel }
+
+/// Where the mobile tutorial sheet sits. `top` is for scenes whose target is
+/// in the lower half of the screen (composer, popups, user panel), so the
+/// sheet never covers what it is pointing at.
+enum TutorialMobileCardPlacement { bottom, top }
 
 class TutorialSceneSpec {
   const TutorialSceneSpec({
@@ -76,6 +86,8 @@ class TutorialSceneSpec {
     this.cardPlacement = TutorialCardPlacement.bottomRight,
     this.hideTutorialCard = false,
     this.autoAdvanceAfter,
+    this.mobilePanel = TutorialMobilePanel.main,
+    this.mobileCardPlacement = TutorialMobileCardPlacement.bottom,
   });
 
   final String roomId;
@@ -88,12 +100,15 @@ class TutorialSceneSpec {
   final TutorialCardPlacement cardPlacement;
   final bool hideTutorialCard;
   final Duration? autoAdvanceAfter;
+  final TutorialMobilePanel mobilePanel;
+  final TutorialMobileCardPlacement mobileCardPlacement;
 }
 
 const TutorialSceneSpec defaultTutorialScene = TutorialSceneSpec();
 
-TutorialSceneSpec tutorialSceneForStep(String id) =>
-    tutorialSceneSpecs[id] ?? defaultTutorialScene;
+TutorialSceneSpec tutorialSceneForStep(String id) => Layout.mobile
+    ? mobileTutorialSceneSpecs[id] ?? defaultTutorialScene
+    : tutorialSceneSpecs[id] ?? defaultTutorialScene;
 
 const TutorialFocusSpec _spaceRailFocus = TutorialFocusSpec(
   alignment: Alignment.center,
@@ -543,5 +558,401 @@ const Map<String, TutorialSceneSpec> tutorialSceneSpecs = {
     overlay: TutorialDemoOverlay.tutorialReplay,
     focus: _tutorialReplayButtonFocus,
     cardPlacement: TutorialCardPlacement.topLeft,
+  ),
+};
+
+// ---------------------------------------------------------------------------
+// Mobile scenes.
+//
+// Same anchor ids as desktop, so the measured path is identical. Mobile
+// geometry remains edge-relative only for intentionally broad, unanchored
+// scenes. Anchored scenes wait for their actual surface rather than showing a
+// stale fallback while a panel transition is still in flight.
+// ---------------------------------------------------------------------------
+
+const TutorialFocusSpec _mobileSpaceRailFocus = TutorialFocusSpec(
+  alignment: Alignment.center,
+  width: 64,
+  height: 560,
+  anchorId: TutorialAnchorIds.spaceRail,
+  anchorPadding: EdgeInsets.all(4),
+  left: 6,
+  top: 60,
+  bottom: 100,
+  radius: 24,
+  arrowDirection: TutorialArrowDirection.left,
+);
+
+const TutorialFocusSpec _mobileRoomListFocus = TutorialFocusSpec(
+  alignment: Alignment.center,
+  width: 300,
+  height: 500,
+  anchorId: TutorialAnchorIds.roomList,
+  anchorPadding: EdgeInsets.all(4),
+  left: 72,
+  right: 6,
+  top: 104,
+  bottom: 100,
+  radius: 26,
+);
+
+const TutorialFocusSpec _mobileComposerFocus = TutorialFocusSpec(
+  alignment: Alignment.center,
+  width: 374,
+  height: 56,
+  anchorId: TutorialAnchorIds.composer,
+  anchorPadding: EdgeInsets.fromLTRB(4, 4, 4, 6),
+  left: 8,
+  right: 8,
+  bottom: 16,
+  radius: 30,
+  arrowDirection: TutorialArrowDirection.down,
+);
+
+const TutorialFocusSpec _mobileComposerPopupFocus = TutorialFocusSpec(
+  alignment: Alignment.center,
+  width: 374,
+  height: 300,
+  anchorId: TutorialAnchorIds.composerPopup,
+  anchorPadding: EdgeInsets.all(4),
+  left: 8,
+  right: 8,
+  bottom: 84,
+  radius: 30,
+  arrowDirection: TutorialArrowDirection.down,
+);
+
+const TutorialFocusSpec _mobileEffectsMenuFocus = TutorialFocusSpec(
+  alignment: Alignment.center,
+  width: 260,
+  height: 240,
+  anchorId: TutorialAnchorIds.effectsMenu,
+  anchorPadding: EdgeInsets.all(4),
+  right: 8,
+  bottom: 84,
+  radius: 22,
+  arrowDirection: TutorialArrowDirection.down,
+);
+
+const TutorialFocusSpec _mobileTimelineEffectFocus = TutorialFocusSpec(
+  alignment: Alignment.center,
+  width: 374,
+  height: 420,
+  anchorId: TutorialAnchorIds.timeline,
+  anchorPadding: EdgeInsets.all(4),
+  left: 8,
+  right: 8,
+  top: 120,
+  bottom: 90,
+  radius: 24,
+);
+
+const TutorialFocusSpec _mobileRoomSidePanelFocus = TutorialFocusSpec(
+  alignment: Alignment.center,
+  width: 368,
+  height: 620,
+  anchorId: TutorialAnchorIds.roomSidePanel,
+  anchorPadding: EdgeInsets.fromLTRB(4, 4, 0, 4),
+  left: 22,
+  right: 0,
+  top: 54,
+  bottom: 0,
+  radius: 30,
+);
+
+const TutorialFocusSpec _mobileEmoticonHeartFocus = TutorialFocusSpec(
+  alignment: Alignment.center,
+  width: 64,
+  height: 64,
+  anchorId: TutorialAnchorIds.emoticonHeart,
+  anchorPadding: EdgeInsets.all(6),
+  right: 24,
+  top: 200,
+  radius: 18,
+  arrowDirection: TutorialArrowDirection.right,
+);
+
+const TutorialFocusSpec _mobileCallControlsFocus = TutorialFocusSpec(
+  alignment: Alignment.center,
+  width: 374,
+  height: 520,
+  anchorId: TutorialAnchorIds.callView,
+  anchorPadding: EdgeInsets.all(8),
+  left: 8,
+  right: 8,
+  top: 120,
+  bottom: 90,
+  radius: 24,
+);
+
+const TutorialFocusSpec _mobileSoundboardPopupFocus = TutorialFocusSpec(
+  alignment: Alignment.center,
+  width: 366,
+  height: 340,
+  anchorId: TutorialAnchorIds.soundboardPopup,
+  anchorPadding: EdgeInsets.all(6),
+  left: 12,
+  right: 12,
+  bottom: 110,
+  radius: 24,
+  arrowDirection: TutorialArrowDirection.down,
+);
+
+const TutorialFocusSpec _mobileActivityCardFocus = TutorialFocusSpec(
+  alignment: Alignment.center,
+  width: 378,
+  height: 70,
+  anchorId: TutorialAnchorIds.activityCard,
+  anchorPadding: EdgeInsets.all(6),
+  left: 6,
+  right: 6,
+  bottom: 74,
+  radius: 20,
+  arrowDirection: TutorialArrowDirection.down,
+);
+
+const TutorialFocusSpec _mobileAccountPopupFocus = TutorialFocusSpec(
+  alignment: Alignment.center,
+  width: 378,
+  height: 420,
+  anchorId: TutorialAnchorIds.accountPopup,
+  anchorPadding: EdgeInsets.all(6),
+  left: 6,
+  right: 6,
+  bottom: 80,
+  radius: 24,
+  arrowDirection: TutorialArrowDirection.down,
+);
+
+const TutorialFocusSpec _mobileSecurityVerifyFocus = TutorialFocusSpec(
+  alignment: Alignment.center,
+  width: 342,
+  height: 76,
+  anchorId: TutorialAnchorIds.securityVerify,
+  anchorPadding: EdgeInsets.all(6),
+  left: 24,
+  right: 24,
+  top: 200,
+);
+
+const TutorialFocusSpec _mobileSecurityDecryptionFocus = TutorialFocusSpec(
+  alignment: Alignment.center,
+  width: 342,
+  height: 76,
+  anchorId: TutorialAnchorIds.securityDecryption,
+  anchorPadding: EdgeInsets.all(6),
+  left: 24,
+  right: 24,
+  top: 290,
+);
+
+const TutorialFocusSpec _mobileSecuritySessionsFocus = TutorialFocusSpec(
+  alignment: Alignment.center,
+  width: 342,
+  height: 160,
+  anchorId: TutorialAnchorIds.securitySessions,
+  anchorPadding: EdgeInsets.all(6),
+  left: 24,
+  right: 24,
+  top: 380,
+);
+
+const TutorialFocusSpec _mobileEncryptedRoomPadlockFocus = TutorialFocusSpec(
+  alignment: Alignment.center,
+  width: 56,
+  height: 56,
+  anchorId: TutorialAnchorIds.encryptedRoomPadlock,
+  anchorPadding: EdgeInsets.all(8),
+  right: 60,
+  top: 110,
+  radius: 16,
+  arrowDirection: TutorialArrowDirection.right,
+);
+
+const TutorialFocusSpec _mobileTutorialReplayButtonFocus = TutorialFocusSpec(
+  alignment: Alignment.center,
+  width: 190,
+  height: 56,
+  anchorId: TutorialAnchorIds.tutorialReplayButton,
+  anchorPadding: EdgeInsets.all(6),
+  left: 24,
+  top: 380,
+  radius: 16,
+  arrowDirection: TutorialArrowDirection.left,
+);
+
+/// Scene table for `mobileTutorialSteps`. Keyed by the same ids as the desktop
+/// table where a step carries over, so a reviewer can read this as a diff.
+const Map<String, TutorialSceneSpec> mobileTutorialSceneSpecs = {
+  'welcome-1': TutorialSceneSpec(
+    mobileCardPlacement: TutorialMobileCardPlacement.top,
+  ),
+  'mobile-navigation': TutorialSceneSpec(
+    mobilePanel: TutorialMobilePanel.navigation,
+    overlay: TutorialDemoOverlay.spaceRail,
+  ),
+  'spaces-1': TutorialSceneSpec(
+    mobilePanel: TutorialMobilePanel.navigation,
+    overlay: TutorialDemoOverlay.spaceRail,
+    focus: _mobileSpaceRailFocus,
+  ),
+  'spaces-2': TutorialSceneSpec(
+    mobilePanel: TutorialMobilePanel.navigation,
+    overlay: TutorialDemoOverlay.spaceRail,
+    focus: _mobileSpaceRailFocus,
+  ),
+  'rooms-1': TutorialSceneSpec(
+    mobilePanel: TutorialMobilePanel.navigation,
+    overlay: TutorialDemoOverlay.roomList,
+    focus: _mobileRoomListFocus,
+  ),
+  'rooms-chat': TutorialSceneSpec(
+    roomId: DemoClient.demoLoungeRoomId,
+    mobileCardPlacement: TutorialMobileCardPlacement.top,
+  ),
+  'rooms-forum': TutorialSceneSpec(roomId: DemoClient.demoForumRoomId),
+  'rooms-photo': TutorialSceneSpec(roomId: DemoClient.demoPhotoAlbumRoomId),
+  'rooms-calendar': TutorialSceneSpec(roomId: DemoClient.demoCalendarRoomId),
+  'rooms-voice': TutorialSceneSpec(roomId: DemoClient.demoVoiceRoomId),
+  'rooms-dms': TutorialSceneSpec(
+    initialSpaceId: null,
+    roomId: DemoClient.demoMiraDmRoomId,
+    mobilePanel: TutorialMobilePanel.navigation,
+    overlay: TutorialDemoOverlay.roomList,
+    focus: _mobileRoomListFocus,
+  ),
+  'messaging-1': TutorialSceneSpec(
+    overlay: TutorialDemoOverlay.composer,
+    focus: _mobileComposerFocus,
+    mobileCardPlacement: TutorialMobileCardPlacement.top,
+  ),
+  'messaging-menus': TutorialSceneSpec(
+    overlay: TutorialDemoOverlay.mediaMenuCycle,
+    focus: _mobileComposerPopupFocus,
+    mobileCardPlacement: TutorialMobileCardPlacement.top,
+  ),
+  'messaging-effects-intro': TutorialSceneSpec(
+    overlay: TutorialDemoOverlay.effectsMenu,
+    focus: _mobileEffectsMenuFocus,
+    mobileCardPlacement: TutorialMobileCardPlacement.top,
+  ),
+  'messaging-effects-demo': TutorialSceneSpec(
+    overlay: TutorialDemoOverlay.snowEffect,
+    focus: _mobileTimelineEffectFocus,
+    mobileCardPlacement: TutorialMobileCardPlacement.top,
+  ),
+  'messaging-nicknames': TutorialSceneSpec(
+    mobilePanel: TutorialMobilePanel.roomPanel,
+    overlay: TutorialDemoOverlay.membersNicknames,
+    sidePanel: TutorialDemoSidePanel.defaultView,
+    focus: _mobileRoomSidePanelFocus,
+  ),
+  'emoticons-room': TutorialSceneSpec(
+    roomId: DemoClient.demoLoungeRoomId,
+    settingsSurface: TutorialDemoSettingsSurface.roomEmoticons,
+  ),
+  'emoticons-heart': TutorialSceneSpec(
+    roomId: DemoClient.demoLoungeRoomId,
+    settingsSurface: TutorialDemoSettingsSurface.roomEmoticons,
+    focus: _mobileEmoticonHeartFocus,
+  ),
+  'emoticons-app': TutorialSceneSpec(
+    settingsSurface: TutorialDemoSettingsSurface.appEmoticons,
+  ),
+  'calls-settings': TutorialSceneSpec(
+    roomId: DemoClient.demoVoiceRoomId,
+    settingsSurface: TutorialDemoSettingsSurface.appVoiceAndVideo,
+  ),
+  'calls-controls': TutorialSceneSpec(
+    roomId: DemoClient.demoVoiceRoomId,
+    overlay: TutorialDemoOverlay.callMemberControls,
+    focus: _mobileCallControlsFocus,
+    mobileCardPlacement: TutorialMobileCardPlacement.top,
+  ),
+  'soundboard-popup': TutorialSceneSpec(
+    roomId: DemoClient.demoVoiceRoomId,
+    mobilePanel: TutorialMobilePanel.navigation,
+    overlay: TutorialDemoOverlay.soundboardPopup,
+    focus: _mobileSoundboardPopupFocus,
+    mobileCardPlacement: TutorialMobileCardPlacement.bottom,
+  ),
+  'soundboard-space': TutorialSceneSpec(
+    settingsSurface: TutorialDemoSettingsSurface.spaceSoundboard,
+  ),
+  'soundboard-app': TutorialSceneSpec(
+    settingsSurface: TutorialDemoSettingsSurface.appSoundboard,
+  ),
+  'notifications-settings': TutorialSceneSpec(
+    settingsSurface: TutorialDemoSettingsSurface.appNotifications,
+  ),
+  'notifications-overrides': TutorialSceneSpec(
+    settingsSurface: TutorialDemoSettingsSurface.appNotifications,
+  ),
+  'mobile-notifications': TutorialSceneSpec(
+    settingsSurface: TutorialDemoSettingsSurface.appNotifications,
+  ),
+  'customization-appearance': TutorialSceneSpec(
+    settingsSurface: TutorialDemoSettingsSurface.appAppearance,
+  ),
+  'customization-room': TutorialSceneSpec(
+    roomId: DemoClient.demoLoungeRoomId,
+    settingsSurface: TutorialDemoSettingsSurface.roomAppearance,
+  ),
+  'customization-theme-editor': TutorialSceneSpec(
+    settingsSurface: TutorialDemoSettingsSurface.themeEditor,
+  ),
+  'activity-settings': TutorialSceneSpec(
+    settingsSurface: TutorialDemoSettingsSurface.appActivity,
+  ),
+  'activity-card': TutorialSceneSpec(
+    mobilePanel: TutorialMobilePanel.navigation,
+    focus: _mobileActivityCardFocus,
+    mobileCardPlacement: TutorialMobileCardPlacement.top,
+  ),
+  'account-quick-access': TutorialSceneSpec(
+    mobilePanel: TutorialMobilePanel.navigation,
+    overlay: TutorialDemoOverlay.accountPopup,
+    focus: _mobileAccountPopupFocus,
+    mobileCardPlacement: TutorialMobileCardPlacement.top,
+  ),
+  'privacy-default': TutorialSceneSpec(
+    roomId: DemoClient.demoEncryptedRoomId,
+    mobileCardPlacement: TutorialMobileCardPlacement.top,
+  ),
+  'privacy-security-settings': TutorialSceneSpec(
+    settingsSurface: TutorialDemoSettingsSurface.accountSecurity,
+  ),
+  'privacy-verify': TutorialSceneSpec(
+    settingsSurface: TutorialDemoSettingsSurface.accountSecurity,
+    focus: _mobileSecurityVerifyFocus,
+  ),
+  'privacy-decryption': TutorialSceneSpec(
+    settingsSurface: TutorialDemoSettingsSurface.accountSecurity,
+    focus: _mobileSecurityDecryptionFocus,
+  ),
+  'privacy-sessions': TutorialSceneSpec(
+    settingsSurface: TutorialDemoSettingsSurface.accountSecurity,
+    focus: _mobileSecuritySessionsFocus,
+    mobileCardPlacement: TutorialMobileCardPlacement.top,
+  ),
+  'privacy-padlock': TutorialSceneSpec(
+    roomId: DemoClient.demoEncryptedRoomId,
+    mobilePanel: TutorialMobilePanel.roomPanel,
+    sidePanel: TutorialDemoSidePanel.defaultView,
+    focus: _mobileEncryptedRoomPadlockFocus,
+  ),
+  'help-safety': TutorialSceneSpec(
+    settingsSurface: TutorialDemoSettingsSurface.helpSafety,
+  ),
+  'help-report-bug': TutorialSceneSpec(
+    settingsSurface: TutorialDemoSettingsSurface.helpReportBug,
+  ),
+  'help-faq': TutorialSceneSpec(
+    settingsSurface: TutorialDemoSettingsSurface.helpFaq,
+  ),
+  'help-tutorial': TutorialSceneSpec(
+    settingsSurface: TutorialDemoSettingsSurface.helpTutorial,
+    overlay: TutorialDemoOverlay.tutorialReplay,
+    focus: _mobileTutorialReplayButtonFocus,
   ),
 };

@@ -311,8 +311,8 @@ class _InviteSheetCloseButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Align(
       alignment: Alignment.centerRight,
-      child: Tooltip(
-        message: "Close invite screen",
+      child: tiamat.Tooltip(
+        text: "Close invite screen",
         child: Semantics(
           button: true,
           label: "Close invite screen",

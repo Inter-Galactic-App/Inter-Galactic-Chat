@@ -22,6 +22,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intergalactic/client/matrix/components/voip_room/livekit_microphone_sender_gate.dart';
 import 'package:intergalactic/client/matrix/components/voip_room/livekit_room_teardown_barrier.dart';
+import 'package:intergalactic/client/matrix/components/voip_room/matrix_livekit_backend.dart';
 import 'package:intergalactic/client/matrix/components/voip_room/matrix_livekit_voip_session.dart';
 import 'package:intergalactic/config/platform_utils.dart';
 import 'package:livekit_client/livekit_client.dart' as lk;
@@ -62,6 +63,91 @@ void main() {
         LivekitMicrophoneSenderAttachment.detached,
       );
       expect(LivekitMicrophoneSenderGate.isDetached(publication), isTrue);
+    });
+
+    group('Push to Talk join arming', () {
+      // BUG-322 residual, raised by REVIEW: the decision that the join must
+      // publish rather than skip was covered, and the CALL SITE that acts on
+      // it was not. These assert the consequence a user would hear - whether
+      // the capture track is live - rather than the predicate.
+
+      test(
+        'enables the track once the sender is known to carry nothing',
+        () async {
+          final track = FakeLocalAudioTrack();
+          final publication = _microphonePublication(track: track);
+          track.attachSender();
+          await track.disable();
+
+          final armed =
+              await LivekitMicrophoneSenderGate.armPushToTalkJoinPublication(
+                publication: publication,
+                track: track,
+                source: 'test',
+              );
+
+          expect(armed.attachment, LivekitMicrophoneSenderAttachment.detached);
+          expect(armed.trackEnabled, isTrue);
+          expect(
+            track.mediaStreamTrack.enabled,
+            isTrue,
+            reason:
+                'the press has to carry audio, so the track is live once the '
+                'sender is detached and nothing can leave',
+          );
+        },
+      );
+
+      test('leaves the track disabled while the publication is still '
+          'negotiating', () async {
+        // No sender yet. `attachmentOf` calls that `unknown`, and it is the
+        // NORMAL state for a publication that has just come back from
+        // publishAudioTrack - so this is the common case, not an edge one.
+        final track = FakeLocalAudioTrack();
+        final publication = _microphonePublication(track: track);
+        await track.disable();
+
+        final armed =
+            await LivekitMicrophoneSenderGate.armPushToTalkJoinPublication(
+              publication: publication,
+              track: track,
+              source: 'test',
+            );
+
+        expect(armed.attachment, LivekitMicrophoneSenderAttachment.unknown);
+        expect(armed.trackEnabled, isFalse);
+        expect(
+          track.mediaStreamTrack.enabled,
+          isFalse,
+          reason:
+              'enabling here would put a LIVE microphone on a Push to Talk '
+              'join behind an indicator that reads muted',
+        );
+      });
+
+      test('leaves the track disabled when the detach itself failed', () async {
+        final track = FakeLocalAudioTrack();
+        final publication = _microphonePublication(track: track);
+        final sender = track.attachSender();
+        sender.replaceTrackError = StateError('replaceTrack failed');
+        await track.disable();
+
+        final armed =
+            await LivekitMicrophoneSenderGate.armPushToTalkJoinPublication(
+              publication: publication,
+              track: track,
+              source: 'test',
+            );
+
+        expect(armed.senderMoved, isFalse);
+        expect(armed.attachment, LivekitMicrophoneSenderAttachment.attached);
+        expect(armed.trackEnabled, isFalse);
+        expect(
+          track.mediaStreamTrack.enabled,
+          isFalse,
+          reason: 'the sender is still carrying the track, so audio would flow',
+        );
+      });
     });
 
     test('attachment is independent of the publication mute flag', () {
@@ -167,6 +253,50 @@ void main() {
         );
       },
     );
+  });
+
+  group('Push to Talk join publish outcome', () {
+    // BUG-322 residual. The join settles exactly one outcome string and the
+    // sender-reconcile diagnostics are its only reader. A create or publish
+    // failure was caught, logged, and then reported as
+    // `published_muted_push_to_talk_join` anyway - so the outcome claimed a
+    // publication the participant does not have, which is the one thing the
+    // diagnostics cannot work out for themselves.
+    //
+    // Neither native capture nor an SFU exists under flutter_test, so the
+    // publish here CANNOT succeed: `LocalAudioTrack.create` reaches an absent
+    // platform channel, and if it ever got past that the fake participant
+    // answers `publishAudioTrack` through noSuchMethod. Both are the real
+    // catch path, and the assertion is on what that path reported.
+    test('reports failed_push_to_talk_join_publish when nothing was '
+        'published', () async {
+      final backend = MatrixLivekitBackend(FakeCallMatrixRoom());
+      final participant = FakeLocalParticipant(identity: _aliceIdentity);
+      final enableState = MatrixLivekitInitialMicrophoneEnableState();
+
+      await backend.debugPublishInitialMicrophoneMutedForPushToTalkForTesting(
+        participant,
+        audioCaptureOptions: const lk.AudioCaptureOptions(),
+        initialMicrophoneEnableState: enableState,
+      );
+
+      expect(
+        participant.getTrackPublicationBySource(lk.TrackSource.microphone),
+        isNull,
+        reason: 'the premise: the publish did not happen',
+      );
+      expect(
+        enableState.initialEnableIsSettled,
+        isTrue,
+        reason:
+            'the join-time sender reconcile waits on this, so a failure that '
+            'settles nothing costs every Push to Talk join the full fallback',
+      );
+      expect(
+        enableState.initialEnableOutcome,
+        'failed_push_to_talk_join_publish',
+      );
+    });
   });
 
   group('MatrixLivekitInitialMicrophoneEnableState', () {
@@ -305,6 +435,104 @@ void main() {
       expect(sender.track, isNull);
     }, skip: _skipUnlessWindows);
 
+    test(
+      'a Push to Talk join is not unmuted by the join-time reconcile',
+      () async {
+        // BUG-320 x BUG-322, exercised rather than reasoned about because
+        // the failure mode if it is wrong is a LIVE MICROPHONE on a user who
+        // chose Push to Talk.
+        //
+        // BUG-320 added a join-time reconcile whose purpose is repairing
+        // DETACHED senders. BUG-322 makes a Push to Talk join publish with
+        // the sender detached ON PURPOSE - that is PTT's steady state on
+        // Windows. So the reconcile now runs against a publication that is
+        // detached deliberately, and the question is whether it 'repairs' it.
+        //
+        // Reasoning was not enough: a mutation on the reconcile branch showed
+        // an unsequenced reconcile computing direction=unmute on a
+        // publication reading muted=true, so the direction is not a simple
+        // read of the mute flag.
+        //
+        // WHAT THIS SCENARIO CANNOT CATCH, found by REVIEW running the
+        // mutation rather than taking the claim. `shouldUnmute` is computed as
+        // `!shouldMute && shouldReconcileUnmutedPublication(...)`, so the mute
+        // direction SHADOWS the unmute one. On a PTT join `shouldMute` is true
+        // - call active, desired disabled, `publication.muted` false as this
+        // scenario builds it - which makes `shouldUnmute` false whatever the
+        // predicate returns. Delete `_desiredMicrophoneEnabled` from that predicate and
+        // this scenario still passes, because the reconcile still takes the
+        // mute branch and still leaves the sender detached.
+        //
+        // So the scenario pins the OUTCOME and the predicate assertion at the
+        // end pins the REASON. Without the second, this test would be
+        // protected by a short-circuit rather than by what it was written for.
+        final track = FakeLocalAudioTrack();
+        final publication = _microphonePublication(
+          track: track,
+          propagateTrackMute: false,
+        );
+        final sender = track.attachDetachedSender();
+        // Published with the sender detached, which is what the Push to Talk
+        // join leaves behind. `muted` is set FALSE by hand here, which the
+        // real arm does not do - `setDetached(detached: true)` signals muted
+        // on every branch that leaves the sender carrying nothing. False is
+        // the harder input: it is the only one that makes the drift reconcile
+        // take a branch at all, so the state that could put a live microphone
+        // on a Push to Talk user is the one under test.
+        publication.setMuted(false);
+
+        final enableState = MatrixLivekitInitialMicrophoneEnableState();
+        enableState.markDesiredMicrophoneMuted(stopOnMute: false);
+
+        final harness = await _LocalPublicationHarness.create(
+          publications: <lk.LocalTrackPublication>[publication],
+          initialMicrophoneEnableState: enableState,
+        );
+
+        await harness.session.debugReconcileLocalMicrophoneDriftForTesting(
+          publication,
+          trigger: 'initial_join',
+        );
+
+        expect(
+          sender.track,
+          isNull,
+          reason:
+              'THE ASSERTION THAT MATTERS: the reconcile must not put a live '
+              'microphone on a Push to Talk user',
+        );
+        expect(
+          sender.reattachCount,
+          0,
+          reason: 'not reattached once, not even transiently',
+        );
+        expect(
+          publication.muted,
+          isFalse,
+          reason:
+              'the reconcile must not have moved the metadata either; this '
+              'publication was built pre-arm by construction',
+        );
+
+        // The REASON, asserted where the short-circuit cannot hide it. In the
+        // Push to Talk join state the unmute direction must be refused on its
+        // OWN terms - the app does not want the microphone sending - and not
+        // merely because the mute direction won the race to decide first.
+        expect(
+          enableState.shouldReconcileUnmutedPublication(
+            publicationMuted: false,
+            senderDetached: true,
+          ),
+          isFalse,
+          reason:
+              'a detached sender is Push to Talk steady state, not drift to '
+              'repair; this is the term whose removal would put a live '
+              'microphone on a Push to Talk user',
+        );
+      },
+      skip: _skipUnlessWindows,
+    );
+
     test('isMicrophoneMuted reports the microphone, not the first audio '
         'publication', () async {
       // `Participant.isMuted` is `audioTrackPublications.firstOrNull?.muted`
@@ -434,6 +662,7 @@ class _LocalPublicationHarness {
 
   static Future<_LocalPublicationHarness> create({
     required List<lk.LocalTrackPublication> publications,
+    MatrixLivekitInitialMicrophoneEnableState? initialMicrophoneEnableState,
   }) async {
     final livekitRoom = FakeLiveKitRoom(
       localParticipant: FakeLocalParticipant(
@@ -448,6 +677,7 @@ class _LocalPublicationHarness {
       livekitRoom,
       stateKey: _aliceStateKey,
       foci: <Uri>[Uri.parse('https://livekit.example.org')],
+      initialMicrophoneEnableState: initialMicrophoneEnableState,
     );
 
     // Hang-up is memoised; this cancels the session's periodic timers.

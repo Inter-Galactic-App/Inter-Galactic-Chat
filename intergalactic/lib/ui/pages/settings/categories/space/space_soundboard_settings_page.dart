@@ -552,8 +552,8 @@ class _SpaceSoundboardSettingsPageState
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 else ...[
-                  Tooltip(
-                    message: isGlobal
+                  tiamat.Tooltip(
+                    text: isGlobal
                         ? 'Remove pack from favorites'
                         : 'Add pack to favorites',
                     child: IconButton(
@@ -582,8 +582,8 @@ class _SpaceSoundboardSettingsPageState
                             ),
                     ),
                   ),
-                  Tooltip(
-                    message: isActive
+                  tiamat.Tooltip(
+                    text: isActive
                         ? 'Active in your call soundboard'
                         : 'Not in your call soundboard',
                     child: Switch.adaptive(

@@ -173,8 +173,8 @@ class EmoticonToolTray extends StatelessWidget {
               child: tiamat.Button.secondary(
                 key: const ValueKey('emoticon-editor-pick-photo'),
                 text: hasSource
-                    ? EmoticonCreatorStrings.promptChangePhoto
-                    : EmoticonCreatorStrings.promptSelectPhoto,
+                    ? EmoticonCreatorStrings.promptEmoticonCreatorChangePhoto
+                    : EmoticonCreatorStrings.promptEmoticonCreatorSelectPhoto,
                 onTap: controller.loading ? null : onPickSourceImage,
               ),
             ),
@@ -182,7 +182,7 @@ class EmoticonToolTray extends StatelessWidget {
             SizedBox(
               height: 44,
               child: tiamat.Button.secondary(
-                text: EmoticonCreatorStrings.promptCropPhoto,
+                text: EmoticonCreatorStrings.promptEmoticonCreatorCropPhoto,
                 onTap:
                     !hasSource ||
                         controller.loading ||

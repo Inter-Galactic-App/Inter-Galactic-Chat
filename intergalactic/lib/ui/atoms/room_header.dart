@@ -8,6 +8,7 @@ import 'package:intergalactic/config/layout_config.dart';
 import 'package:intergalactic/main.dart'; // For preferences
 import 'package:intergalactic/ui/molecules/user_panel.dart';
 import 'package:intergalactic/ui/atoms/room_download_status.dart';
+import 'package:intergalactic/ui/atoms/stream_viewer_header_indicator.dart';
 import 'package:intergalactic/utils/notification_utils.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' as m;
@@ -151,7 +152,16 @@ class _RoomHeaderState extends State<RoomHeader> {
       topic: widget.room.topic,
       onTap: widget.onTap,
       onBurgerMenuTap: widget.onBurgerMenuTap,
-      menu: widget.menu,
+      menu: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          StreamViewerHeaderIndicator(
+            room: widget.room,
+            compact: widget.compact || Layout.mobile,
+          ),
+          if (widget.menu != null) widget.menu!,
+        ],
+      ),
       compact: widget.compact,
       sharedEncryptedHistory: sharedEncryptedHistory,
       activity: RoomDownloadStatus(room: widget.room),
@@ -281,8 +291,8 @@ class HeaderView extends StatelessWidget {
                                     0,
                                     0,
                                   ),
-                                  child: m.Tooltip(
-                                    message:
+                                  child: tiamat.Tooltip(
+                                    text:
                                         'Encrypted full-history sharing is enabled for eligible invited devices.',
                                     child: m.Icon(
                                       m.Icons.history,

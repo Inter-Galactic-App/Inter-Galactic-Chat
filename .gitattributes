@@ -33,3 +33,8 @@ intergalactic/assets/licenses/** -text
 # whitespace merely to satisfy a generic diff check.
 docs/release/evidence/license-sources/android-native-payloads/webrtc-sdk-android-137.7151.04-WEBRTC.md whitespace=-trailing-space,-blank-at-eof
 intergalactic/assets/licenses/webrtc-sdk-android-137.7151.04-NOTICES.txt whitespace=-trailing-space,-blank-at-eof
+
+# The libDF notice is generated from captured, byte-pinned licence texts. Keep
+# its generated CRLF bytes stable for its recipient-facing digest while leaving
+# ordinary source files subject to the normal whitespace check.
+intergalactic/assets/licenses/deepfilternet-libdf-rust-crates-NOTICE.txt whitespace=-trailing-space

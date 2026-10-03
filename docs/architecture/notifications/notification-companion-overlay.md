@@ -48,18 +48,15 @@ companion window is being created from that same event.
 
 ## Desktop Host
 
-`NotificationCompanionHost` is mounted beside the detached call window host on
-Windows and macOS when the native detached-window build define is enabled and
-Flutter windowing is available. macOS must fail closed when Flutter's runtime
-`isWindowingEnabled` flag is false, even if the build was configured for
-windowing; otherwise `RegularWindowController`
-construction can throw repeatedly from the app tree. In that fallback state the
-host is not mounted, `overlayHostAvailable` remains false, and macOS message
-notifications continue through the normal Darwin local notification path rather
-than being suppressed for a companion window that cannot exist.
+`NotificationCompanionHost` is currently supported only on Windows when the
+native detached-window build define and Flutter windowing are available.
+The macOS host remains disabled: its runner cannot enable Flutter multi-view
+after the implicit view attaches. In that state `overlayHostAvailable` stays
+false and macOS message notifications use the normal Darwin local notification
+path rather than being suppressed for a companion window that cannot exist.
 
-Both platforms create a fixed-size secondary `RegularWindow` through
-`ViewAnchor`. Windows then applies HWND styling for MVP overlay behavior:
+Windows creates a fixed-size secondary `RegularWindow` through `ViewAnchor`
+and applies HWND styling for overlay behavior:
 
 - topmost window placement
 - frameless chrome
@@ -74,14 +71,8 @@ prevents system-drawn corner artifacts from appearing inside the transparent
 canvas while keeping the main app custom title bar and notification policy
 separate.
 
-macOS uses the Flutter `RegularWindow` path without the Windows HWND styling,
-topmost flag, transparent DWM chrome, or cursor-position drag movement because
-Flutter's current macOS windowing API does not expose equivalent positioning
-controls. macOS companion validation should therefore focus first on separate
-window creation, notification delivery/suppression, click routing, and close
-behavior.
-
-Non-IO builds and unsupported desktop platforms use the stub host and do not create an overlay.
+Non-IO builds use the stub host; unsupported desktop platforms do not create
+an overlay.
 
 Drag movement is anchored to the Windows cursor screen position. On drag start,
 the host records the current HWND origin and `GetCursorPos`; on each drag

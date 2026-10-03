@@ -2109,7 +2109,7 @@
         {
           "file": "LICENSE",
           "sha256": "CCF6244964385D34FEF3799AA7792E9F8D35517DE026F39A4F43F0E89B2079EB",
-          "bytes": 1077,
+          "bytes": 1078,
           "role": "license_or_notice_text"
         }
       ],
@@ -2956,7 +2956,7 @@
         {
           "file": "LICENSE",
           "sha256": "B65C9AC375B3B6C538EFE6253131C44A73B50C5EE0C48A34319E766633BFEE02",
-          "bytes": 1077,
+          "bytes": 1078,
           "role": "license_or_notice_text"
         }
       ],

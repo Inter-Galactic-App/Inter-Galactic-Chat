@@ -144,6 +144,7 @@ class MatrixEmoticonRoomStateManager implements MatrixEmoticonStateManager {
   Future<void> setState(String packKey, Map<String, dynamic> content) async {
     Object? firstError;
     StackTrace? firstStack;
+    var updatedLocalState = false;
     for (final eventType in [
       MatrixImagePackCompatibility.stableRoomEventType,
       MatrixImagePackCompatibility.legacyRoomEventType,
@@ -159,10 +160,18 @@ class MatrixEmoticonRoomStateManager implements MatrixEmoticonStateManager {
         (room.states[eventType] ??=
                 <String, matrix.StrippedStateEvent>{})[packKey] =
             result!;
+        updatedLocalState = true;
       } catch (error, stackTrace) {
         firstError ??= error;
         firstStack ??= stackTrace;
       }
+    }
+    // The state cache above is updated synchronously, but the previous code
+    // waited for a later /sync echo before refreshing the component's pack
+    // list. A just-created Space pack could therefore be visible in Settings
+    // while `:shortcode:` still sent as plain text in its room.
+    if (updatedLocalState) {
+      onStateChangedController.add(null);
     }
     if (firstError != null) {
       Error.throwWithStackTrace(firstError, firstStack ?? StackTrace.current);

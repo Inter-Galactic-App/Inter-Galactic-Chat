@@ -14,22 +14,51 @@ class ScreenShareAdaptiveFallbackDecision {
   final bool changed;
 }
 
+/// Degrades the screen-share profile under sustained sender trouble and steps
+/// it back up once the link has been quiet for a while.
+///
+/// BUG-324. The step UP used to jump straight back to the requested profile
+/// after `upgradeAfter` of quiet, with no memory of the last attempt and no
+/// look at the uplink estimate. On a persistently poor uplink that is a loop:
+/// Smooth is quiet for 45 s, the share jumps to High Quality, fails in 8 s,
+/// drops to Balanced, fails again, lands on Smooth, and repeats - and on
+/// Windows every one of those profile changes recreates the capture and
+/// republishes the share under a new track sid, which is what left observers
+/// with stale duplicate tiles of one sharer (BUG-321's trigger). Three things
+/// stop the loop: the step up climbs ONE preset at a time, a step up that
+/// fails inside [upgradeFailureWindow] doubles the quiet time required before
+/// the next one (up to [maxUpgradeHold]), and a step up is held while the
+/// sender's own available-outgoing-bitrate estimate cannot carry the next
+/// profile's minimum.
 class ScreenShareAdaptiveFallbackController {
   ScreenShareAdaptiveFallbackController({
     this.degradeAfter = const Duration(seconds: 8),
     this.upgradeAfter = const Duration(seconds: 45),
-  });
+    this.upgradeFailureWindow = const Duration(seconds: 60),
+    this.maxUpgradeHold = const Duration(minutes: 10),
+  }) : _upgradeHold = upgradeAfter;
 
   final Duration degradeAfter;
   final Duration upgradeAfter;
+
+  /// A degrade this soon after a step up means the step up FAILED.
+  final Duration upgradeFailureWindow;
+
+  /// Ceiling for the doubled quiet time after repeated failed step ups.
+  final Duration maxUpgradeHold;
 
   DateTime? _badSince;
   DateTime? _stableSince;
   ScreenShareProfileConfig? _effectiveProfile;
   String? _reason;
+  Duration _upgradeHold;
+  DateTime? _lastUpgradeAt;
 
   ScreenShareProfileConfig? get effectiveProfile => _effectiveProfile;
   String? get reason => _reason;
+
+  /// Quiet time currently required before the next step up.
+  Duration get upgradeHold => _upgradeHold;
 
   ScreenShareAdaptiveFallbackDecision evaluate({
     required ScreenShareProfileConfig requestedProfile,
@@ -38,13 +67,17 @@ class ScreenShareAdaptiveFallbackController {
   }) {
     _effectiveProfile ??= requestedProfile;
 
-    final screenSender = snapshot.tracks.where((track) {
-      return track.type == VoipStreamType.screenshare &&
-          track.direction == VoipDiagnosticsTrackDirection.sender;
-    }).fold<VoipTrackDiagnostics?>(null, (best, track) {
-      if (best == null) return track;
-      return (track.bitrateBps ?? 0) > (best.bitrateBps ?? 0) ? track : best;
-    });
+    final screenSender = snapshot.tracks
+        .where((track) {
+          return track.type == VoipStreamType.screenshare &&
+              track.direction == VoipDiagnosticsTrackDirection.sender;
+        })
+        .fold<VoipTrackDiagnostics?>(null, (best, track) {
+          if (best == null) return track;
+          return (track.bitrateBps ?? 0) > (best.bitrateBps ?? 0)
+              ? track
+              : best;
+        });
 
     if (screenSender == null) {
       _badSince = null;
@@ -73,11 +106,15 @@ class ScreenShareAdaptiveFallbackController {
         final degraded = _degrade(_effectiveProfile!, reason: problem);
         if (!_profileEncodingMatches(degraded, _effectiveProfile!)) {
           _effectiveProfile = degraded;
-          _reason = problem;
           _badSince = now;
+          final reason = _noteUpgradeFailedIfRecent(now)
+              ? '$problem; upgrade held ${_upgradeHold.inSeconds}s after a '
+                    'failed step up'
+              : problem;
+          _reason = reason;
           return ScreenShareAdaptiveFallbackDecision(
             profile: degraded,
-            reason: problem,
+            reason: reason,
             changed: true,
           );
         }
@@ -91,13 +128,35 @@ class ScreenShareAdaptiveFallbackController {
 
     _badSince = null;
     _stableSince ??= now;
+    final lastUpgradeAt = _lastUpgradeAt;
+    if (lastUpgradeAt != null &&
+        now.difference(lastUpgradeAt) > upgradeFailureWindow) {
+      // The last step up survived its window: back to the base quiet time.
+      _upgradeHold = upgradeAfter;
+      _lastUpgradeAt = null;
+    }
     if (!_profileEncodingMatches(_effectiveProfile!, requestedProfile) &&
-        now.difference(_stableSince!) >= upgradeAfter) {
-      _effectiveProfile = requestedProfile;
+        now.difference(_stableSince!) >= _upgradeHold) {
+      final candidate = _nextUpgradeProfile(
+        _effectiveProfile!,
+        requestedProfile,
+      );
+      final holdReason = _uplinkHoldReason(screenSender, candidate);
+      if (holdReason != null) {
+        // Not a reset of the quiet clock: the moment the estimate can carry
+        // the next profile, the step up goes.
+        _reason = holdReason;
+        return ScreenShareAdaptiveFallbackDecision(
+          profile: _effectiveProfile!,
+          reason: holdReason,
+        );
+      }
+      _effectiveProfile = candidate;
       _reason = null;
       _stableSince = now;
+      _lastUpgradeAt = now;
       return ScreenShareAdaptiveFallbackDecision(
-        profile: requestedProfile,
+        profile: candidate,
         changed: true,
       );
     }
@@ -111,7 +170,104 @@ class ScreenShareAdaptiveFallbackController {
     _stableSince = null;
     _effectiveProfile = null;
     _reason = null;
+    _upgradeHold = upgradeAfter;
+    _lastUpgradeAt = null;
   }
+
+  /// Doubles the quiet time when a degrade lands inside the failure window of
+  /// the last step up. Returns whether it did.
+  bool _noteUpgradeFailedIfRecent(DateTime now) {
+    final lastUpgradeAt = _lastUpgradeAt;
+    _lastUpgradeAt = null;
+    if (lastUpgradeAt == null ||
+        now.difference(lastUpgradeAt) > upgradeFailureWindow) {
+      return false;
+    }
+    final doubled = _upgradeHold * 2;
+    _upgradeHold = doubled > maxUpgradeHold ? maxUpgradeHold : doubled;
+    return true;
+  }
+
+  /// The next profile ONE preset up the Smooth -> Balanced -> High Quality
+  /// ladder, never above [requested]. A requested profile that is not a preset
+  /// (advanced settings) has no ladder to climb and is returned directly, as
+  /// is any current profile already at or above the requested rank.
+  ScreenShareProfileConfig _nextUpgradeProfile(
+    ScreenShareProfileConfig current,
+    ScreenShareProfileConfig requested,
+  ) {
+    final requestedRank = _presetRank(requested);
+    if (requestedRank == null) {
+      return requested;
+    }
+    final currentRank = _presetRank(current);
+    if (currentRank != null && currentRank >= requestedRank) {
+      return requested;
+    }
+    final target = switch (currentRank) {
+      null => ScreenShareProfileConfig.smooth,
+      1 => ScreenShareProfileConfig.balanced,
+      _ => ScreenShareProfileConfig.highQuality,
+    };
+    final step = _preserveEncodingPreference(target: target, current: current);
+    if ((_presetRank(step) ?? 0) >= requestedRank) {
+      return requested;
+    }
+    return step;
+  }
+
+  /// 1, 2 or 3 for the Smooth, Balanced and High Quality presets (in either
+  /// encoding preference); null for a sub-preset fallback layer, CPU rescue,
+  /// or advanced custom settings.
+  int? _presetRank(ScreenShareProfileConfig profile) {
+    final family = profile.profile;
+    if (profile.cpuRescueMode || family == null) {
+      return null;
+    }
+    final preset = switch (family) {
+      ScreenShareQualityProfile.smooth => ScreenShareProfileConfig.smooth,
+      ScreenShareQualityProfile.balanced => ScreenShareProfileConfig.balanced,
+      ScreenShareQualityProfile.highQuality =>
+        ScreenShareProfileConfig.highQuality,
+    };
+    final comparable = _preserveEncodingPreference(
+      target: preset,
+      current: profile,
+    );
+    if (!_profileEncodingMatches(profile, comparable)) {
+      return null;
+    }
+    return switch (family) {
+      ScreenShareQualityProfile.smooth => 1,
+      ScreenShareQualityProfile.balanced => 2,
+      ScreenShareQualityProfile.highQuality => 3,
+    };
+  }
+
+  /// Why the step up to [candidate] must wait, or null when it may go. Uses
+  /// the sender's own available-outgoing-bitrate estimate against the
+  /// candidate's minimum (its `minBitrateBps`, else 60% of its maximum - the
+  /// same fraction below which `_problemReason` calls the bitrate a problem).
+  /// An unknown estimate never holds.
+  String? _uplinkHoldReason(
+    VoipTrackDiagnostics sender,
+    ScreenShareProfileConfig candidate,
+  ) {
+    final availableOut = sender.availableOutgoingBitrateBps;
+    if (availableOut == null || availableOut <= 0) {
+      return null;
+    }
+    final layer = candidate.mainLayer;
+    final needed = layer.minBitrateBps ?? (layer.maxBitrateBps * 0.6).round();
+    if (availableOut >= needed) {
+      return null;
+    }
+    return 'holding ${_effectiveProfile!.label}: uplink estimate '
+        '${_mbps(availableOut)} below ${candidate.label} minimum '
+        '${_mbps(needed)}';
+  }
+
+  String _mbps(int bps) => '${(bps / 1000000).toStringAsFixed(1)}Mbps';
 
   String? _problemReason(VoipTrackDiagnostics track) {
     final targetBitrate = track.targetBitrateBps ?? 0;
@@ -175,9 +331,11 @@ class ScreenShareAdaptiveFallbackController {
       return false;
     }
 
-    final widthTooLarge = encodedWidth > requestedWidth + 32 &&
+    final widthTooLarge =
+        encodedWidth > requestedWidth + 32 &&
         encodedWidth > requestedWidth * 1.1;
-    final heightTooLarge = encodedHeight > requestedHeight + 18 &&
+    final heightTooLarge =
+        encodedHeight > requestedHeight + 18 &&
         encodedHeight > requestedHeight * 1.1;
     return widthTooLarge || heightTooLarge;
   }
@@ -285,8 +443,10 @@ class ScreenShareAdaptiveFallbackController {
     final requestedFps = track.requestedFps ?? 0;
     final absoluteFloor = track.hardwareEncodeActive == true ? 8.0 : 10.0;
     final threshold = requestedFps > 0
-        ? [absoluteFloor, requestedFps * 0.25]
-            .reduce((left, right) => left > right ? left : right)
+        ? [
+            absoluteFloor,
+            requestedFps * 0.25,
+          ].reduce((left, right) => left > right ? left : right)
         : absoluteFloor;
 
     return observedFps <= threshold;
@@ -351,12 +511,14 @@ class ScreenShareAdaptiveFallbackController {
 
     final currentLayer = current.mainLayer;
     final nextResolution = _nextFallbackResolution(currentLayer);
-    final reducedResolution = nextResolution.width != currentLayer.width ||
+    final reducedResolution =
+        nextResolution.width != currentLayer.width ||
         nextResolution.height != currentLayer.height;
     final bitrateCeiling = nextResolution.width >= 960 ? 1200000 : 700000;
-    final nextBitrate = (currentLayer.maxBitrateBps * 0.7)
-        .round()
-        .clamp(350000, bitrateCeiling);
+    final nextBitrate = (currentLayer.maxBitrateBps * 0.7).round().clamp(
+      350000,
+      bitrateCeiling,
+    );
     final nextFramerate = reducedResolution
         ? currentLayer.maxFramerate.clamp(24, 30)
         : (currentLayer.maxFramerate <= 24 ? 20 : 24).clamp(15, 30);
@@ -385,14 +547,13 @@ class ScreenShareAdaptiveFallbackController {
         current.mainLayer.maxBitrateBps <= 350000;
   }
 
-  ScreenShareProfileConfig _cpuRescueProfile(
-    ScreenShareProfileConfig current,
-  ) {
+  ScreenShareProfileConfig _cpuRescueProfile(ScreenShareProfileConfig current) {
     final lowLayer = current.lowLayer ?? current.mainLayer;
     final rescueLayer = lowLayer.copyWith(
       maxFramerate: lowLayer.maxFramerate > 20 ? 20 : lowLayer.maxFramerate,
-      maxBitrateBps:
-          lowLayer.maxBitrateBps > 300000 ? 300000 : lowLayer.maxBitrateBps,
+      maxBitrateBps: lowLayer.maxBitrateBps > 300000
+          ? 300000
+          : lowLayer.maxBitrateBps,
     );
 
     return current.copyWith(
@@ -405,8 +566,9 @@ class ScreenShareAdaptiveFallbackController {
   }
 
   String _labelWithMode(String label, String mode) {
-    final base =
-        label.replaceAll(RegExp(r' \((fallback|CPU rescue)\)'), '').trim();
+    final base = label
+        .replaceAll(RegExp(r' \((fallback|CPU rescue)\)'), '')
+        .trim();
     return '$base ($mode)';
   }
 
@@ -440,9 +602,6 @@ class ScreenShareAdaptiveFallbackController {
       cap.height / height,
     ].reduce((left, right) => left < right ? left : right);
 
-    return (
-      width: (width * scale).round(),
-      height: (height * scale).round(),
-    );
+    return (width: (width * scale).round(), height: (height * scale).round());
   }
 }

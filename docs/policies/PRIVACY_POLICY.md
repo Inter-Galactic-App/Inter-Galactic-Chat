@@ -16,8 +16,14 @@ Optional features may involve additional data:
 
 - Push notifications: APNs or another push service receives a push token and routing metadata. Notification content depends on the selected homeserver and app settings.
 - URL previews: when enabled, a URL may be sent to the selected homeserver
-  preview endpoint, a configured preview service, or a provider-limited direct
-  client fallback for supported public providers so a preview can be generated.
+  preview endpoint or a configured preview service. A separate, off-by-default
+  direct-fallback setting for the room type permits client requests to TikTok,
+  Instagram, or Reddit. An incomplete preview may trigger a direct metadata or
+  thumbnail fetch. A preview with enough metadata but no image may separately
+  request a provider site icon. Direct provider requests may include the full
+  previewed URL, including sensitive query values. The provider or image host
+  can see the device's network address and request metadata; a thumbnail URL
+  may itself contain query values.
 - GIF search: search text and request metadata may be sent to a configured GIF provider or relay.
 - Emoticon Creator/background removal: source photos you select are processed
   on your device to create transparent images and local drafts. On Android,

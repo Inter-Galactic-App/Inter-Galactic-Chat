@@ -11,9 +11,12 @@ cargokit as a build phase and then force-loads the archive it produces:
     :script => 'sh "$PODS_TARGET_SRCROOT/../cargokit/build_pod.sh" ../rust vodozemac_bindings_dart'
     'OTHER_LDFLAGS' => '-force_load ${BUILT_PRODUCTS_DIR}/libvodozemac_bindings_dart.a'
 
-On Apple the whole Rust dependency tree is therefore merged into the single
-`Runner` Mach-O — no `.framework`, no `.dylib`, no file to enumerate. On Android
-and Windows the same tree arrives inside
+In the Apple artifact examined for this original 2026-08-19 record, the whole
+Rust dependency tree was merged into `Runner` — no separate `.framework` or
+`.dylib` to enumerate. The patched iOS variant also force-loads the same
+archive into the notification service extension, so the tree is present in
+both Runner and the NSE Mach-O. The NSE has its own native-payload mapping.
+On Android and Windows the tree arrives inside
 `libvodozemac_bindings_dart.so` / `.dll`.
 
 Every automatic notice surface enumerates packages, so none of them can see it:

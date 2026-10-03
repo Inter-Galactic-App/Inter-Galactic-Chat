@@ -1,6 +1,5 @@
 # Stream Receiver Diagnostic Contract
 
-Owner: EXPERIMENTAL
 Status: Phase 4 receiver presentation lineage diagnostics are implemented for
 the in-process and external receiver probes. The contract, runner scaffold,
 app-side in-process subscribe-only receiver control path, in-process
@@ -249,7 +248,7 @@ Done in this phase:
 
 - Contract fields and lane definitions are documented.
 - The probe plan is captured in
-  `docs/streaming/archive/contracts/stream-receiver-diagnostic-contract-workspace-phase1.md`.
+  the historical receiver-diagnostic contract work.
 - `tools/stream-lab/run_true_receiver_test.ps1` provides a safe runner scaffold.
 - `tools/stream-receiver-probe/InterGalacticReceiverProbe.ps1` accepts a
   protected local control pipe, refuses token-like command-line arguments, and
@@ -269,7 +268,7 @@ Done in this phase:
   and still requires `renderer_attached=true` plus `renderer_visible=true`
   before the renderer-callback freshness gate can pass.
 - `MatrixLivekitReceiverProbeController` can be started from a developer-mode
-  LiveKit call session to request the SERVER-owned short-lived probe token in
+  LiveKit call session to request a server-issued short-lived probe token in
   memory, join the same LiveKit room as a distinct subscribe-only participant,
   publish nothing, subscribe to the selected screenshare at high quality, and
   emit redacted `intergalactic_stream_view_probe` events labeled

@@ -216,6 +216,25 @@ void main() {
       );
     });
 
+    test(
+      'allows absent and falsely small size metadata for stream validation',
+      () {
+        final now = DateTime.utc(2026, 5, 29, 18);
+        final missingSize = _validStoryContent(now: now);
+        (missingSize['info'] as Map<String, Object?>).remove('size');
+
+        expect(parseStoryEventContent(missingSize, now: now), isNotNull);
+        expect(
+          parseStoryEventContent(
+            _validStoryContent(now: now)
+              ..['info'] = {'mimetype': 'image/png', 'size': 1},
+            now: now,
+          ),
+          isNotNull,
+        );
+      },
+    );
+
     test('accepts encrypted Matrix file metadata without a plaintext url', () {
       final now = DateTime.utc(2026, 5, 29, 18);
       final content = _validStoryContent(now: now)

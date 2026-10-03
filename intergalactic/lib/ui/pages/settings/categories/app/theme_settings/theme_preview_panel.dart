@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intergalactic/config/custom_theme_definition.dart';
 import 'package:intergalactic/ui/pages/settings/categories/app/theme_settings/theme_token_usage_map.dart';
 import 'package:tiamat/config/style/theme_extensions.dart';
+import 'package:tiamat/tiamat.dart' as tiamat;
 
 class ThemePreviewPanel extends StatelessWidget {
   const ThemePreviewPanel({
@@ -255,8 +256,8 @@ class _PreviewTokenSwatch extends StatelessWidget {
     final color = _previewTokenColor(context, tokenId);
     final label = abbreviationForThemeToken(tokenId);
 
-    return Tooltip(
-      message: _themeFieldLabel(tokenId),
+    return tiamat.Tooltip(
+      text: _themeFieldLabel(tokenId),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
         decoration: BoxDecoration(

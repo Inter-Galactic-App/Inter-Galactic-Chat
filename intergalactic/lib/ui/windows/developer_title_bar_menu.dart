@@ -10,6 +10,7 @@ import 'package:intergalactic/ui/motion/inter_galactic_motion.dart';
 import 'package:intergalactic/ui/navigation/adaptive_dialog.dart';
 import 'package:intergalactic/ui/pages/settings/categories/developer/developer_log_actions.dart';
 import 'package:intergalactic_noise_suppression/intergalactic_noise_suppression.dart';
+import 'package:tiamat/tiamat.dart' as tiamat;
 
 class DeveloperTitleBarMenu extends StatefulWidget {
   const DeveloperTitleBarMenu({required this.navigatorKey, super.key});
@@ -312,8 +313,8 @@ class _DeveloperTitleBarMenuState extends State<DeveloperTitleBarMenu> {
             _scheduleHoverClose();
             setState(() {});
           },
-          child: Tooltip(
-            message: 'Developer quick controls',
+          child: tiamat.Tooltip(
+            text: 'Developer quick controls',
             child: Semantics(
               button: true,
               label: 'Developer quick controls',

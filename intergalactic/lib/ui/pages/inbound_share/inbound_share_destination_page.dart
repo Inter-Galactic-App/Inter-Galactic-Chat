@@ -14,7 +14,9 @@ class InboundShareDestinationPage extends StatefulWidget {
   });
 
   final List<InboundShareDestination> destinations;
-  final ValueChanged<InboundShareDestination> onSelected;
+
+  /// Returns false when the destination became unwritable after it was listed.
+  final bool Function(InboundShareDestination) onSelected;
   final VoidCallback onCancelled;
   final FutureOr<List<InboundShareDestination>> Function()? refreshDestinations;
 
@@ -28,6 +30,7 @@ class _InboundShareDestinationPageState
   String _query = '';
   late List<InboundShareDestination> _destinations;
   bool _refreshing = false;
+  bool _destinationUnavailable = false;
 
   @override
   void initState() {
@@ -41,10 +44,25 @@ class _InboundShareDestinationPageState
     setState(() => _refreshing = true);
     try {
       final refreshed = await Future.sync(refreshDestinations);
-      if (mounted) setState(() => _destinations = List.unmodifiable(refreshed));
+      if (mounted) {
+        setState(() {
+          _destinations = List.unmodifiable(refreshed);
+          _destinationUnavailable = false;
+        });
+      }
     } finally {
       if (mounted) setState(() => _refreshing = false);
     }
+  }
+
+  void _select(InboundShareDestination destination) {
+    if (widget.onSelected(destination)) return;
+    setState(() {
+      _destinationUnavailable = true;
+      _destinations = List.unmodifiable(
+        _destinations.where((item) => !identical(item, destination)),
+      );
+    });
   }
 
   @override
@@ -76,11 +94,55 @@ class _InboundShareDestinationPageState
               onChanged: (value) => setState(() => _query = value),
             ),
           ),
+          if (_destinationUnavailable)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Semantics(
+                liveRegion: true,
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Conversation unavailable',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'That conversation can no longer receive this share. '
+                          'Nothing was sent. Refresh or choose another conversation.',
+                        ),
+                        if (widget.refreshDestinations != null) ...[
+                          const SizedBox(height: 8),
+                          TextButton.icon(
+                            onPressed: _refreshing ? null : _refresh,
+                            icon: _refreshing
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.refresh),
+                            label: const Text('Refresh'),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           Expanded(
             child: visible.isEmpty
                 ? _EmptyDestinations(
                     refreshing: _refreshing,
-                    onRefresh: widget.refreshDestinations == null
+                    onRefresh:
+                        widget.refreshDestinations == null ||
+                            _destinationUnavailable
                         ? null
                         : _refresh,
                   )
@@ -111,7 +173,7 @@ class _InboundShareDestinationPageState
                             placeholderText: destination.roomName,
                             placeholderColor: destination.room.defaultColor,
                           ),
-                          onTap: () => widget.onSelected(destination),
+                          onTap: () => _select(destination),
                         ),
                       );
                     },

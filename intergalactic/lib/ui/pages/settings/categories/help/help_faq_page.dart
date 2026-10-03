@@ -81,24 +81,15 @@ const List<FaqEntry> faqEntries = [
       "Use Settings > Report a Bug for app crashes, broken UI, notification problems, media bugs, or anything that needs Inter Galactic diagnostics.",
       "For app support, use intergalactic@ourgalaxy.space.",
     ],
-    keywords: [
-      "abuse",
-      "bug",
-      "diagnostics",
-      "help",
-      "report",
-      "support",
-    ],
+    keywords: ["abuse", "bug", "diagnostics", "help", "report", "support"],
   ),
   FaqEntry(
     section: FaqSection.general,
     question: "How do I replay the tutorial?",
-    summary:
-        "The guided tutorial is currently desktop-only and can be replayed from desktop settings.",
+    summary: "Replay the guided tutorial from Settings > Help > Tutorial.",
     answer: [
-      "On desktop, open Settings > Tutorial and choose Replay tutorial.",
-      "Mobile builds hide the tutorial page until the mobile tutorial path is ready.",
-      "The desktop tutorial opens over local sample rooms without changing Matrix room state.",
+      "Open Settings > Help > Tutorial and choose Replay tutorial.",
+      "The tutorial opens over local sample rooms without changing Matrix room state.",
     ],
     keywords: [
       "demo preview",
@@ -176,13 +167,7 @@ const List<FaqEntry> faqEntries = [
       "Use the delete action for the old or untrusted session. You may need to enter your account password, depending on the homeserver.",
       "Only remove sessions you recognize as old or unwanted. Removing the wrong session can interrupt that device's access.",
     ],
-    keywords: [
-      "delete device",
-      "device",
-      "session",
-      "trash",
-      "unverified",
-    ],
+    keywords: ["delete device", "device", "session", "trash", "unverified"],
   ),
   FaqEntry(
     section: FaqSection.security,
@@ -270,32 +255,137 @@ const List<FaqEntry> faqEntries = [
       "GIF search terms are sent to the relay or provider selected by the build or your local override.",
       "Disabling GIF search stops GIF lookup without changing normal image and sticker behavior.",
     ],
-    keywords: [
-      "gif",
-      "gifs",
-      "klipy",
-      "media",
-      "relay",
-      "tenor",
-    ],
+    keywords: ["gif", "gifs", "klipy", "media", "relay", "tenor"],
   ),
   FaqEntry(
     section: FaqSection.features,
     question: "How do activity and presence features work?",
     summary:
-        "Activity features show local media, Spotify, Steam, or status only when enabled.",
+        "Choose which activities appear locally and whether a short status is shared.",
     answer: [
-      "Activity and presence are opt-in. Go to Settings > Activity to connect or configure supported providers such as Spotify or Steam.",
-      "When multiple activities are available, Inter Galactic can choose which activity view/card to show locally and publish according to the enabled privacy settings.",
-      "If an activity does not clear after an app closes, disconnect and reconnect that provider from Activity settings.",
+      "Activity is opt-in. Open Settings > App Settings > Activity to choose what appears on your device and configure available sources.",
+      "Sources include Spotify, Steam game activity on desktop, and system music controls on iOS. Available sources vary by platform.",
+      "Local display and sharing a short Matrix status are separate choices. Matrix status shares a brief summary, not full music or game details.",
+      "Turning a source off stops its activity from appearing; it does not remove your saved connection.",
     ],
     keywords: [
       "activity",
       "game",
+      "local media",
       "presence",
+      "privacy",
       "spotify",
       "steam",
       "status",
+    ],
+  ),
+  FaqEntry(
+    section: FaqSection.features,
+    question: "How do stories work, and who can see them?",
+    summary:
+        "Share photo or short video stories with existing DM contacts; stories expire after 24 hours.",
+    answer: [
+      "Stories appear in the Home status strip. A story is shared with your existing direct-message contacts when you post it.",
+      "Stories normally expire after 24 hours. You can post photos or videos up to 30 seconds long.",
+      "The app does not trim longer videos for you. Choose a clip that is already within the limit before posting.",
+    ],
+    keywords: [
+      "24 hours",
+      "audience",
+      "contacts",
+      "DM",
+      "expire",
+      "stories",
+      "video",
+    ],
+  ),
+  FaqEntry(
+    section: FaqSection.features,
+    question: "How does the call soundboard work?",
+    summary:
+        "Play sounds from a shared space soundboard during an active call.",
+    answer: [
+      "Open Soundboard from the call controls to browse sounds available from your spaces. Space settings manage sound uploads and permissions.",
+      "Soundboard playback is local on participating devices. It is not sent as your microphone audio or as a call media track, and it does not change your microphone settings.",
+    ],
+    keywords: ["call", "calls", "soundboard", "space", "sounds", "microphone"],
+  ),
+  FaqEntry(
+    section: FaqSection.features,
+    question: "What is the Desktop Companion?",
+    summary:
+        "An optional Windows desktop overlay for approved message notifications.",
+    answer: [
+      "On Windows, enable it in Settings > App Settings > Desktop Companion. It shows approved message notifications in a small companion window; select one to open that room.",
+      "The companion is optional and can be disabled in its settings. You can also hide message previews there.",
+    ],
+    keywords: [
+      "desktop",
+      "floating notification",
+      "overlay",
+      "preview",
+      "notification companion",
+      "windows",
+    ],
+  ),
+  FaqEntry(
+    section: FaqSection.features,
+    question: "How can I reduce background noise on calls?",
+    summary:
+        "Use Noise Suppression in Voice and Video settings on supported devices.",
+    answer: [
+      "Open Settings > App Settings > Voice and Video and turn on Noise Suppression. Available controls vary by device.",
+      "Hush voice isolation is available on Windows and macOS. It can reduce nearby voices or TV audio, but uses more CPU and may make your own audio choppy under heavy load.",
+      "If your voice sounds worse or becomes choppy, turn Hush off or try a less aggressive noise-suppression option.",
+    ],
+    keywords: [
+      "background noise",
+      "Hush",
+      "microphone",
+      "noise cancellation",
+      "noise suppression",
+      "RNNoise",
+      "voice isolation",
+    ],
+  ),
+  FaqEntry(
+    section: FaqSection.features,
+    question: "How do I use message effects?",
+    summary:
+        "Choose an effect from the composer, or enable automatic phrase-triggered effects.",
+    answer: [
+      "On desktop, open the effects menu beside the emoji picker. On mobile, open it by long-pressing the mic or send button.",
+      "Effects can add an animation or change how your message is formatted. Automatic message effects can respond to phrases such as congratulations, pride, or snow day; manual effects remain available when automatic effects are off.",
+      "Manage these options in Settings > General. Automatic effects require Message effects to be enabled as well.",
+    ],
+    keywords: [
+      "automatic effects",
+      "confetti",
+      "composer",
+      "effects",
+      "message effects",
+      "mobile",
+      "snowfall",
+    ],
+  ),
+  FaqEntry(
+    section: FaqSection.features,
+    question: "How do I change themes or accessibility settings?",
+    summary:
+        "Choose an appearance in Appearance; adjust readability and motion in Accessibility.",
+    answer: [
+      "Open Settings > App Settings > Appearance to choose a theme and other visual preferences.",
+      "Open Settings > App Settings > Accessibility to adjust contrast, text size, bold text, motion, animated media, focus indicators, and touch targets.",
+      "Accessibility options can follow your device settings or use a preference you choose in the app.",
+    ],
+    keywords: [
+      "accessibility",
+      "contrast",
+      "motion",
+      "readability",
+      "text size",
+      "theme",
+      "themes",
     ],
   ),
   FaqEntry(
@@ -322,14 +412,14 @@ const List<FaqEntry> faqEntries = [
 
 final List<SettingsSearchEntry> faqSearchEntries =
     List<SettingsSearchEntry>.unmodifiable([
-  for (final entry in faqEntries)
-    SettingsSearchEntry(
-      title: entry.question,
-      description: entry.summary,
-      section: entry.section.label,
-      keywords: entry.keywords,
-    ),
-]);
+      for (final entry in faqEntries)
+        SettingsSearchEntry(
+          title: entry.question,
+          description: entry.summary,
+          section: entry.section.label,
+          keywords: entry.keywords,
+        ),
+    ]);
 
 class HelpFaqPage extends StatelessWidget {
   const HelpFaqPage({super.key});
@@ -348,22 +438,22 @@ class HelpFaqPage extends StatelessWidget {
               Text(
                 "FAQ",
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurface,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w400,
-                      letterSpacing: 0,
-                    ),
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w400,
+                  letterSpacing: 0,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
                 "Quick answers for common Inter Galactic and Matrix questions.",
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w400,
-                      height: 1.25,
-                      letterSpacing: 0,
-                    ),
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w400,
+                  height: 1.25,
+                  letterSpacing: 0,
+                ),
               ),
               const SizedBox(height: 20),
               for (final section in FaqSection.values)

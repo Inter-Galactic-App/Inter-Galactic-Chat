@@ -30,6 +30,9 @@ intergalactic_noise_suppression_configure(double vad_threshold,
                                           int deepfilternet_hush_enabled);
 
 INTERGALACTIC_NOISE_SUPPRESSION_EXPORT int
+intergalactic_noise_suppression_set_speech_protect_hysteresis(int enabled);
+
+INTERGALACTIC_NOISE_SUPPRESSION_EXPORT int
 intergalactic_noise_suppression_set_pipeline_mode(int mode);
 
 INTERGALACTIC_NOISE_SUPPRESSION_EXPORT int

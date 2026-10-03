@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intergalactic/client/components/inbox/inbox_query.dart';
 import 'package:intergalactic/ui/pages/inbox/inbox_room_card.dart';
+import 'package:tiamat/tiamat.dart' as tiamat;
 
 /// Responsive Inbox content shared by the desktop overlay and mobile page.
 class InboxView extends StatelessWidget {
@@ -63,8 +64,8 @@ class InboxView extends StatelessWidget {
                 onSelectionChanged: (selection) =>
                     onFilterChanged(selection.single),
               ),
-              Tooltip(
-                message: tagged
+              tiamat.Tooltip(
+                text: tagged
                     ? 'Marks only the displayed direct mentions as read'
                     : 'Marks every displayed Inbox conversation as read',
                 child: FilledButton.icon(

@@ -35,7 +35,12 @@ set_target_properties(intergalactic_rnnoise_replay PROPERTIES
 target_compile_definitions(intergalactic_rnnoise_replay PRIVATE
   _CRT_SECURE_NO_WARNINGS
   NOMINMAX
+  INTERGALACTIC_AUDIO_NATIVE_TEST
 )
+
+enable_testing()
+add_test(NAME hush_gain_quiet_to_loud
+  COMMAND intergalactic_rnnoise_replay --test-hush-gain-quiet-to-loud)
 
 if (MSVC)
   target_compile_options(intergalactic_rnnoise_replay PRIVATE

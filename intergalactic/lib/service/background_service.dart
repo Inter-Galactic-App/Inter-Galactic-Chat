@@ -9,6 +9,7 @@ import 'package:intergalactic/main.dart';
 import 'package:intergalactic/service/background_service_notifications/background_service_task_notification.dart';
 import 'package:intergalactic/service/background_service_notifications/background_service_task_notification2.dart';
 import 'package:intergalactic/service/background_service_task.dart';
+import 'package:intergalactic/service/background_service_init_gate.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -22,13 +23,14 @@ const AndroidNotificationChannel channel = AndroidNotificationChannel(
 
 FlutterBackgroundService? _service;
 bool isReady = false;
-bool _serviceInitStarted = false;
 BackgroundNotificationsManager2? _embeddedPushNotificationManager;
 EmbeddedNtfySseListener? _embeddedPushListener;
 StreamSubscription? _readySubscription;
 const String _androidNotificationIcon = "ig_notification_icon";
 
 List<BackgroundServiceTask> _taskQueue = List.empty(growable: true);
+
+final BackgroundServiceInitGate _serviceInitGate = BackgroundServiceInitGate();
 
 bool get _shouldUseEmbeddedPushBackgroundService =>
     BuildConfig.ANDROID && !BuildConfig.ENABLE_GOOGLE_SERVICES;
@@ -90,13 +92,16 @@ void handleTask(BackgroundServiceTask task, FlutterBackgroundService service) {
   if (task is BackgroundServiceTaskNotification) {
     Log.i("Handling task: ${task.eventId} ${task.hashCode}");
 
-    FlutterBackgroundService().invoke("on_message_received",
-        {"event_id": task.eventId, "room_id": task.roomId});
+    FlutterBackgroundService().invoke("on_message_received", {
+      "event_id": task.eventId,
+      "room_id": task.roomId,
+    });
   }
 }
 
-Future<bool> initBackgroundService(
-    {bool keepAliveForEmbeddedPush = false}) async {
+Future<bool> initBackgroundService({
+  bool keepAliveForEmbeddedPush = false,
+}) async {
   Log.w("Init background service");
   _service = FlutterBackgroundService();
 
@@ -107,7 +112,8 @@ Future<bool> initBackgroundService(
 
   await flutterLocalNotificationsPlugin
       .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>()
+        AndroidFlutterLocalNotificationsPlugin
+      >()
       ?.createNotificationChannel(channel);
 
   try {
@@ -115,27 +121,24 @@ Future<bool> initBackgroundService(
         keepAliveForEmbeddedPush && _shouldUseEmbeddedPushBackgroundService;
 
     _service!.configure(
-        iosConfiguration: IosConfiguration(),
-        androidConfiguration: AndroidConfiguration(
-            onStart: onServiceStarted,
-            isForegroundMode: true,
-            autoStart: isPersistentPushService,
-            autoStartOnBoot: isPersistentPushService,
-            initialNotificationTitle: isPersistentPushService
-                ? "Inter Galactic notifications"
-                : "Updating Notifications",
-            initialNotificationContent: isPersistentPushService
-                ? "Listening for message notifications"
-                : "Updating Notifications",
-            notificationChannelId: channel.id,
-            foregroundServiceNotificationId: id));
+      iosConfiguration: IosConfiguration(),
+      androidConfiguration: AndroidConfiguration(
+        onStart: onServiceStarted,
+        isForegroundMode: true,
+        autoStart: isPersistentPushService,
+        autoStartOnBoot: isPersistentPushService,
+        initialNotificationTitle: isPersistentPushService
+            ? "Inter Galactic notifications"
+            : "Updating Notifications",
+        initialNotificationContent: isPersistentPushService
+            ? "Listening for message notifications"
+            : "Updating Notifications",
+        notificationChannelId: channel.id,
+        foregroundServiceNotificationId: id,
+      ),
+    );
 
     await _service!.startService();
-
-    FlutterBackgroundService().invoke("init", {
-      "keep_alive_for_embedded_push": isPersistentPushService,
-    });
-    Log.i("Invoking background service init");
 
     await _readySubscription?.cancel();
     _readySubscription = _service!.on("ready").take(1).listen((event) {
@@ -149,14 +152,21 @@ Future<bool> initBackgroundService(
       }
     });
 
+    FlutterBackgroundService().invoke("init", {
+      "keep_alive_for_embedded_push": isPersistentPushService,
+    });
+    Log.i("Invoking background service init");
+
     return true;
   } catch (exception) {
     if (exception is MissingPluginException) {
       Log.w(
-          "Failed to start background service due to missing implementation. This wont show the banner, ${Isolate.current.debugName}");
+        "Failed to start background service due to missing implementation. This wont show the banner, ${Isolate.current.debugName}",
+      );
     } else {
       Log.w(
-          "Failed to start background service!, ${Isolate.current.debugName}");
+        "Failed to start background service!, ${Isolate.current.debugName}",
+      );
     }
     return false;
   }
@@ -164,19 +174,23 @@ Future<bool> initBackgroundService(
 
 ServiceInstance? instance;
 Future<void> onServiceInit(Map<String, dynamic>? data) async {
-  final keepAliveForEmbeddedPush = _shouldUseEmbeddedPushBackgroundService &&
+  final keepAliveForEmbeddedPush =
+      _shouldUseEmbeddedPushBackgroundService &&
       data?["keep_alive_for_embedded_push"] != false;
 
-  if (_serviceInitStarted) {
-    if (keepAliveForEmbeddedPush && _embeddedPushNotificationManager != null) {
-      _startEmbeddedPushListener(_embeddedPushNotificationManager!);
-    }
-    instance?.invoke("ready");
-    return;
-  }
+  await _serviceInitGate.run(
+    initialize: () => _initializeService(keepAliveForEmbeddedPush),
+    onReady: () {
+      if (keepAliveForEmbeddedPush &&
+          _embeddedPushNotificationManager != null) {
+        _startEmbeddedPushListener(_embeddedPushNotificationManager!);
+      }
+      instance?.invoke("ready");
+    },
+  );
+}
 
-  _serviceInitStarted = true;
-
+Future<void> _initializeService(bool keepAliveForEmbeddedPush) async {
   if (!preferences.isInit) {
     await preferences.init();
   }
@@ -193,14 +207,17 @@ Future<void> onServiceInit(Map<String, dynamic>? data) async {
             : "Updating Notifications",
         keepAliveForEmbeddedPush ? "Listening for message notifications" : null,
         NotificationDetails(
-          android: AndroidNotificationDetails(channel.id, channel.name,
-              category: AndroidNotificationCategory.service,
-              icon: _androidNotificationIcon,
-              ongoing: true,
-              showProgress: !keepAliveForEmbeddedPush,
-              silent: true,
-              maxProgress: 100,
-              indeterminate: !keepAliveForEmbeddedPush),
+          android: AndroidNotificationDetails(
+            channel.id,
+            channel.name,
+            category: AndroidNotificationCategory.service,
+            icon: _androidNotificationIcon,
+            ongoing: true,
+            showProgress: !keepAliveForEmbeddedPush,
+            silent: true,
+            maxProgress: 100,
+            indeterminate: !keepAliveForEmbeddedPush,
+          ),
         ),
       );
     }
@@ -230,19 +247,14 @@ Future<void> onServiceInit(Map<String, dynamic>? data) async {
 
     await notificationManager.init();
 
-    if (keepAliveForEmbeddedPush) {
-      _startEmbeddedPushListener(notificationManager);
-    }
-
     await Future.delayed(const Duration(milliseconds: 200));
     notificationManager.flushQueueLoop();
   }
-
-  instance?.invoke("ready");
 }
 
 void _startEmbeddedPushListener(
-    BackgroundNotificationsManager2 notificationManager) {
+  BackgroundNotificationsManager2 notificationManager,
+) {
   final topic = preferences.embeddedNtfyTopic.value;
   if (topic == null || topic.isEmpty) {
     Log.w("Embedded push background service: no ntfy topic is configured");
@@ -286,8 +298,6 @@ void onServiceStarted(ServiceInstance service) async {
   });
 
   if (_shouldUseEmbeddedPushBackgroundService) {
-    unawaited(onServiceInit({
-      "keep_alive_for_embedded_push": true,
-    }));
+    unawaited(onServiceInit({"keep_alive_for_embedded_push": true}));
   }
 }

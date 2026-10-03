@@ -45,6 +45,28 @@ The shared layer should own:
 
 The shared layer should not assume one OS delivery model.
 
+## In-app unread projection after a read marker
+
+`MatrixRoom` is the shared unread-count source for Inbox and Favorites. The
+pinned Matrix SDK sends read markers to the server but replaces its cached
+notification and highlight counts only on sync. After a successful explicit
+room or Inbox read, the room therefore temporarily projects counts past the
+exact marked event and emits `onUpdate`; a failed marker changes nothing.
+Inbox snapshots freeze the exact target event ID; the room checks cached
+newest-first event order, not millisecond timestamps, so a newer notification
+remains visible even when it shares the target's `origin_server_ts`. The
+Inbox cache scan also stops at that accepted target while the SDK's
+`m.fully_read` cache catches up, so an older marked direct mention cannot
+reappear in the mention-only filter.
+
+The projection uses the pre-request SDK counts and a bounded, in-memory set of
+notification event IDs. A stale pre-marker sync retains the projection. It
+retires when a sync confirms the target with converged or partially reduced
+unread counts, or when explicit room account data reports a different marker
+from both the target and the marker present before the request. This affects in-app
+counts, not Android/iOS notification-tray cancellation, which has its own
+platform path and rebuilt-device validation.
+
 ## Room Notification Snooze
 
 Per-chat snooze is a local Inter Galactic notification policy. Snooze records
@@ -170,11 +192,14 @@ companion receives nothing.
 The companion still uses the normal approved-notification pipeline and does not
 change local notification sounds, pusher registration, Matrix push rules, or
 click response handling. While the companion host is available and the
-companion is enabled, Windows and macOS notifiers suppress native message
+companion is enabled, the Windows notifier suppresses native message
 notifications so the same approved message is not displayed in both the
 companion and a system notification. Call and calendar reminder notifications
 stay native. Companion clicks route through
 `EventBus.openRoomFromNotification((roomId, clientId))`.
+
+The companion host is currently Windows-only. macOS keeps its normal local
+notification path even though the companion settings tab is visible there.
 
 macOS local notifications use `MacosNotifier` and Flutter's Darwin/macOS local
 notification APIs. This path requests local alert, badge, and sound permission,
@@ -236,6 +261,19 @@ enables Firebase dependencies, the Gradle Google Services plugin, Firebase
 imports, and `lib/firebase_options.dart`. Before web package resolution, run the
 same toggle in `disable` mode so browser builds use Web Push without compiling
 Android-only Firebase Messaging packages.
+
+### Background service readiness
+
+`lib/service/background_service.dart` has two initialization callers on Android:
+the service's automatic embedded-push startup and the foreground isolate's
+explicit `init` request. Both share a `BackgroundServiceInitGate`. The first
+caller registers the `on_message_received` task listener and completes the
+notification manager initialization; concurrent callers await that same future
+before emitting `ready`. A failed initialization clears the gate so a later
+start can retry. The foreground isolate subscribes to `ready` before sending
+`init`, so a fast service start cannot emit the only readiness signal before
+the task queue listener exists. Keep queued background tasks behind this
+readiness boundary; do not invoke `ready` from a duplicate-init fast path.
 
 FCM must stay a data-only delivery path. Android should not render FCM
 notification title/body fields directly for Matrix messages because encrypted
@@ -347,6 +385,18 @@ Key concerns:
 - privacy of notification previews
 - keeping account/session routing deterministic
 
+The iOS host's bounded silent wake also owns the developer-only E10 backup
+presence measurement. During the existing remote-wake sync,
+`MatrixE2eeDiagnostics` observes decrypt failures and may probe the current
+server-side room-key backup version and one room/session key. The scope allows
+at most two probes, caps each at 750 ms, and skips when the existing wake
+budget is too low; it finishes before the wake releases the database and does
+not extend the sync deadline. It records only aggregate
+`candidates/in_backup/not_in_backup/version_unusable/skipped_budget` counts.
+This is host-side measurement only: it does not decrypt, import, upload, or
+change key policy, and it does not involve the Notification Service Extension
+or vodozemac.
+
 iPhone notification taps should preserve room/account routing across both
 local-notification payloads and APNs response payloads. The native
 `AppDelegate.swift` bridge captures tapped APNs responses, normalizes
@@ -393,6 +443,17 @@ emits the selected-room success signal for that notification route without
 changing the room again; this preserves the tested success path while allowing
 the pending native response to clear.
 
+Merely tapping a notification does not mark its room as read. Once the timeline
+reaches its newest event, the room-read path requests notification clearing;
+snoozing a room also requests clearing. `NotificationManager.clearNotifications`
+and `clearNotificationsByRoute` remove Flutter-local alerts for that account
+and room and ask the native iOS bridge to remove delivered APNs alerts with the
+same exact `client_id` and `room_id`. The native bridge checks for a push
+trigger and refuses missing route fields; other accounts and rooms remain
+visible. This includes NSE generic fallbacks for the cleared room. A remote
+alert lacking either routing field cannot be cleared this way, and there is no
+global Notification Center clear.
+
 Debug iOS builds expose a developer-only APNs replay harness in App >
 Advanced > Developer > Notifications. The replay control calls the native
 `debugReplayNotificationResponse` method, which is compiled under `#if DEBUG`
@@ -416,6 +477,16 @@ the connected phone, use a local profile-mode harness build with
 and `APS_ENVIRONMENT=development`. That keeps the replay UI available, signs
 with sandbox APNs for development-device testing, and leaves normal
 Release/TestFlight production APNs behavior unchanged.
+
+For the developer-mode-only E10 key-backup measurement, the native silent-wake
+bridge retains the APNs client, room, and event route only while that wake is
+pending. Before the wake's bounded sync, Dart reads the routed encrypted event
+without decrypting it and uses its transient Megolm session id for the existing
+aggregate backup-presence probe. This covers wakes where to-device processing
+receives the room key before a `BadEncrypted` timeline event is observable.
+The route and session id are neither logged nor persisted; the probe remains
+bounded by the existing wake budget and does not change the NSE, key material,
+or notification rendering.
 
 Notification routing diagnostics should remain structured and redacted. The
 iOS/native and Dart route path logs payload receipt, target room/event
@@ -474,6 +545,79 @@ Xcode Background Modes capability enabled. Do not add `processing` unless the
 app introduces a real long-running `BGProcessingTask` use case; Matrix message
 notification decryption should stay on the APNs wake/fetch-local-render path
 rather than deferred processing.
+
+#### Notification Service Extension (local decrypt, NSE Phase C)
+
+`ios/InterGalactic Notification Extension/NotificationService.swift` is the
+iOS half of the documented push-privacy model: the gateway sends routing
+identifiers only, and the extension turns them into a readable notification
+on the device without the app running. It is invoked only when the APNs
+payload carries `mutable-content: 1`, which is a gateway change owned by
+SERVER; without it the extension is inert and the generic alert shows.
+
+The six media-placeholder bodies use the extension's `Localizable.strings`,
+generated during its Xcode target build from the host `assets/l10n/intl_*.arb`
+files. The policy snapshot carries no presentation strings. English source
+keys are required; a missing locale value uses the explicit English default
+in Swift. All 19 non-English host ARBs now supply these six keys. An unsigned
+iPhoneOS build from app commit `698ad982` packaged all 20 locale catalogues
+in the notification extension; each parsed with exactly six media-body keys.
+This verifies generation and bundle placement, not runtime locale selection,
+translation quality, signed-payload identity, or notification delivery.
+
+The pipeline:
+
+1. **Payload validation.** `client_id`, `room_id` and `event_id` are
+   bounded by length, matched against Matrix identifier grammar, and
+   percent-encoded into the request path. No fallback to "the first client".
+2. **Policy first.** The extension reads
+   `<App Group>/notification-policy/policy.json`, written by the host through
+   `NotificationPolicySnapshot` (`lib/client/components/push_notification/ios/`)
+   every time a watched preference changes, before the preference write
+   returns (`Preference.afterWrite`). Missing, malformed, oversized, or
+   undecidable snapshot, notifications muted, Mentions-only mode, a snoozed
+   room, or the private preview choice: the gateway payload is delivered
+   unmodified. Room snoozes are matched by HMAC-SHA256 digest of
+   `clientId::roomId` under a key carried in the file, so the snapshot names
+   no room. The snapshot is deleted on data reset and when the last account
+   is removed, and rewritten on other account changes.
+3. **Database, read-only.** `<App Group>/db/account/drift/<client_id>/data.db`
+   is opened `SQLITE_OPEN_READONLY` with a 1.5 s busy timeout, and exactly one
+   `client_data` row supplies the homeserver, the token and the user id.
+   Failures are classified by extended result code (busy, cantopen, corrupt)
+   for a diagnostic counter that is pre-registered but not yet built.
+4. **Fetch.** `GET /_matrix/client/v3/rooms/{room}/event/{event}` against the
+   stored homeserver only, HTTPS only, no redirects, 8 s request and 12 s
+   resource timeouts, 2 MB body cap. Only an iOS request timeout may trigger
+   one retry within the original event-fetch envelope; all other failures
+   stop. Developer Mode records only the bounded attempt count. 401 and 403
+   stop the extension; it never refreshes or writes a token, and holds it in
+   memory only.
+5. **Decrypt.** `m.megolm.v1.aes-sha2` only, through vodozemac's
+   `ios_decrypt_event` with the session pickle from the same database and the
+   pickle key derived exactly as `pickle_key.dart` does (UTF-16 code units,
+   low byte, padded or truncated to 32). A missing session, an Olm-only
+   event, or any library error is an ordinary failure: generic, no retry.
+6. **Gates mirrored from `shouldNotify`.** Self-sent events and events older
+   than ten minutes deliver generic.
+7. **Render, once.** A fresh mutable copy gets title (sender display
+   name from `room_members`, else the localpart), subtitle (room name from
+   room state, if any), body (text, or the media presentation such as
+   "Sent an image"), `threadIdentifier = clientId::roomId` to match the
+   host's own notifications, and the rich message category so Reply and
+   Mute work. It is handed over in one assignment; the gateway content is
+   never mutated and is what `serviceExtensionTimeWillExpire` delivers.
+8. **Logging.** `os.Logger` lines carry a stage, an outcome class and
+   integer codes, all literals or numbers. Nothing event-derived, no path, no
+   origin, no library error string.
+
+Not in the first revision, by decision rather than omission: image
+attachments (needs the authenticated media download plus AES-CTR
+attachment decryption, which the vodozemac ABI does not provide), Mentions
+mode (needs a per-event highlight signal in the payload), and the diagnostic
+counter above. The target is `APPLICATION_EXTENSION_API_ONLY`, links the
+vodozemac archive through `-force_load` and the system `sqlite3`, and must
+never depend on the `flutter_vodozemac` pod, which pulls `Flutter.framework`.
 
 ### Web
 
@@ -586,6 +730,15 @@ Visible preference/config areas include:
 
 - `intergalactic/lib/config/preferences.dart`
 - notifier-specific content builders
+- `lib/client/components/push_notification/ios/notification_policy_snapshot_io.dart`:
+  the local notification preferences the iOS extension honours are carried
+  to it through this snapshot. A new local-only notification control is not
+  honoured by the extension until it is added to
+  `NotificationPolicyInputs`, the watched key set, and the extension's
+  `NSEPolicy.decide`. Older valid snapshots without `developer_mode` retain
+  their rich-preview policy while defaulting the developer-only path off;
+  malformed values still fail closed. Add new controls to all three in one
+  change and decide their old-snapshot default explicitly.
 
 ## Change Checklist
 
@@ -607,7 +760,14 @@ When changing notifications, inspect all of the following:
 - notification privacy settings still apply
 - no stale pusher or token cleanup regressions
 
-## TODOs To Verify In Repo
+## Verified Implementation Paths
 
-- Verify the current native iOS APNs bridge path before documenting file-level ownership more narrowly than `intergalactic/ios/`.
-- Verify whether any desktop target has additional native notifier code outside the shared Dart notifier layer before adding more platform-specific path guidance.
+- iOS shared notifier behavior lives under
+  `intergalactic/lib/client/components/push_notification/ios/ios_notifier.dart`;
+  the native APNs registration and tap bridge lives in
+  `intergalactic/ios/Runner/AppDelegate.swift`.
+- Desktop notification policy remains in the shared Dart notifier layer. The
+  Windows companion display host is implemented under
+  `intergalactic/lib/ui/windows/notification_companion/`.
+- Keep platform-specific ownership claims narrow and verify the target runner
+  folder before documenting a new native notifier path.

@@ -3,6 +3,8 @@ import 'package:intergalactic/client/attachment.dart';
 import 'package:intergalactic/client/client.dart';
 import 'package:intergalactic/client/components/threads/thread_component.dart';
 import 'package:intergalactic/client/components/url_preview/url_preview_component.dart';
+import 'package:intergalactic/client/matrix/components/message_forwarding/matrix_forwarded_message.dart';
+import 'package:intergalactic/client/matrix/timeline_events/matrix_timeline_event_message.dart';
 import 'package:intergalactic/client/timeline_events/local_media_send_event.dart';
 import 'package:intergalactic/client/timeline_events/photo_stack_grouping.dart';
 import 'package:intergalactic/client/timeline_events/timeline_event.dart';
@@ -20,6 +22,7 @@ import 'package:intergalactic/ui/molecules/read_indicator.dart';
 import 'package:intergalactic/ui/molecules/timeline_events/events/timeline_event_view_attachments.dart';
 import 'package:intergalactic/ui/molecules/timeline_events/events/timeline_event_view_reactions.dart';
 import 'package:intergalactic/ui/molecules/timeline_events/events/timeline_event_view_reply.dart';
+import 'package:intergalactic/ui/molecules/timeline_events/events/timeline_event_view_forwarded.dart';
 import 'package:intergalactic/ui/molecules/timeline_events/events/timeline_event_view_sticker.dart';
 import 'package:intergalactic/ui/molecules/timeline_events/events/timeline_event_view_thread.dart';
 import 'package:intergalactic/ui/molecules/timeline_events/events/timeline_event_view_url_previews.dart';
@@ -100,6 +103,8 @@ class _TimelineEventViewMessageState extends State<TimelineEventViewMessage>
   );
 
   Widget? formattedContent;
+  Widget? _unmodifiedFormattedContent;
+  bool _isLinkOnlyPreviewMessage = false;
   String? body;
   ImageProvider? senderAvatar;
   List<Attachment>? attachments;
@@ -108,6 +113,7 @@ class _TimelineEventViewMessageState extends State<TimelineEventViewMessage>
   ImageProvider? sticker;
   bool hasReactions = false;
   bool isInResponse = false;
+  MatrixForwardedPresentation? forwardedPresentation;
   bool showSender = false;
   bool emojiOnlyMessage = false;
   LocalMediaSendState? localMediaSendState;
@@ -130,6 +136,38 @@ class _TimelineEventViewMessageState extends State<TimelineEventViewMessage>
   int index = 0;
 
   bool edited = false;
+
+  /// True once [loadStateFromEvent] has filled the five event-derived `late`
+  /// fields: [senderName], [senderId], [senderColor], [eventId] and
+  /// [sentTime].
+  ///
+  /// An index that does not resolve leaves all five unset and `build` reads
+  /// them unconditionally, so an early return on its own would trade
+  /// RangeError for LateInitializationError - the trap TimelineEventViewPoll
+  /// hit.
+  bool _hasEvent = false;
+
+  /// Whether [index] still names an event in the current list.
+  ///
+  /// [index] is the position the owning entry handed over, and it is only
+  /// accurate at that moment. TimelineViewEntry has no `didUpdateWidget`, so
+  /// after a removal it keeps its old index until the next `update()` corrects
+  /// it - and this widget's own `didUpdateWidget` does not re-read anything
+  /// when the index it is given has not changed. So `build` can run against a
+  /// list that has already shrunk under an index that was valid when
+  /// [loadEventState] last ran, which is why this is checked in `build` rather
+  /// than only at load time. Three reads in `build` depend on it: the
+  /// attachment slot's `events[index]`, and both `events[...]` reads in
+  /// [shouldShowBubbleAvatar].
+  bool get _indexResolves {
+    final timeline = widget.timeline;
+    return timeline == null || (index >= 0 && index < timeline.events.length);
+  }
+
+  /// True when this entry paints the photo stack rather than a plain
+  /// attachment list. Mirrors the condition the `attachments:` slot uses.
+  bool get _rendersPhotoStack =>
+      attachments != null && photoStackAttachments != null;
 
   /// Resolves everything derived from the *client* rather than from the event.
   ///
@@ -171,6 +209,14 @@ class _TimelineEventViewMessageState extends State<TimelineEventViewMessage>
   @override
   Widget build(BuildContext context) {
     if (!_ready) {
+      return const SizedBox.shrink();
+    }
+
+    // An index with no event renders as an empty row rather than as the
+    // neighbouring message - the same choice TimelineViewEntryState.loadState
+    // and TimelineEventViewPoll make. See [_hasEvent] and [_indexResolves] for
+    // why both halves are needed.
+    if (!_hasEvent || !_indexResolves) {
       return const SizedBox.shrink();
     }
 
@@ -238,6 +284,7 @@ class _TimelineEventViewMessageState extends State<TimelineEventViewMessage>
                 ? PhotoStackAttachmentView(
                     items: photoStackAttachments!,
                     timeline: widget.timeline!,
+                    scopeEventId: eventId,
                     previewMedia: widget.previewMedia,
                     isThreadTimeline: widget.isThreadTimeline,
                     setEditingEvent: widget.setEditingEvent,
@@ -271,7 +318,20 @@ class _TimelineEventViewMessageState extends State<TimelineEventViewMessage>
               previewMedia: widget.previewMedia,
             )
           : null,
-      inResponseTo: isInResponse && widget.timeline != null
+      inResponseTo: forwardedPresentation != null
+          ? TimelineEventViewForwarded(
+              presentation: forwardedPresentation!,
+              bubbleMessages: bubbleMessages,
+              alignRight: alignRight,
+              bubbleColor: activeBubbleColor,
+              // The original author is not a member here, but the colour is
+              // derived from the Matrix ID alone, so a forward credits them in
+              // the same colour a reply in their own room would.
+              originalAuthorColor: room
+                  ?.getMemberOrFallback(forwardedPresentation!.originalAuthorId)
+                  .defaultColor,
+            )
+          : isInResponse && widget.timeline != null
           ? TimelineEventViewReply(
               timeline: widget.timeline!,
               index: index,
@@ -281,18 +341,28 @@ class _TimelineEventViewMessageState extends State<TimelineEventViewMessage>
               bubbleColor: activeBubbleColor,
             )
           : null,
-      reactions: hasReactions && widget.timeline != null
-          ? TimelineEventViewReactions(timeline: widget.timeline!, index: index)
+      // A photo stack renders this event's reactions itself, as the "All"
+      // chip beside the per-photo ones - the anchor event is both the stack's
+      // reaction target and its last photo. Leaving this row on printed them a
+      // second time, and under a number that named the wrong photo.
+      reactions: hasReactions && widget.timeline != null && !_rendersPhotoStack
+          ? TimelineEventViewReactions(
+              timeline: widget.timeline!,
+              index: index,
+              updateRevision: widget.updateRevision,
+            )
           : null,
       urlPreviews:
           previewComponent != null && doUrlPreview && widget.timeline != null
           ? TimelineEventViewUrlPreviews(
               index: index,
+              updateRevision: widget.updateRevision,
               timeline: widget.timeline!,
               component: previewComponent!,
               bubbleMessages: bubbleMessages,
               alignRight: alignRight,
               bubbleColor: activeBubbleColor,
+              onPreviewVisibilityChanged: _onPreviewVisibilityChanged,
             )
           : null,
       thread: isHeadOfThread && widget.timeline != null
@@ -368,23 +438,80 @@ class _TimelineEventViewMessageState extends State<TimelineEventViewMessage>
         }
       });
     }
+
+    // The other half of this widget's input, and the one `didUpdateWidget`
+    // used to ignore entirely. `initialEvent` is how TimelineEventViewSingle
+    // drives this view - it passes no timeline, a constant index of 0 and a
+    // constant revision, so the branch above can never fire there and the
+    // event was read once, at `initState`, and never again.
+    //
+    // That is reachable: room_event_search_widget.dart:96 feeds an
+    // ImplicitlyAnimatedList whose results arrive over a stream
+    // (onResultsChanged, :154) and replace `currentResults` in place, and the
+    // underlying AnimatedList builds its children positionally with no keys.
+    // A result inserted above this row hands the same State a different
+    // event, and without this the row keeps rendering the previous one.
+    //
+    // Applied after the index branch and last, which is the order `initState`
+    // uses: an explicit event wins over whatever the index resolved to.
+    //
+    // An event that goes away is handled too, and is why this is a comparison
+    // with a null branch rather than `initialEvent != null &&`. No current
+    // caller does it - TimelineEventViewSingle's own `event` is non-nullable -
+    // but this widget's parameter is nullable, so "the event was withdrawn"
+    // is a state a caller can express, and falling through would have left
+    // the removed event on screen. `_hasEvent` is the honest answer for it:
+    // the five `late` fields still hold the previous event, and it is what
+    // stops `build` reading them.
+    if (_ready && widget.initialEvent != oldWidget.initialEvent) {
+      setState(() {
+        final event = widget.initialEvent;
+        if (event != null) {
+          loadStateFromEvent(event);
+        } else if (widget.timeline != null) {
+          // A timeline is the other source of truth for this row, and it
+          // outranks nothing-at-all: fall back to what the index resolves to
+          // rather than blanking a row that still has an event behind it.
+          // loadEventState clears `_hasEvent` itself if it does not.
+          loadEventState(widget.index);
+        } else {
+          _hasEvent = false;
+        }
+      });
+    }
   }
 
   void loadEventState(var eventIndex) {
     index = eventIndex;
-    if (widget.timeline != null) {
-      var event = widget.timeline!.events[eventIndex];
-      loadStateFromEvent(event);
+    if (widget.timeline == null) {
+      return;
     }
+
+    // "This row now shows a different event", so clear rather than keep. The
+    // index arrives from `didUpdateWidget` as well as from `initState`, and a
+    // revision bump reaches this widget a frame after the entry read the
+    // index, by which time a removal may have shortened the list. Keeping the
+    // previous render would attach this row to a message that is no longer in
+    // the timeline.
+    if (eventIndex < 0 || eventIndex >= widget.timeline!.events.length) {
+      _hasEvent = false;
+      return;
+    }
+
+    var event = widget.timeline!.events[eventIndex];
+    loadStateFromEvent(event);
   }
 
   void loadStateFromEvent(TimelineEvent event) {
     formattedContent = null;
+    _unmodifiedFormattedContent = null;
+    _isLinkOnlyPreviewMessage = false;
     body = null;
     attachments = null;
     sticker = null;
     hasReactions = false;
     isInResponse = false;
+    forwardedPresentation = null;
     doUrlPreview = false;
     edited = false;
     isHeadOfThread = false;
@@ -404,6 +531,11 @@ class _TimelineEventViewMessageState extends State<TimelineEventViewMessage>
     senderColor = sender.defaultColor;
 
     sentTime = event.originServerTs;
+    // Every `late` field is assigned by this point, which is exactly what
+    // `_hasEvent` promises `build`. Set here rather than at the top: the
+    // returns further down are content branches, and all of them run after
+    // this line.
+    _hasEvent = true;
 
     if (widget.timeline != null) {
       if (event is TimelineEventFeatureReactions) {
@@ -446,12 +578,14 @@ class _TimelineEventViewMessageState extends State<TimelineEventViewMessage>
       return;
     }
 
-    var content = event.buildFormattedContent(timeline: widget.timeline);
-    if (content == null) {
-      formattedContent = null;
-    } else {
-      formattedContent = content;
+    if (event is MatrixTimelineEventMessage) {
+      forwardedPresentation = MatrixForwardedPresentation.tryParse(event);
     }
+
+    _unmodifiedFormattedContent = event.buildFormattedContent(
+      timeline: widget.timeline,
+    );
+    formattedContent = _unmodifiedFormattedContent;
 
     attachments = event.attachments;
     final photoStack = _resolvePhotoStack(event);
@@ -471,98 +605,147 @@ class _TimelineEventViewMessageState extends State<TimelineEventViewMessage>
         : null;
 
     emojiOnlyMessage = _isEmojiOnlyTextMessage(event);
+    _isLinkOnlyPreviewMessage =
+        doUrlPreview && _messageIsOnlyPreviewLinks(event);
 
     if (doUrlPreview &&
         knownPreviewData != null &&
         knownPreviewData != UrlPreviewComponent.invalidPreviewData &&
-        _messageIsOnlyPreviewLinks(event)) {
+        _isLinkOnlyPreviewMessage) {
       formattedContent = null;
     }
   }
 
+  void _onPreviewVisibilityChanged(bool hasVisiblePreview) {
+    if (!_isLinkOnlyPreviewMessage) {
+      return;
+    }
+
+    final nextContent = hasVisiblePreview ? null : _unmodifiedFormattedContent;
+    if (identical(formattedContent, nextContent)) {
+      return;
+    }
+
+    setState(() {
+      formattedContent = nextContent;
+    });
+  }
+
+  // EVERY MESSAGE BELOW DECLARES ITS OWN PARAMETERLESS MEMBER, and the two
+  // `_localMediaSendState...` members that pick between them hold no
+  // `Intl.message` at all. That split is load bearing: `intl_translation` keys
+  // a message off its declaring member, so it takes at most one message per
+  // member and refuses any message declared inside a member that takes
+  // parameters. Folding these back into the switch un-extracts all twelve
+  // silently - no error, no analyzer complaint and no failing test. Adding
+  // `args: [sendState]` is not the fix either: none of these messages uses
+  // `sendState`, so declaring it as a placeholder would be a lie.
+
+  String get localMediaSendPreparing => Intl.message(
+    "Preparing",
+    desc: "Status label shown for a local media message being prepared",
+    name: "localMediaSendPreparing",
+  );
+
+  String get localMediaSendUploading => Intl.message(
+    "Uploading",
+    desc: "Status label shown for a local media message being uploaded",
+    name: "localMediaSendUploading",
+  );
+
+  String get localMediaSendSending => Intl.message(
+    "Sending",
+    desc: "Status label shown for a local media message being sent",
+    name: "localMediaSendSending",
+  );
+
+  String get localMediaSendSent => Intl.message(
+    "Sent",
+    desc: "Status label shown for a local media message that was sent",
+    name: "localMediaSendSent",
+  );
+
+  String get localMediaSendFailed => Intl.message(
+    "Couldn't send",
+    desc: "Status label shown for a local media message send failure",
+    name: "localMediaSendFailed",
+  );
+
+  String get localMediaSendCancelled => Intl.message(
+    "Cancelled",
+    desc: "Status label shown for a cancelled local media message",
+    name: "localMediaSendCancelled",
+  );
+
   String _localMediaSendStateLabel(LocalMediaSendState sendState) {
     switch (sendState) {
       case LocalMediaSendState.preparing:
-        return Intl.message(
-          "Preparing",
-          desc: "Status label shown for a local media message being prepared",
-          name: "localMediaSendPreparing",
-        );
+        return localMediaSendPreparing;
       case LocalMediaSendState.uploading:
-        return Intl.message(
-          "Uploading",
-          desc: "Status label shown for a local media message being uploaded",
-          name: "localMediaSendUploading",
-        );
+        return localMediaSendUploading;
       case LocalMediaSendState.sending:
-        return Intl.message(
-          "Sending",
-          desc: "Status label shown for a local media message being sent",
-          name: "localMediaSendSending",
-        );
+        return localMediaSendSending;
       case LocalMediaSendState.sent:
-        return Intl.message(
-          "Sent",
-          desc: "Status label shown for a local media message that was sent",
-          name: "localMediaSendSent",
-        );
+        return localMediaSendSent;
       case LocalMediaSendState.failed:
-        return Intl.message(
-          "Couldn't send",
-          desc: "Status label shown for a local media message send failure",
-          name: "localMediaSendFailed",
-        );
+        return localMediaSendFailed;
       case LocalMediaSendState.cancelled:
-        return Intl.message(
-          "Cancelled",
-          desc: "Status label shown for a cancelled local media message",
-          name: "localMediaSendCancelled",
-        );
+        return localMediaSendCancelled;
     }
   }
+
+  String get localMediaSendPreparingSemantic => Intl.message(
+    "Preparing media to send",
+    desc:
+        "Accessibility label for a local media message being prepared to send",
+    name: "localMediaSendPreparingSemantic",
+  );
+
+  String get localMediaSendUploadingSemantic => Intl.message(
+    "Uploading media",
+    desc: "Accessibility label for a local media message being uploaded",
+    name: "localMediaSendUploadingSemantic",
+  );
+
+  String get localMediaSendSendingSemantic => Intl.message(
+    "Sending media message",
+    desc:
+        "Accessibility label for a local media message being sent after upload",
+    name: "localMediaSendSendingSemantic",
+  );
+
+  String get localMediaSendSentSemantic => Intl.message(
+    "Media sent",
+    desc: "Accessibility label for a local media message that has been sent",
+    name: "localMediaSendSentSemantic",
+  );
+
+  String get localMediaSendFailedSemantic => Intl.message(
+    "Media upload failed",
+    desc: "Accessibility label for a local media message that failed to send",
+    name: "localMediaSendFailedSemantic",
+  );
+
+  String get localMediaSendCancelledSemantic => Intl.message(
+    "Media send cancelled",
+    desc: "Accessibility label for a cancelled local media message send",
+    name: "localMediaSendCancelledSemantic",
+  );
 
   String _localMediaSendStateSemanticLabel(LocalMediaSendState sendState) {
     switch (sendState) {
       case LocalMediaSendState.preparing:
-        return Intl.message(
-          "Preparing media to send",
-          desc:
-              "Accessibility label for a local media message being prepared to send",
-          name: "localMediaSendPreparingSemantic",
-        );
+        return localMediaSendPreparingSemantic;
       case LocalMediaSendState.uploading:
-        return Intl.message(
-          "Uploading media",
-          desc: "Accessibility label for a local media message being uploaded",
-          name: "localMediaSendUploadingSemantic",
-        );
+        return localMediaSendUploadingSemantic;
       case LocalMediaSendState.sending:
-        return Intl.message(
-          "Sending media message",
-          desc:
-              "Accessibility label for a local media message being sent after upload",
-          name: "localMediaSendSendingSemantic",
-        );
+        return localMediaSendSendingSemantic;
       case LocalMediaSendState.sent:
-        return Intl.message(
-          "Media sent",
-          desc:
-              "Accessibility label for a local media message that has been sent",
-          name: "localMediaSendSentSemantic",
-        );
+        return localMediaSendSentSemantic;
       case LocalMediaSendState.failed:
-        return Intl.message(
-          "Media upload failed",
-          desc:
-              "Accessibility label for a local media message that failed to send",
-          name: "localMediaSendFailedSemantic",
-        );
+        return localMediaSendFailedSemantic;
       case LocalMediaSendState.cancelled:
-        return Intl.message(
-          "Media send cancelled",
-          desc: "Accessibility label for a cancelled local media message send",
-          name: "localMediaSendCancelledSemantic",
-        );
+        return localMediaSendCancelledSemantic;
     }
   }
 
@@ -614,23 +797,29 @@ class _TimelineEventViewMessageState extends State<TimelineEventViewMessage>
         : event.getPlaintextBody(timeline);
   }
 
+  /// Whether [event]'s body is nothing but a link (or links) once every URL
+  /// is removed.
+  ///
+  /// Decided from the PLAIN TEXT body alone - never by comparing [getLinks]'
+  /// HTML-derived `Uri`s against it. `getLinks` reads the HTML formatted
+  /// body, where `&` is entity-encoded as `&amp;`; the URL regex does not
+  /// match `;`, so a query string containing `&` is truncated there when
+  /// read from HTML and the truncated form is never a substring of the
+  /// plaintext original - a link-only TikTok/YouTube message (both routinely
+  /// carry `&` in their query strings) would read as having body text left
+  /// over and never hide behind its preview.
   bool _messageIsOnlyPreviewLinks(TimelineEventMessage event) {
     final timeline = widget.timeline;
     if (timeline == null) {
       return false;
     }
 
-    final links = event.getLinks(timeline: timeline);
-    if (links == null || links.isEmpty) {
+    final plainText = event.getPlaintextBody(timeline).trim();
+    if (plainText.isEmpty) {
       return false;
     }
 
-    var remaining = event.getPlaintextBody(timeline).trim();
-    for (final link in links) {
-      remaining = remaining.replaceAll(link.toString(), '');
-    }
-
-    return remaining.trim().isEmpty;
+    return TextUtils.stripUrls(plainText).trim().isEmpty;
   }
 
   _PhotoStackResolution _resolvePhotoStack(TimelineEventMessage event) {

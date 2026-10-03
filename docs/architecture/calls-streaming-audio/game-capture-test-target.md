@@ -1,8 +1,7 @@
 # Game Capture Test Target
 
 Status: Debug-only measurement harness
-Owner: EXPERIMENTAL
-Last updated: 2026-06-05
+Last updated: 2026-09-22
 
 Inter Galactic includes a local Windows D3D11 test app named
 `InterGalacticCaptureTarget.exe` under `tools/game-capture-target/`. It exists
@@ -78,6 +77,15 @@ The target section is separate from `gameCaptureProbe`. Use
 `gameCaptureTestTarget` to confirm the synthetic source Present cadence, and
 use `gameCaptureProbe` to confirm hook/host/handoff behavior for the selected
 process.
+
+### Stop Reporting
+
+On Windows, a stop request waits briefly for the helper to exit. A timeout is
+reported as `stop_unconfirmed`, with a reason that the process may still be
+running; it is not reported as `stopped`. The runner does not attempt a
+SIGKILL escalation because Windows does not support that stronger signal
+selection through `Process.kill`. A non-zero observed exit remains a confirmed
+`stopped` result, and a stop-operation exception is reported as `stop_failed`.
 
 ## Local No-Call Harness
 
@@ -224,5 +232,5 @@ game-capture backend phases:
 - Eventually, encoder texture-input experiments before attempting BG3.
 
 Any future phase that publishes target/hook frames to LiveKit must update the
-game-capture backend architecture, stream diagnostic contract, integration
-queue, and security/review plan before becoming user-facing.
+game-capture backend architecture and stream diagnostic contract docs before
+becoming user-facing.

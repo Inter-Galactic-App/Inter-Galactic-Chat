@@ -1,9 +1,6 @@
 # libmpv and its bundled FFmpeg — third-party notice evidence (Windows desktop)
 
 Generated: 2026-08-07
-Prepared by: S&C
-Status: DRAFT - NOT PUBLISHED. REVIEW owns placement and publication.
-
 This document supplies the notice content for `libmpv-2.dll`, the Windows media playback
 library, and for the FFmpeg statically compiled inside it. Neither
 `docs/release/THIRD_PARTY_NOTICES.md` nor `docs/policies/THIRD_PARTY_NOTICES.md` currently
@@ -147,9 +144,8 @@ from the Inter Galactic open-source information page.
   this entry previously presented the encouraged text as the required one.
   **The year is permanently absent, and this is now settled rather than
   pending.** The FTL directs replacing `<year>` with the version actually used.
-  S&C recorded that this bundle's FreeType version appears nowhere and expected
-  a direct probe of the DLL to confirm it; REVIEW ran that probe on Windows,
-  2026-08-15, against the shipped `libmpv-2.dll`, sha256
+  The bundle's FreeType version is not recoverable from the DLL. A direct string
+  probe against the shipped `libmpv-2.dll`, sha256
   `D5F0694B08C124E785D858D00082F3E3B158DD9138BFC48C0382BF1EB443A5FC` — the
   digest this document already records — and it comes back **empty**:
 
@@ -169,8 +165,7 @@ from the Inter Galactic open-source information page.
 
   Do **not** infer the year from the DLL's build date: 2.13.x, 2.12.x and 2.11.x
   give 2023, 2022 and 2021 respectively, and a date bound only answers where
-  every candidate agrees. Tracked in
-  `docs/agent-control/security-and-compliance-handoff.md` (Matrix_Dev).
+  every candidate agrees.
 
   The credit form is encouraged rather than required, so an absent year does not
   leave a mandatory limb unmet; the mandatory disclaimer above is present. Note

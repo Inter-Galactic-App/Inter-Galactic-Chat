@@ -18,6 +18,7 @@ import 'package:intergalactic/config/layout_config.dart';
 import 'package:intergalactic/main.dart' as app_globals;
 import 'package:intergalactic/ui/molecules/emoticon_picker.dart';
 import 'package:intergalactic/ui/molecules/message_input.dart';
+import 'package:intergalactic/ui/molecules/overlapping_panels.dart';
 import 'package:intergalactic/ui/onboarding/tutorial_anchor.dart';
 import 'package:intergalactic/ui/onboarding/tutorial_focus_overlay.dart';
 import 'package:intergalactic/ui/onboarding/tutorial_scene.dart';
@@ -221,8 +222,9 @@ class _TutorialDemoBackdropState extends State<TutorialDemoBackdrop> {
     return MainPage(
       _clientManager,
       key: ValueKey(
-        'tutorial-demo-${widget.scene.initialSpaceId}-${widget.scene.roomId}-${widget.scene.sidePanel}-${widget.scene.sidePanelThreadId}-${widget.scene.settingsSurface}',
+        'tutorial-demo-${widget.scene.initialSpaceId}-${widget.scene.roomId}-${widget.scene.sidePanel}-${widget.scene.sidePanelThreadId}-${widget.scene.settingsSurface}-${widget.scene.mobilePanel}',
       ),
+      initialMobileRevealSide: _mobileRevealSide(widget.scene.mobilePanel),
       initialClientId: DemoClient.demoIdentifier,
       initialSpaceId: widget.scene.initialSpaceId,
       initialRoom: widget.scene.roomId,
@@ -244,6 +246,14 @@ class _TutorialDemoBackdropState extends State<TutorialDemoBackdrop> {
       null => null,
     };
   }
+
+  RevealSide _mobileRevealSide(TutorialMobilePanel panel) {
+    return switch (panel) {
+      TutorialMobilePanel.navigation => RevealSide.left,
+      TutorialMobilePanel.main => RevealSide.main,
+      TutorialMobilePanel.roomPanel => RevealSide.right,
+    };
+  }
 }
 
 class _TutorialSettingsOverlay extends StatelessWidget {
@@ -259,22 +269,26 @@ class _TutorialSettingsOverlay extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
+    // The tutorial card is layered by OnboardingPage above this backdrop. Keep
+    // mobile settings at their natural full-screen size rather than shrinking
+    // them to make room for that card.
+    if (Layout.mobile) {
+      return SizedBox.expand(child: _settingsBody(context));
+    }
+
     return LayoutBuilder(
       builder: (context, constraints) {
-        final inset = Layout.mobile ? 12.0 : 28.0;
+        final inset = 28.0;
         final maxWidth = math.max(260.0, constraints.maxWidth - inset * 2);
         final maxHeight = math.max(360.0, constraints.maxHeight - inset * 2);
-        final width = Layout.mobile
-            ? maxWidth
-            : math.min(maxWidth, math.max(760.0, constraints.maxWidth * 0.74));
-        final height = Layout.mobile
-            ? math.min(maxHeight, constraints.maxHeight * 0.76)
-            : math.min(maxHeight, constraints.maxHeight * 0.88);
+        final width = math.min(
+          maxWidth,
+          math.max(760.0, constraints.maxWidth * 0.74),
+        );
+        final height = math.min(maxHeight, constraints.maxHeight * 0.88);
 
         return Align(
-          alignment: Layout.mobile
-              ? Alignment.bottomCenter
-              : Alignment.centerRight,
+          alignment: Alignment.centerRight,
           child: Padding(
             padding: EdgeInsets.all(inset),
             child: SizedBox(
@@ -283,7 +297,7 @@ class _TutorialSettingsOverlay extends StatelessWidget {
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   color: scheme.surfaceContainer,
-                  borderRadius: BorderRadius.circular(Layout.mobile ? 28 : 20),
+                  borderRadius: BorderRadius.circular(20),
                   border: Border.all(
                     color: scheme.outline.withValues(alpha: 0.42),
                   ),
@@ -296,7 +310,7 @@ class _TutorialSettingsOverlay extends StatelessWidget {
                   ],
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(Layout.mobile ? 27 : 19),
+                  borderRadius: BorderRadius.circular(19),
                   child: _settingsBody(context),
                 ),
               ),
@@ -324,6 +338,7 @@ class _TutorialSettingsOverlay extends StatelessWidget {
           room: room,
           contextSpace: demoSpace,
           initialTabId: _settingsInitialTabId(surface),
+          initialTabInline: Layout.mobile,
         );
       }
     }
@@ -332,6 +347,7 @@ class _TutorialSettingsOverlay extends StatelessWidget {
       return SpaceSettingsPage(
         space: demoSpace,
         initialTabId: _settingsInitialTabId(surface),
+        initialTabInline: Layout.mobile,
       );
     }
 
@@ -342,15 +358,19 @@ class _TutorialSettingsOverlay extends StatelessWidget {
         theme: defaultThemeForCustomBase('dark'),
       );
 
-      return Padding(
-        padding: const EdgeInsets.all(16),
-        child: CustomThemeEditorPage(initialDraft: draft),
+      return Material(
+        color: Theme.of(context).colorScheme.surface,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: CustomThemeEditorPage(initialDraft: draft),
+        ),
       );
     }
 
     return AppSettingsPage(
       initialTabId: _settingsInitialTabId(surface),
       includeTutorialPreviewTabs: true,
+      initialTabInline: Layout.mobile,
     );
   }
 
@@ -560,7 +580,7 @@ class _FloatingDemoMenu extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.all(14),
             child: SizedBox(
-              width: 250,
+              width: Layout.mobile ? 220 : 250,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -887,9 +907,11 @@ class _TimelineSnowEffectOverlayState
             child: ClipRect(child: ParticlePlayer()),
           ),
         ),
-        const _FloatingDemoMenu(
+        _FloatingDemoMenu(
           alignment: Alignment.bottomRight,
-          margin: EdgeInsets.fromLTRB(0, 0, 230, 88),
+          margin: Layout.mobile
+              ? const EdgeInsets.fromLTRB(0, 0, 8, 104)
+              : const EdgeInsets.fromLTRB(0, 0, 230, 88),
           title: 'Snowfall sent',
           rows: [
             ('❄', 'Effect playing in the timeline'),

@@ -6,11 +6,14 @@ import 'package:intergalactic/client/matrix/matrix_client.dart';
 import 'package:intergalactic/client/components/profile/profile_component.dart';
 import 'package:intergalactic/client/components/activity/activity_connection_alerts.dart';
 import 'package:intergalactic/client/components/push_notification/ios/ios_notifier.dart';
+import 'package:intergalactic/client/components/push_notification/ios/notification_policy_snapshot_io.dart';
 import 'package:intergalactic/client/components/push_notification/notification_content.dart';
 import 'package:intergalactic/client/components/push_notification/notification_manager.dart';
+import 'package:intergalactic/client/matrix/database/app_group/drift_database_location.dart';
 import 'package:intergalactic/config/app_config.dart';
 import 'package:intergalactic/config/build_config.dart';
 import 'package:intergalactic/config/platform_utils.dart';
+import 'package:intergalactic/debug/log.dart';
 import 'package:intergalactic/diagnostic/diagnostics.dart';
 import 'package:intergalactic/main.dart';
 import 'package:intergalactic/ui/atoms/code_block.dart';
@@ -65,6 +68,8 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
         if (PlatformUtils.isAndroid) shortcuts(),
         backgroundTasks(),
         if (BuildConfig.DEBUG) dumpDatabases(),
+        if (BuildConfig.DEBUG && PlatformUtils.isIOS)
+          notificationPolicySnapshotTools(),
         if (BuildConfig.DEBUG) executeShellCommand(),
         otherSettings(),
       ],
@@ -686,6 +691,110 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
     );
   }
 
+  /// S&C required check (1) for the Notification Service Extension: with the
+  /// policy snapshot deleted, corrupted or truncated, the extension must
+  /// deliver the gateway's generic payload. These act on the real file in the
+  /// App Group so the check runs against the real read path; Rewrite restores
+  /// it from the live preferences.
+  Widget notificationPolicySnapshotTools() {
+    // Every button here must run through this: a file-system failure that is
+    // neither awaited nor caught reports success by showing nothing.
+    Future<void> run(String action, Future<void> Function() change) async {
+      try {
+        await change();
+        Log.i(
+          'Notification policy snapshot developer action=$action',
+          category: LogCategory.notifications,
+          source: 'developer-tools',
+        );
+      } catch (error, stackTrace) {
+        if (mounted) {
+          await AdaptiveDialog.showError(context, error, stackTrace);
+        }
+      }
+    }
+
+    Future<void> tamper(
+      String action,
+      Future<void> Function(File file) change,
+    ) async {
+      final directory = await NotificationPolicySnapshot.developerDirectory();
+      if (directory == null) {
+        return;
+      }
+      final file = File(p.join(directory, NotificationPolicySnapshot.fileName));
+      await run(action, () => change(file));
+    }
+
+    return developerUtilityGroup(
+      icon: Icons.policy_outlined,
+      title: "Notification Policy Snapshot",
+      description:
+          "Tamper with the extension's policy file to prove it fails closed (S&C check 1), then rewrite it.",
+      children: [
+        _DeveloperActionRow(
+          title: "Rewrite",
+          description: "Write the snapshot from the live preferences.",
+          action: tiamat.Button(
+            text: "Rewrite",
+            onTap: () => run('rewrite', NotificationPolicySnapshot.write),
+          ),
+        ),
+        _DeveloperActionRow(
+          title: "Rewrite with images off",
+          description:
+              "Write the snapshot with media previews off (S&C check 2). Expect an image message without a picture.",
+          action: tiamat.Button(
+            text: "Images off",
+            onTap: () => run(
+              'rewrite_media_off',
+              NotificationPolicySnapshot.developerWriteWithMediaOff,
+            ),
+          ),
+        ),
+        _DeveloperActionRow(
+          title: "Delete",
+          description: "Remove the file. Expect the generic notification.",
+          action: tiamat.Button(
+            text: "Delete",
+            onTap: () => tamper('delete', (file) async {
+              if (await file.exists()) {
+                await file.delete();
+              }
+            }),
+          ),
+        ),
+        _DeveloperActionRow(
+          title: "Corrupt",
+          description: "Replace the file with bytes that are not JSON.",
+          action: tiamat.Button(
+            text: "Corrupt",
+            onTap: () => tamper('corrupt', (file) async {
+              await file.writeAsString(
+                '{"version": 1, "notifications_enabled": tru',
+                flush: true,
+              );
+            }),
+          ),
+        ),
+        _DeveloperActionRow(
+          title: "Truncate",
+          description: "Cut the file to half its length.",
+          action: tiamat.Button(
+            text: "Truncate",
+            onTap: () => tamper('truncate', (file) async {
+              final bytes = await file.readAsBytes();
+              await file.writeAsBytes(
+                bytes.sublist(0, bytes.length ~/ 2),
+                flush: true,
+              );
+            }),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget dumpDatabases() {
     return developerUtilityGroup(
       icon: Icons.storage_outlined,
@@ -712,18 +821,47 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
                   .where((event) => event is File)
                   .toList();
 
-              try {
-                for (var file in files) {
+              // On iOS the account databases live in the App Group container
+              // once the migration has run, outside getDatabasePath(). Include
+              // them, or the dump quietly stops containing the account data.
+              List<FileSystemEntity>? appGroupFiles;
+              final appGroupRoot = DriftDatabaseLocation.appGroupDriftRoot;
+              if (appGroupRoot != null) {
+                final appGroupDir = Directory(appGroupRoot);
+                if (await appGroupDir.exists()) {
+                  appGroupFiles = await appGroupDir
+                      .list(recursive: true)
+                      .where((event) => event is File)
+                      .toList();
+                }
+              }
+
+              Future<void> copyInto(
+                String destinationRoot,
+                List<FileSystemEntity> entries,
+              ) async {
+                for (var file in entries) {
                   var name = p.basename(file.path);
                   var dirname = p.basename(p.dirname(file.path));
 
-                  var newFolder = Directory(p.join(folder, dirname));
+                  var newFolder = Directory(p.join(destinationRoot, dirname));
                   if (!await newFolder.exists()) {
                     await newFolder.create(recursive: true);
                   }
 
-                  var newFile = p.join(folder, dirname, name);
+                  var newFile = p.join(destinationRoot, dirname, name);
                   await (file as File).copy(newFile);
+                }
+              }
+
+              try {
+                await copyInto(folder, files);
+                if (appGroupFiles != null) {
+                  // After the migration both sources hold account databases
+                  // with the same directory and file names, so the App Group
+                  // copies need their own root or one silently overwrites the
+                  // other and the dump contains only half the accounts.
+                  await copyInto(p.join(folder, 'app-group'), appGroupFiles);
                 }
               } catch (error, stackTrace) {
                 if (mounted) {

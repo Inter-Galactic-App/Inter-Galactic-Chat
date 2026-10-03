@@ -264,6 +264,7 @@ struct ProcessorSharedState {
   std::atomic<double> deepfilternet_last_local_snr{0.0};
   std::atomic<int> deepfilternet_speech_protected_frames{0};
   std::atomic<double> deepfilternet_last_speech_protect_wet_mix{1.0};
+  std::atomic<bool> deepfilternet_speech_protect_hysteresis_enabled{false};
   std::atomic<bool> deepfilternet_transient_suppression_enabled{false};
   std::atomic<int> deepfilternet_transient_suppressed_frames{0};
   std::atomic<int> deepfilternet_transient_adjusted_samples{0};
@@ -292,8 +293,18 @@ struct ProcessorSharedState {
   std::mutex prewarm_mutex;
   std::unique_ptr<DeepFilterNetRuntime> prewarmed_deepfilternet;
   std::unique_ptr<DeepFilterNetRuntime> prewarmed_hush;
+  // `ready` means a runtime whose model LOADED and produced a warm-up frame,
+  // not merely that an object exists. A prewarm that fails publishes nothing
+  // and records why, so the callback can report the real cause instead of a
+  // generic not-initialized.
   std::atomic<bool> prewarmed_deepfilternet_ready{false};
   std::atomic<bool> prewarmed_hush_ready{false};
+  std::atomic<bool> prewarm_deepfilternet_attempted{false};
+  std::atomic<bool> prewarm_hush_attempted{false};
+  std::atomic<int> prewarmed_deepfilternet_reason{
+      kDeepFilterNetRuntimeReasonNotInitialized};
+  std::atomic<int> prewarmed_hush_reason{
+      kDeepFilterNetRuntimeReasonNotInitialized};
   std::atomic<double> deepfilternet_warmup_ms{0.0};
   std::atomic<double> deepfilternet_hush_warmup_ms{0.0};
   std::atomic<int> deepfilternet_prewarm_pending_frames{0};
@@ -305,6 +316,12 @@ struct ProcessorSharedState {
 // shared prewarm slots for Process() to adopt. Must be called off the audio
 // callback thread. Slots that are still marked ready are left untouched so a
 // repeated trigger does not reload an unclaimed model.
+//
+// A slot is published ONLY when initialization, frame length and the silent
+// warm-up inference all succeed. On failure nothing is published, the
+// matching `prewarmed_*_reason` carries the native reason, and the callback
+// keeps failing open - so a broken model reads as a bypass with a real cause
+// rather than as a ready runtime that silently does nothing.
 void PrewarmDeepFilterNetRuntimes(ProcessorSharedState* shared_state,
                                   bool include_deepfilternet,
                                   bool include_hush);
@@ -325,6 +342,9 @@ class RnnoiseCaptureProcessor
   void Release() override;
 
  private:
+#ifdef INTERGALACTIC_AUDIO_NATIVE_TEST
+  friend struct HushGainRecoveryTestAccess;
+#endif
   bool EnsureRnnoiseState();
   void ResetRnnoiseState();
   void SetFormatMismatch(int reason_code, const char* log_reason);
@@ -462,6 +482,7 @@ class RnnoiseCaptureProcessor
   int output_antialias_history_count_ = 0;
   float prototype_gain_ = 1.0f;
   float deepfilternet_wet_mix_ = 1.0f;
+  int deepfilternet_speech_protect_hold_frames_ = 0;
   float deepfilternet_hush_recovery_gain_ = 1.0f;
   bool has_last_callback_time_ = false;
   std::chrono::steady_clock::time_point last_callback_time_{};

@@ -1126,6 +1126,104 @@ void main() {
     });
   });
 
+  group('DeepFilterNet libDF Rust crates', () {
+    late List<LicenseEntry> libdfEntries;
+    late String libdfEverything;
+
+    setUpAll(() async {
+      libdfEntries = await NativeLicenses.libdfRustEntriesForTest().toList();
+      libdfEverything = libdfEntries.map(textOf).join('\n');
+    });
+
+    test('the generated notice is shipped with its pinned bytes', () async {
+      final ByteData data = await rootBundle.load(
+        'assets/licenses/deepfilternet-libdf-rust-crates-NOTICE.txt',
+      );
+      final String actual = sha256
+          .convert(
+            data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
+          )
+          .toString();
+      expect(
+        actual,
+        '47d95db86aa1030964635319f4d17e3a1550e4aa7376642c06e8f2342f31bfc3',
+        reason: 'the libDF recipient notice is not the generated evidence text',
+      );
+    });
+
+    test('the notice is explicitly registered for incremental packaging', () {
+      final File pubspec = File('pubspec.yaml');
+      expect(
+        pubspec.existsSync(),
+        isTrue,
+        reason: 'pubspec.yaml moved; this packaging tripwire reads nothing',
+      );
+      expect(
+        RegExp(
+          r'^\s*-\s+assets/licenses/deepfilternet-libdf-rust-crates-NOTICE\.txt\s*$',
+          multiLine: true,
+        ).hasMatch(pubspec.readAsStringSync()),
+        isTrue,
+        reason:
+            'the libDF notice is directory-only in pubspec.yaml; Flutter '
+            'incremental packaging can miss a newly added file under that entry',
+      );
+    });
+
+    test('the full document is attached to the delivered libDF runtime', () {
+      const String label =
+          'DeepFilterNet libDF Rust crates (Windows df.dll and Android libdf.so)';
+      final Iterable<LicenseEntry> attached = libdfEntries.where(
+        (LicenseEntry entry) => entry.packages.contains(label),
+      );
+      expect(attached, isNotEmpty, reason: 'no entry carries the libDF label');
+      // Bound to the label, not merely present in the registry. A length
+      // check alone is satisfied by ANY large notice, so the generated libDF
+      // document could be attached to a different runtime entry and this
+      // still passed - and the test below joins every libDF entry's text, so
+      // it cannot tell the two apart either. These markers come from the
+      // generated document itself.
+      final Iterable<String> attachedTexts = attached.map(textOf);
+      expect(
+        attachedTexts.any(
+          (String text) =>
+              text.length > 300000 &&
+              text.contains('109 unique package/version pairs') &&
+              text.contains('deep_filter  0.5.7-pre'),
+        ),
+        isTrue,
+        reason:
+            'the libDF label has no complete recipient notice attached, or '
+            'the notice attached to it is not the generated libDF document',
+      );
+    });
+
+    test(
+      'the notice names the measured package closure and its qualifications',
+      () {
+        for (final String expected in <String>[
+          '109 unique package/version pairs',
+          'deep_filter  0.5.7-pre',
+          'Rust standard library  1.94.1',
+          'crunchy 0.2.2',
+          'realfft 3.3.0',
+          'qualified SPDX MIT mapping',
+        ]) {
+          expect(
+            libdfEverything.contains(expected),
+            isTrue,
+            reason: 'libDF notice is missing $expected',
+          );
+        }
+        expect(
+          libdfEverything.contains('vodozemac  0.9.0'),
+          isFalse,
+          reason: 'the distinct vodozemac closure must not be claimed as libDF',
+        );
+      },
+    );
+  });
+
   group('Rust crates linked into the app binary', () {
     late List<LicenseEntry> rustEntries;
     late String rustEverything;
@@ -1310,6 +1408,13 @@ void main() {
       // notice into a confusing one.
       expect(rustEverything.contains('static archive'), isTrue);
       expect(rustEverything.contains('merged into the application'), isTrue);
+      expect(
+        rustEverything.contains(
+          'notification extension contain the statically linked tree',
+        ),
+        isTrue,
+        reason: 'the patched iOS notice must not describe Runner-only linkage',
+      );
     });
 
     test('nothing that is not linked in is claimed', () {
