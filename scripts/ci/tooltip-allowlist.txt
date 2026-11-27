@@ -1,0 +1,3 @@
+# Material tooltip sites, grandfathered. Counts may fall, never rise.
+# Regenerate: bash scripts/ci/check-tooltip-component.sh --update
+# See scripts/ci/check-tooltip-component.sh for why this gate exists.

@@ -1,0 +1,21 @@
+name: intergalactic_windows_share
+description: Windows native screen and shared-audio capture bindings for Inter Galactic.
+publish_to: none
+version: 0.0.1
+
+environment:
+  sdk: '>=3.6.0 <4.0.0'
+  flutter: '>=3.24.0'
+
+resolution: workspace
+
+dependencies:
+  ffi: ^2.2.0
+  flutter:
+    sdk: flutter
+
+flutter:
+  plugin:
+    platforms:
+      windows:
+        pluginClass: IntergalacticWindowsSharePlugin

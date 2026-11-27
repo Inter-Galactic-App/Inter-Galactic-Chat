@@ -1,0 +1,798 @@
+{
+  "schemaVersion": 1,
+  "generated_at": "2026-08-07T14:12:12Z",
+  "generated_by": "S&C",
+  "status": "Tracked release evidence. Promoted from scratch 2026-08-08 at REVIEW's placement direction. Engineering licence/provenance evidence, not legal advice. Per-component corresponding source was published 2026-08-09 at https://app.ourgalaxy.space/source/ - see docs/release/evidence/corresponding-source-holding/HOLDING.json. Until 2026-08-09 this field read 'NOT yet published', which stopped being true the day the archives went live.",
+  "component": "Third-party components compiled into the bundled Windows FFmpeg tool pair",
+  "applies_to": {
+    "binaries": [
+      "intergalactic/windows/third_party/ffmpeg/bin/ffmpeg.exe",
+      "intergalactic/windows/third_party/ffmpeg/bin/ffprobe.exe"
+    ],
+    "binaries_note": "ffprobe.exe was removed from the desktop payload by app PR #101, but every public release through 0.8.0+993 shipped it and the source-availability obligation runs to those recipients. It is named here deliberately and must not be tidied out. Both executables share one provider, revision and configure line, so the component list is identical for both.",
+    "ffmpeg_version": "n8.1.1-13-g83e8541aa6-20260613",
+    "ffmpeg_revision": "83e8541aa601935a610b1b8958d56e8d0331318b",
+    "provider": "BtbN FFmpeg Builds, autobuild-2026-06-13-13-31, ffmpeg-n8.1.1-13-g83e8541aa6-win64-lgpl-8.1.zip",
+    "linkage": "static; the two executables are self-contained",
+    "invocation": "the app runs the tools as subprocesses and does not link FFmpeg libraries"
+  },
+  "derivation": {
+    "method": "parsed the `configuration:` line captured from the exact shipped binary",
+    "evidence_path": "repo:docs/release/evidence/ffmpeg/ffmpeg-version.txt",
+    "authority_for_licence_classes": [
+      "repo-extracted FFmpeg LICENSE.md (source tarball ffmpeg-n8.1.1-13-g83e8541aa6-source.tar.gz), filed at repo:docs/release/evidence/license-sources/ffmpeg/LICENSE-FFmpeg.md",
+      "repo-extracted FFmpeg configure: EXTERNAL_LIBRARY_GPL_LIST / _NONFREE_LIST / _VERSION3_LIST / _GPLV3_LIST, filed at repo:docs/release/evidence/ffmpeg-components/ffmpeg-configure-license-lists.md",
+      "per-component upstream licence files and repository metadata"
+    ],
+    "enable_flags_total": 62,
+    "excluded_from_component_count": [
+      "version3",
+      "pthreads",
+      "cuda-llvm",
+      "schannel"
+    ],
+    "exclusion_rationale": "--enable-version3 is a licence-election switch; --enable-pthreads selects a threading model; --enable-cuda-llvm selects how CUDA kernels are compiled; --enable-schannel uses the Windows TLS API rather than a redistributed library. None is a third-party component shipped inside the binaries.",
+    "third_party_component_count": 58,
+    "prior_count_reconciliation": "The prior count of 58 is confirmed and reproduces exactly as 62 --enable- flags minus the four non-component switches above. It is nevertheless an undercount of what is actually inside the binaries: see toolchain_components, which the configure line does not name.",
+    "linkage_field_semantics": "`linkage_confirmed` is present only on entries where linkage could NOT be confirmed by symbol or string probe, and is always false there. Its absence means linkage was either confirmed (see the entry's notes) or not separately probed. Added 2026-08-08 so the unconfirmed set is machine-locatable rather than inferable only from open_gaps prose.",
+    "scope_boundary": {
+      "statement": "This derivation is EXACT for the configure line and BLIND ONE LEVEL DOWN, by construction rather than by oversight. A library that arrives as a dependency of an enabled component has no --enable- flag, so there is nothing here to parse and nothing in configure's EXTERNAL_LIBRARY_GPL_LIST to match - that list is keyed on FFmpeg's own flag names.",
+      "demonstrated_by": "FFTW (GPL-2.0-or-later) is statically compiled into this binary via chromaprint's FFT backend, and libudfread (LGPL-2.1-or-later) via libbluray. Neither is nameable from the configure line.",
+      "the_layer_beneath": "repo:docs/release/evidence/ffmpeg-components/TRANSITIVE_COMPONENTS.json",
+      "method_and_limits": "repo:docs/release/evidence/ffmpeg-components/TRANSITIVE_METHOD.md",
+      "re_run_with": "workspace:tools/release/Get-FfmpegTransitiveComponents.ps1",
+      "effect_on_summary_below": "None of the counts in `summary` change. All twelve newly found transitive components are attribution-only, and the two that carry a source obligation (fftw3, libudfread) were already known. The counts remain correct for their own scope; they are simply not a statement about the whole binary, and `gpl_only_components: 0` in particular must never be quoted as 'no GPL code in the binary'.",
+      "added": "2026-08-09 by S&C / REVIEW"
+    },
+    "disabled_flags": [
+      "debug",
+      "w32threads",
+      "libxcb",
+      "xlib",
+      "libpulse",
+      "avisynth",
+      "libdavs2",
+      "libdvdread",
+      "libdvdnav",
+      "libfdk-aac",
+      "frei0r",
+      "librubberband",
+      "libdrm",
+      "libvidstab",
+      "libx264",
+      "libx265",
+      "libxavs2",
+      "libxvid"
+    ]
+  },
+  "summary": {
+    "third_party_components": 58,
+    "attribution_only": 42,
+    "lgpl_family_source_obligation": 13,
+    "weak_copyleft_source_obligation": 2,
+    "total_with_source_obligation": 16,
+    "gpl_only_components": 0,
+    "nonfree_components": 0,
+    "needs_review": 2,
+    "needs_review_components": [
+      "libkvazaar",
+      "libzmq"
+    ],
+    "needs_review_count_correction": "This field read 4 from 2026-08-07 until 2026-08-08. Only three entries carry a NEEDS-REVIEW marker and no fourth could be reconciled to any entry, so the count is corrected to 3 and the members are now named. Do not restore 4 without naming the fourth. The likely source of the confusion is the separate set of FOUR components whose linkage could not be confirmed by probe - a different axis, now carried as `linkage_confirmed: false` and counted in `linkage_unconfirmed` below.",
+    "linkage_unconfirmed": 4,
+    "linkage_unconfirmed_components": [
+      "chromaprint",
+      "libharfbuzz",
+      "libsnappy",
+      "libuavs3d"
+    ],
+    "not_linked_into_shipped_binaries": [
+      "sdl2"
+    ],
+    "gpl_family_source_obligation": 1,
+    "gpl_family_source_obligation_components": [
+      "libzvbi"
+    ],
+    "gpl_only_components_semantics": "Counts configure-line components FFmpeg itself classifies as GPL-only. It is NOT a statement that no GPL code is in the binary, and must never be restated as one. GPL code IS present by two paths this field cannot see: FFTW (GPL-2.0-or-later), a transitive dependency of chromaprint; and part of libzvbi (GPL-2.0-only in src/packet-830.* and src/pdc.*), invisible to a whole-component SPDX id because the tree is per-file mixed. Corrected 2026-08-09 by S&C.",
+    "gpl_code_present_in_binary": true,
+    "gpl_code_present_paths": [
+      "fftw3 (transitive, via chromaprint) - GPL-2.0-or-later",
+      "libzvbi src/packet-830.* - GPL-2.0-only, treated as present on the unconditional source-level call chain (undeterminable by binary measurement); src/pdc.* same licence, positive evidence of ABSENCE measured 2026-08-09 (app PR #139; method and limits in docs/release/evidence/ffmpeg/libzvbi-gpl2-linkage-measurement.md). Until 2026-08-09 this entry read 'link-reachable' for packet-830.* and 'linkage not established' for pdc.*. The measurement narrows the exposure and withdraws nothing - libzvbi stays disclosed and its source stays published."
+    ],
+    "needs_review_correction_2026_08_09": "libzvbi left this list on 2026-08-09 because reading its source resolved the question - AGAINST the earlier classification, not in its favour. It is now recorded as partly GPL-2.0-only. Removing it from needs-review is not a clearance."
+  },
+  "gpl_and_nonfree_check": {
+    "result": "CLEAN AS TO THE CONFIGURE LINE",
+    "method": "Cross-checked every enabled flag against FFmpeg configure's own EXTERNAL_LIBRARY_GPL_LIST, EXTERNAL_LIBRARY_NONFREE_LIST and EXTERNAL_LIBRARY_GPLV3_LIST, extracted from the matching source revision.",
+    "gpl_list_members_enabled": [],
+    "nonfree_list_members_enabled": [],
+    "gplv3_list_members_enabled": [],
+    "gpl_list_members_explicitly_disabled": [
+      "avisynth",
+      "frei0r",
+      "libdavs2",
+      "libdvdnav",
+      "libdvdread",
+      "librubberband",
+      "libvidstab",
+      "libx264",
+      "libx265",
+      "libxavs2",
+      "libxvid"
+    ],
+    "nonfree_list_members_explicitly_disabled": [
+      "libfdk-aac"
+    ],
+    "version3_drivers_enabled": [
+      "gmp (LGPL-3.0-or-later)",
+      "libaribb24 (LGPL-3.0-or-later)",
+      "libopencore-amrnb (Apache-2.0)",
+      "libopencore-amrwb (Apache-2.0)"
+    ],
+    "note": "--enable-version3 is not optional decoration: four enabled components require it. Removing it would make the build non-distributable, so LGPL-3.0-or-later is the correct and necessary licence for the tool pair.",
+    "result_scope_correction_2026_08_09": "Previously reported as an unqualified 'CLEAN'. That phrasing has now been the proximate cause of two wrong public statements - the FFTW miss and the in-app notice claiming no GPL-only component is present. The check is correct and correctly run; it is authoritative for direct configure-line components as FFmpeg classifies them, and blind by construction to (1) transitive dependencies and (2) per-file mixed licensing inside a component. Both blind spots have produced real GPL code in the shipped binary. A CLEAN here means 'no enabled component is on FFmpeg's GPL-only list' and nothing more.",
+    "gpl_list_members_enabled_note": "Empty on FFmpeg's own list. See result_scope_correction_2026_08_09."
+  },
+  "ffmpeg_own_obligations": {
+    "ijg_credit": {
+      "requirement": "FFmpeg LICENSE.md: libavcodec/jfdctfst.c, libavcodec/jfdctint_template.c and libavcodec/jrevdct.c are taken from libjpeg. Because we distribute executables only, we must credit the Independent JPEG Group in the accompanying documentation, and must indicate any changes (additions and deletions) to those three files.",
+      "our_position": "No Inter Galactic modifications were made; the binaries are unmodified upstream BtbN builds.",
+      "status": "MUST APPEAR IN THE NOTICE"
+    },
+    "freetype_credit": {
+      "requirement": "The FreeType Licence (FTL) requires a specific credit line in the documentation when the FTL is elected over the GPL-2.0 alternative.",
+      "status": "MUST APPEAR IN THE NOTICE; the dual-licence election must be recorded"
+    }
+  },
+  "open_gaps": [
+    "Upstream component VERSIONS are not recorded anywhere we hold. The FFmpeg configure line names components but not versions, and BtbN pins them in its own build scripts. Two classifications (libkvazaar, libzmq) are version-dependent, and a defensible SBOM needs the pinned versions regardless.",
+    "CLOSED 2026-08-09 - corresponding source for every obligated component (the 16 here plus the transitive fftw3 and libudfread) is published at https://app.ourgalaxy.space/source/, each cut at its exact pinned commit; commits and digests are in docs/release/evidence/corresponding-source-holding/HOLDING.json. This gap read 'No corresponding source is currently mirrored for any of the 16 components carrying a source obligation. Only the FFmpeg source tarball itself is held.'",
+    "Static linkage means LGPL-2.1 sec.6 / LGPL-3 sec.4 relink provisions are engaged for each LGPL-family component, not merely source availability.",
+    "Linkage could not be confirmed by symbol probe for chromaprint, libharfbuzz, libsnappy and libuavs3d. Only chromaprint materially matters (it is LGPL-family) and it is counted as present, which is the conservative direction. These four now carry `linkage_confirmed: false` so they can be found from the data rather than from this sentence.",
+    "libzvbi is per-file mixed and part of it is GPL-2.0-only (src/packet-830.*, src/pdc.*). A whole-component SPDX id cannot express that, and the inventory schema currently has one id per component. Any future component added here needs a per-file check, not just an upstream id lookup - the same class of miss as FFTW, on a different axis. Corrected entries carry a license_breakdown object; the schema should make that the norm.",
+    "UPDATED 2026-08-09 (app PR #139) - both linkage statuses moved, in opposite directions. pdc.o now has positive evidence of ABSENCE: three format strings in pdc.c that compile unconditionally (each verified to sit outside any preprocessor conditional) are all missing from the shipped ffmpeg.exe, while 'libzvbi' appears 12 times in the same binary as a working control. Evidence rather than proof - --gc-sections/LTO can strip an unreferenced function with its constants. packet-830.o is downgraded from established to UNDETERMINABLE BY MEASUREMENT (no surviving string literals, no surviving symbol names, no map file or unstripped build) and is treated as present on the source-level call chain, the conservative reading. Method: docs/release/evidence/ffmpeg/libzvbi-gpl2-linkage-measurement.md. This gap read 'Whether pdc.o is linked into the shipped ffmpeg.exe is NOT established and cannot be settled from source alone. It needs the build's map file or an unstripped build. packet-830.o IS established as link-reachable.' The measurement narrows the exposure and withdraws nothing."
+  ],
+  "components": [
+    {
+      "name": "iconv",
+      "configure_flag": "--enable-iconv",
+      "upstream_project": "GNU libiconv",
+      "upstream_url": "https://www.gnu.org/software/libiconv/",
+      "license_id": "LGPL-2.1-or-later",
+      "obligation_class": "attribution + source availability (LGPL-family)",
+      "classification_confidence": "low",
+      "notes": "Well-established GNU project licence; not independently re-fetched this session. Linkage confirmed ('libiconv_t' in binary)."
+    },
+    {
+      "name": "zlib",
+      "configure_flag": "--enable-zlib",
+      "upstream_project": "zlib",
+      "upstream_url": "https://zlib.net/",
+      "license_id": "Zlib",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "high",
+      "notes": ""
+    },
+    {
+      "name": "libxml2",
+      "configure_flag": "--enable-libxml2",
+      "upstream_project": "GNOME libxml2",
+      "upstream_url": "https://gitlab.gnome.org/GNOME/libxml2",
+      "license_id": "MIT",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "high",
+      "notes": "109 distinct xml* symbols present in shipped binary."
+    },
+    {
+      "name": "libvmaf",
+      "configure_flag": "--enable-libvmaf",
+      "upstream_project": "Netflix VMAF",
+      "upstream_url": "https://github.com/Netflix/vmaf",
+      "license_id": "BSD-2-Clause-Patent",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "high",
+      "notes": "DISCREPANCY: FFmpeg LICENSE.md still states VMAF is Apache-2.0 and therefore requires --enable-version3. Upstream LICENSE is BSD-2-Clause-Patent (verified). The version3 requirement is independently satisfied by gmp/libaribb24/libopencore-amr, so the build is unaffected."
+    },
+    {
+      "name": "fontconfig",
+      "configure_flag": "--enable-fontconfig",
+      "upstream_project": "fontconfig",
+      "upstream_url": "https://gitlab.freedesktop.org/fontconfig/fontconfig",
+      "license_id": "MIT",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "medium",
+      "notes": "fontconfig's own licence text is an MIT/BSD-style permissive licence."
+    },
+    {
+      "name": "libharfbuzz",
+      "configure_flag": "--enable-libharfbuzz",
+      "upstream_project": "HarfBuzz",
+      "upstream_url": "https://github.com/harfbuzz/harfbuzz",
+      "license_id": "MIT",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "medium",
+      "linkage_confirmed": false,
+      "notes": "Linkage not confirmable by symbol probe (no hb_* symbols found); presence assumed because libass requires it."
+    },
+    {
+      "name": "libfreetype",
+      "configure_flag": "--enable-libfreetype",
+      "upstream_project": "FreeType",
+      "upstream_url": "https://freetype.org/",
+      "license_id": "FTL OR GPL-2.0-or-later",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "high",
+      "notes": "OBLIGATION: electing the FreeType Licence (FTL) requires the credit line 'Portions of this software are copyright (c) <year> The FreeType Project (www.freetype.org). All rights reserved.' in the documentation. The dual-licence election must be recorded explicitly."
+    },
+    {
+      "name": "libfribidi",
+      "configure_flag": "--enable-libfribidi",
+      "upstream_project": "GNU FriBidi",
+      "upstream_url": "https://github.com/fribidi/fribidi",
+      "license_id": "LGPL-2.1-or-later",
+      "obligation_class": "attribution + source availability (LGPL-family)",
+      "classification_confidence": "high",
+      "notes": ""
+    },
+    {
+      "name": "vulkan",
+      "configure_flag": "--enable-vulkan",
+      "upstream_project": "BtbN Vulkan-Shim-Loader",
+      "upstream_url": "https://github.com/BtbN/Vulkan-Shim-Loader",
+      "pin": "65b3936528cd92eb4ea3de485d03f858a3850484",
+      "pinned_by": "scripts.d/47-vulkan/45-vulkan-loader.sh",
+      "license_id": "MIT",
+      "copyright": "Copyright 2025 Timo Rothenpieler",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "high",
+      "notes": "Corrected 2026-08-14 by S&C, carrying the verified correction from corrections_to_the_component_inventory in TRANSITIVE_COMPONENTS.json into the inventory. The prior entry attributed this to Khronos Vulkan-Headers / Vulkan-Loader (Apache-2.0). The loader the BtbN build actually pins is BtbN's own Vulkan-Shim-Loader at 65b3936528cd92eb4ea3de485d03f858a3850484 (scripts.d/47-vulkan/45-vulkan-loader.sh), MIT, Copyright 2025 Timo Rothenpieler, verified by reading its LICENSE at the pinned commit. The obligation is unchanged - attribution-only under either licence - but the attributed project, URL, licence id and copyright were wrong."
+    },
+    {
+      "name": "libshaderc",
+      "configure_flag": "--enable-libshaderc",
+      "upstream_project": "Google shaderc",
+      "upstream_url": "https://github.com/google/shaderc",
+      "license_id": "Apache-2.0",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "medium",
+      "notes": ""
+    },
+    {
+      "name": "libvorbis",
+      "configure_flag": "--enable-libvorbis",
+      "upstream_project": "Xiph.Org libvorbis",
+      "upstream_url": "https://xiph.org/vorbis/",
+      "license_id": "BSD-3-Clause",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "high",
+      "notes": ""
+    },
+    {
+      "name": "opencl",
+      "configure_flag": "--enable-opencl",
+      "upstream_project": "Khronos OpenCL-Headers",
+      "upstream_url": "https://github.com/KhronosGroup/OpenCL-Headers",
+      "license_id": "Apache-2.0",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "medium",
+      "notes": "Headers only; the OpenCL ICD is loaded from the host system at runtime and is not redistributed."
+    },
+    {
+      "name": "gmp",
+      "configure_flag": "--enable-gmp",
+      "upstream_project": "GNU MP (GMP)",
+      "upstream_url": "https://gmplib.org/",
+      "license_id": "LGPL-3.0-or-later",
+      "obligation_class": "attribution + source availability (LGPL-family)",
+      "classification_confidence": "high",
+      "notes": "Dual GPL-2.0-or-later / LGPL-3.0-or-later. FFmpeg LICENSE.md lists gmp under 'libraries under LGPL version 3'. This is one of the components that forces --enable-version3."
+    },
+    {
+      "name": "lzma",
+      "configure_flag": "--enable-lzma",
+      "upstream_project": "XZ Utils liblzma",
+      "upstream_url": "https://tukaani.org/xz/",
+      "license_id": "0BSD",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "medium",
+      "notes": "liblzma core is public domain / 0BSD; no attribution strictly required but listing is good practice."
+    },
+    {
+      "name": "liblcevc-dec",
+      "configure_flag": "--enable-liblcevc-dec",
+      "upstream_project": "V-Nova LCEVCdec",
+      "upstream_url": "https://github.com/v-novaltd/LCEVCdec",
+      "license_id": "BSD-3-Clause-Clear",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "high",
+      "notes": "Verified from upstream LICENSE.md ('The Clear BSD License'). Note the Clear BSD grants no patent rights."
+    },
+    {
+      "name": "amf",
+      "configure_flag": "--enable-amf",
+      "upstream_project": "AMD Advanced Media Framework headers",
+      "upstream_url": "https://github.com/GPUOpen-LibrariesAndSDKs/AMF",
+      "license_id": "MIT",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "medium",
+      "notes": "Headers only; amfrt64.dll is an AMD driver component on the host, not redistributed."
+    },
+    {
+      "name": "libaom",
+      "configure_flag": "--enable-libaom",
+      "upstream_project": "AOMedia libaom",
+      "upstream_url": "https://aomedia.googlesource.com/aom/",
+      "license_id": "BSD-2-Clause AND AOM-Patent-License-1.0",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "high",
+      "notes": ""
+    },
+    {
+      "name": "libaribb24",
+      "configure_flag": "--enable-libaribb24",
+      "upstream_project": "aribb24",
+      "upstream_url": "https://code.videolan.org/videolan/aribb24",
+      "license_id": "LGPL-3.0-or-later",
+      "obligation_class": "attribution + source availability (LGPL-family)",
+      "classification_confidence": "high",
+      "notes": "FFmpeg LICENSE.md lists libaribb24 under 'libraries under LGPL version 3'. Forces --enable-version3."
+    },
+    {
+      "name": "chromaprint",
+      "configure_flag": "--enable-chromaprint",
+      "upstream_project": "AcoustID Chromaprint",
+      "upstream_url": "https://github.com/acoustid/chromaprint",
+      "license_id": "LGPL-2.1-or-later",
+      "obligation_class": "attribution + source availability (LGPL-family)",
+      "classification_confidence": "high",
+      "linkage_confirmed": false,
+      "notes": "Upstream LICENSE.md: Chromaprint's own code is MIT but it embeds LGPL-2.1 FFmpeg code, so 'as a whole, Chromaprint should be therefore considered to be licensed under the LGPL 2.1 license'. GitHub API reports NOASSERTION. Linkage not confirmable by symbol probe; treated as present (conservative). This is the only linkage-unconfirmed entry that is LGPL-family, so it is the only one where the uncertainty could change an obligation."
+    },
+    {
+      "name": "libdav1d",
+      "configure_flag": "--enable-libdav1d",
+      "upstream_project": "VideoLAN dav1d",
+      "upstream_url": "https://code.videolan.org/videolan/dav1d",
+      "license_id": "BSD-2-Clause",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "high",
+      "notes": ""
+    },
+    {
+      "name": "ffnvcodec",
+      "configure_flag": "--enable-ffnvcodec",
+      "upstream_project": "nv-codec-headers",
+      "upstream_url": "https://github.com/FFmpeg/nv-codec-headers",
+      "license_id": "MIT",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "high",
+      "notes": "Headers only; NVIDIA driver DLLs are host components, not redistributed."
+    },
+    {
+      "name": "libgme",
+      "configure_flag": "--enable-libgme",
+      "upstream_project": "Game_Music_Emu",
+      "upstream_url": "https://github.com/libgme/game-music-emu",
+      "license_id": "LGPL-2.1-or-later",
+      "obligation_class": "attribution + source availability (LGPL-family)",
+      "classification_confidence": "high",
+      "notes": "Linkage confirmed by internal strings 'Blip_Buffer', 'Nintendo NES', 'Game Music Emu'."
+    },
+    {
+      "name": "libkvazaar",
+      "configure_flag": "--enable-libkvazaar",
+      "upstream_project": "Kvazaar (Ultra Video Group, Tampere Univ.)",
+      "upstream_url": "https://github.com/ultravideo/kvazaar",
+      "license_id": "BSD-3-Clause",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "medium",
+      "review_status": "needs-review",
+      "review_reason": "version-dependent classification; the pinned upstream version is unknown",
+      "notes": "NEEDS-REVIEW (version-dependent): Kvazaar was LGPL-2.1 through the 1.x series and relicensed to BSD-3-Clause at 2.0. BtbN pins the version in its build scripts; the FFmpeg configure line does not record it. If BtbN pinned a 1.x build this moves into the LGPL-family bucket."
+    },
+    {
+      "name": "libaribcaption",
+      "configure_flag": "--enable-libaribcaption",
+      "upstream_project": "libaribcaption",
+      "upstream_url": "https://github.com/xqq/libaribcaption",
+      "license_id": "MIT",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "high",
+      "notes": ""
+    },
+    {
+      "name": "libass",
+      "configure_flag": "--enable-libass",
+      "upstream_project": "libass",
+      "upstream_url": "https://github.com/libass/libass",
+      "license_id": "ISC",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "high",
+      "notes": ""
+    },
+    {
+      "name": "libbluray",
+      "configure_flag": "--enable-libbluray",
+      "upstream_project": "VideoLAN libbluray",
+      "upstream_url": "https://code.videolan.org/videolan/libbluray",
+      "license_id": "LGPL-2.1-or-later",
+      "obligation_class": "attribution + source availability (LGPL-family)",
+      "classification_confidence": "high",
+      "classification_basis": "source at the pinned commit",
+      "corrected": "2026-08-09 by S&C. Previously recorded LGPL-2.1-only on the strength of VideoLAN's project description. That is contradicted by the component's own source at the pinned commit and the earlier value was wrong.",
+      "notes": "CORRECTED 2026-08-09. Verified against the held archive libbluray-g4dfb9b0123b0-source.tar.gz at commit 4dfb9b0123b006ce5d66592dc8058f61e5c0cdc8. 845 files carry 'version 2.1 of the License, or (at your option) any later version'; ZERO files in the tree state 2.1 without 'or later'. Two non-LGPL sets exist and neither is in the linked library: jni/*.h are MPL-1.1/GPL-2.0+/LGPL-2.1+ tri-licensed (LGPL-2.1-or-later electable), and src/devtools/bdj_test.c is GPL-2.0-or-later but is a devtool absent from the library build. Consequence: libbluray CAN elect v3 and therefore does have access to GPL-3 section 8 cure, contrary to the earlier record."
+    },
+    {
+      "name": "libjxl",
+      "configure_flag": "--enable-libjxl",
+      "upstream_project": "libjxl (JPEG XL)",
+      "upstream_url": "https://github.com/libjxl/libjxl",
+      "license_id": "BSD-3-Clause",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "high",
+      "notes": ""
+    },
+    {
+      "name": "libmp3lame",
+      "configure_flag": "--enable-libmp3lame",
+      "upstream_project": "LAME",
+      "upstream_url": "https://lame.sourceforge.io/",
+      "license_id": "LGPL-2.0-or-later",
+      "obligation_class": "attribution + source availability (LGPL-family)",
+      "classification_confidence": "high",
+      "notes": "Dual GPL-2.0 / LGPL-2.0 upstream; FFmpeg links it as LGPL. This is the exact component FFmpeg's own compliance checklist names as the worked example."
+    },
+    {
+      "name": "libopus",
+      "configure_flag": "--enable-libopus",
+      "upstream_project": "Opus / libopus (Xiph.Org, Mozilla, Broadcom, et al.)",
+      "upstream_url": "https://opus-codec.org/",
+      "license_id": "BSD-3-Clause",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "high",
+      "notes": ""
+    },
+    {
+      "name": "libplacebo",
+      "configure_flag": "--enable-libplacebo",
+      "upstream_project": "libplacebo",
+      "upstream_url": "https://code.videolan.org/videolan/libplacebo",
+      "license_id": "LGPL-2.1-or-later",
+      "obligation_class": "attribution + source availability (LGPL-family)",
+      "classification_confidence": "high",
+      "notes": "63 distinct pl_* symbols present in shipped binary."
+    },
+    {
+      "name": "librist",
+      "configure_flag": "--enable-librist",
+      "upstream_project": "librist (RIST Forum / VideoLAN)",
+      "upstream_url": "https://code.videolan.org/rist/librist",
+      "license_id": "BSD-2-Clause",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "medium",
+      "notes": ""
+    },
+    {
+      "name": "libssh",
+      "configure_flag": "--enable-libssh",
+      "upstream_project": "libssh (libssh.org)",
+      "upstream_url": "https://www.libssh.org/",
+      "license_id": "LGPL-2.1-or-later",
+      "obligation_class": "attribution + source availability (LGPL-family)",
+      "classification_confidence": "high",
+      "notes": "This is libssh.org's libssh, NOT libssh2 (which is BSD-3-Clause). FFmpeg's libavformat/libssh.c uses libssh. Linkage confirmed ('ssh_new', 'sftp_new', 'ssh_connect')."
+    },
+    {
+      "name": "libtheora",
+      "configure_flag": "--enable-libtheora",
+      "upstream_project": "Xiph.Org libtheora",
+      "upstream_url": "https://theora.org/",
+      "license_id": "BSD-3-Clause",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "high",
+      "notes": ""
+    },
+    {
+      "name": "libvpx",
+      "configure_flag": "--enable-libvpx",
+      "upstream_project": "WebM libvpx",
+      "upstream_url": "https://github.com/webmproject/libvpx",
+      "license_id": "BSD-3-Clause AND additional IP rights grant",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "high",
+      "notes": ""
+    },
+    {
+      "name": "libwebp",
+      "configure_flag": "--enable-libwebp",
+      "upstream_project": "Google libwebp",
+      "upstream_url": "https://chromium.googlesource.com/webm/libwebp",
+      "license_id": "BSD-3-Clause",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "high",
+      "notes": ""
+    },
+    {
+      "name": "libzmq",
+      "configure_flag": "--enable-libzmq",
+      "upstream_project": "ZeroMQ libzmq",
+      "upstream_url": "https://github.com/zeromq/libzmq",
+      "license_id": "MPL-2.0",
+      "obligation_class": "attribution + source availability (weak copyleft, file-level)",
+      "classification_confidence": "medium",
+      "review_status": "needs-review",
+      "review_reason": "version-dependent classification; the pinned upstream version is unknown",
+      "notes": "NEEDS-REVIEW (version-dependent): current upstream is MPL-2.0 (verified). Releases up to 4.3.4 were LGPL-3.0-or-later with a static-linking exception. Either way this carries a source-availability obligation for the library's own files; under MPL-2.0 it is file-level, not whole-work. BtbN pins the version; the configure line does not record it."
+    },
+    {
+      "name": "lv2",
+      "configure_flag": "--enable-lv2",
+      "upstream_project": "LV2 (with lilv / serd / sord / sratom)",
+      "upstream_url": "https://lv2plug.in/",
+      "license_id": "ISC",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "medium",
+      "notes": "26 distinct lilv_* symbols present in shipped binary."
+    },
+    {
+      "name": "libvpl",
+      "configure_flag": "--enable-libvpl",
+      "upstream_project": "Intel Video Processing Library (oneVPL dispatcher)",
+      "upstream_url": "https://github.com/intel/libvpl",
+      "license_id": "MIT",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "medium",
+      "notes": ""
+    },
+    {
+      "name": "openal",
+      "configure_flag": "--enable-openal",
+      "upstream_project": "OpenAL Soft",
+      "upstream_url": "https://github.com/kcat/openal-soft",
+      "license_id": "LGPL-2.0-or-later",
+      "obligation_class": "attribution + source availability (LGPL-family)",
+      "classification_confidence": "high",
+      "notes": "Upstream COPYING is the GNU Library General Public License Version 2 (verified). Linkage confirmed ('alcOpenDevice', 'alcCaptureOpenDevice')."
+    },
+    {
+      "name": "liboapv",
+      "configure_flag": "--enable-liboapv",
+      "upstream_project": "OpenAPV (Advanced Professional Video)",
+      "upstream_url": "https://github.com/AcademySoftwareFoundation/openapv",
+      "license_id": "BSD-3-Clause",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "medium",
+      "notes": ""
+    },
+    {
+      "name": "libopencore-amrnb",
+      "configure_flag": "--enable-libopencore-amrnb",
+      "upstream_project": "OpenCORE AMR-NB",
+      "upstream_url": "https://sourceforge.net/projects/opencore-amr/",
+      "license_id": "Apache-2.0",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "high",
+      "notes": "Apache-2.0 is incompatible with LGPL-2.1; FFmpeg lists OpenCORE among the libraries that force --enable-version3."
+    },
+    {
+      "name": "libopencore-amrwb",
+      "configure_flag": "--enable-libopencore-amrwb",
+      "upstream_project": "OpenCORE AMR-WB",
+      "upstream_url": "https://sourceforge.net/projects/opencore-amr/",
+      "license_id": "Apache-2.0",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "high",
+      "notes": "Same version3 driver as AMR-NB."
+    },
+    {
+      "name": "libopenh264",
+      "configure_flag": "--enable-libopenh264",
+      "upstream_project": "Cisco OpenH264",
+      "upstream_url": "https://github.com/cisco/openh264",
+      "license_id": "BSD-2-Clause",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "high",
+      "notes": "PATENT CAVEAT (not a licence defect): Cisco's royalty-free AVC/H.264 patent offer covers Cisco's own precompiled openh264 binary module only. BtbN compiles openh264 from source into ffmpeg.exe, so that offer does not attach. Owner decision, route separately."
+    },
+    {
+      "name": "libopenjpeg",
+      "configure_flag": "--enable-libopenjpeg",
+      "upstream_project": "OpenJPEG",
+      "upstream_url": "https://github.com/uclouvain/openjpeg",
+      "license_id": "BSD-2-Clause",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "high",
+      "notes": ""
+    },
+    {
+      "name": "libopenmpt",
+      "configure_flag": "--enable-libopenmpt",
+      "upstream_project": "libopenmpt (OpenMPT)",
+      "upstream_url": "https://lib.openmpt.org/libopenmpt/",
+      "license_id": "BSD-3-Clause",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "high",
+      "notes": "91 distinct openmpt_* symbols present in shipped binary."
+    },
+    {
+      "name": "librav1e",
+      "configure_flag": "--enable-librav1e",
+      "upstream_project": "rav1e",
+      "upstream_url": "https://github.com/xiph/rav1e",
+      "license_id": "BSD-2-Clause",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "high",
+      "notes": ""
+    },
+    {
+      "name": "sdl2",
+      "configure_flag": "--enable-sdl2",
+      "upstream_project": "Simple DirectMedia Layer 2",
+      "upstream_url": "https://www.libsdl.org/",
+      "license_id": "Zlib",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "high",
+      "notes": "NOT LINKED into the shipped binaries. Verified: zero SDL_* symbols in ffmpeg.exe or ffprobe.exe; the only 'SDL' hits are the embedded configure string. SDL2 is used by ffplay.exe, which this project does not ship. Recommend excluding from the shipped-binary notice with this evidence recorded."
+    },
+    {
+      "name": "libsnappy",
+      "configure_flag": "--enable-libsnappy",
+      "upstream_project": "Google Snappy",
+      "upstream_url": "https://github.com/google/snappy",
+      "license_id": "BSD-3-Clause",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "medium",
+      "linkage_confirmed": false,
+      "notes": "Linkage not confirmable by symbol probe (C++ symbols); presence assumed from configure line."
+    },
+    {
+      "name": "libsoxr",
+      "configure_flag": "--enable-libsoxr",
+      "upstream_project": "SoX Resampler library",
+      "upstream_url": "https://sourceforge.net/projects/soxr/",
+      "license_id": "LGPL-2.1-or-later",
+      "obligation_class": "attribution + source availability (LGPL-family)",
+      "classification_confidence": "high",
+      "notes": "Verified from upstream LICENCE. Linkage confirmed ('soxr_create')."
+    },
+    {
+      "name": "libsrt",
+      "configure_flag": "--enable-libsrt",
+      "upstream_project": "Haivision SRT",
+      "upstream_url": "https://github.com/Haivision/srt",
+      "license_id": "MPL-2.0",
+      "obligation_class": "attribution + source availability (weak copyleft, file-level)",
+      "classification_confidence": "high",
+      "notes": "MPL-2.0 is file-level weak copyleft: source for the SRT files themselves must be made available. Linkage confirmed ('srt_socket', 'srt_connect')."
+    },
+    {
+      "name": "libsvtav1",
+      "configure_flag": "--enable-libsvtav1",
+      "upstream_project": "SVT-AV1 (Alliance for Open Media)",
+      "upstream_url": "https://gitlab.com/AOMediaCodec/SVT-AV1",
+      "license_id": "BSD-3-Clause-Clear AND AOM-Patent-License-1.0",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "high",
+      "notes": ""
+    },
+    {
+      "name": "libtwolame",
+      "configure_flag": "--enable-libtwolame",
+      "upstream_project": "TwoLAME",
+      "upstream_url": "https://github.com/njh/twolame",
+      "license_id": "LGPL-2.1-or-later",
+      "obligation_class": "attribution + source availability (LGPL-family)",
+      "classification_confidence": "high",
+      "notes": "Linkage confirmed ('twolame_init'). Note --extra-cflags=-DLIBTWOLAME_STATIC confirms static linkage explicitly."
+    },
+    {
+      "name": "libuavs3d",
+      "configure_flag": "--enable-libuavs3d",
+      "upstream_project": "uavs3d (Peking Univ. Shenzhen / Peng Cheng Lab / Bohua UHD)",
+      "upstream_url": "https://github.com/uavs3/uavs3d",
+      "license_id": "BSD-3-Clause",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "medium",
+      "linkage_confirmed": false,
+      "notes": "Upstream COPYING is a BSD-style three-clause text but carries no SPDX tag (GitHub reports NOASSERTION). Linkage not confirmable by symbol probe."
+    },
+    {
+      "name": "vaapi",
+      "configure_flag": "--enable-vaapi",
+      "upstream_project": "libva (Intel VA-API)",
+      "upstream_url": "https://github.com/intel/libva",
+      "license_id": "MIT",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "high",
+      "notes": "63 distinct va* symbols present in shipped binary."
+    },
+    {
+      "name": "libvvenc",
+      "configure_flag": "--enable-libvvenc",
+      "upstream_project": "Fraunhofer HHI VVenC",
+      "upstream_url": "https://github.com/fraunhoferhhi/vvenc",
+      "license_id": "BSD-3-Clause-Clear",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "high",
+      "notes": ""
+    },
+    {
+      "name": "whisper",
+      "configure_flag": "--enable-whisper",
+      "upstream_project": "whisper.cpp (with ggml)",
+      "upstream_url": "https://github.com/ggml-org/whisper.cpp",
+      "license_id": "MIT",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "high",
+      "notes": "37 distinct whisper_* symbols present. Models are not bundled; they are supplied at runtime."
+    },
+    {
+      "name": "libzimg",
+      "configure_flag": "--enable-libzimg",
+      "upstream_project": "zimg",
+      "upstream_url": "https://github.com/sekrit-twc/zimg",
+      "license_id": "WTFPL",
+      "obligation_class": "attribution-only",
+      "classification_confidence": "medium",
+      "notes": "WTFPL imposes no attribution requirement; listed for completeness."
+    },
+    {
+      "name": "libzvbi",
+      "configure_flag": "--enable-libzvbi",
+      "upstream_project": "ZVBI (Zapping VBI library)",
+      "upstream_url": "https://github.com/zapping-vbi/zvbi",
+      "license_id": "LGPL-2.0-or-later AND GPL-2.0-only",
+      "license_id_note": "A single SPDX id cannot express this component. The tree is mixed and the GPL-2.0-only part is not severable from the linked library.",
+      "license_breakdown": {
+        "src/* default": "LGPL-2.0-or-later",
+        "src/packet-830.* and src/pdc.*": "GPL-2.0-only",
+        "src/dvb/dmx.h, src/dvb/frontend.h, src/strptime.*": "LGPL-2.1-or-later",
+        "src/ure.*": "MIT",
+        "src/videodev2k.h": "GPL-2.0-or-later OR BSD-3-Clause",
+        "project root and po/*": "GPL-2.0-or-later",
+        "examples/*": "BSD-2-Clause"
+      },
+      "obligation_class": "attribution + source availability (GPL-family, escalated from LGPL-family)",
+      "classification_confidence": "high",
+      "classification_basis": "source and COPYING.md at the pinned commit, plus the upstream build definition",
+      "review_status": "reviewed",
+      "corrected": "2026-08-09 by S&C. Previously LGPL-2.0-or-later at medium confidence, needs-review, resting on distribution metadata. Reading the source settles it: the single-id classification was incomplete, not merely unconfirmed.",
+      "notes": "CORRECTED 2026-08-09. Verified against the held archive libzvbi-g41477c97c8ed-source.tar.gz at commit 41477c97c8edf7a01f1594b2a95b94f0117eed21. COPYING.md is per-directory and states verbatim: 'The files src/packet-830.* and src/pdc.* have the following copyright and license: License: GPL-2'. The four files themselves carry 'under the terms of the GNU General Public License version 2 as published by the Free Software Foundation' with NO 'or later'. Four files, not two - the .h files carry the same header as the .c files. ESTABLISHED that packet-830 reaches the executable: src/Makefile.am puts packet-830.c/.h and pdc.c/.h in libzvbi_la_SOURCES, and there is an unconditional link-time chain from FFmpeg - libavcodec/libzvbi-teletextdec.c:679 calls vbi_decode -> src/vbi.c:472 vbi_decode_teletext -> src/packet.c:2686 parse_8_30 -> src/packet.c:2146/2165 call vbi_decode_teletext_8301_local_time and vbi_decode_teletext_8302_pdc, both defined in packet-830.c. The event_mask tests at those call sites are runtime guards, not link-time ones, so a static link must pull packet-830.o. NOT ESTABLISHED for pdc.o: no cross-translation-unit reference to any pdc.c-defined symbol exists, so on a standard static link it would not be pulled - but that is an inference about linker behaviour, not a fact about this binary, and settling it needs the build map file or an unstripped build. Consequence: the GPL-2.0-only files have no 'or later', so no v3 election and no GPL-3 section 8 cure is available for them. CORRECTED AGAIN LATER THE SAME DAY (REVIEW, app PR #139): both linkage statuses above have moved. pdc.o now has positive evidence of ABSENCE - three pdc.c format strings that compile unconditionally are all missing from the shipped ffmpeg.exe, with 'libzvbi' x12 in the same binary as the working control; still evidence rather than proof under --gc-sections/LTO. packet-830.o is UNDETERMINABLE BY MEASUREMENT rather than established - nothing of it survives compilation to search for (no literals, and symbol names do not survive the strip either; even vbi_decode appears zero times) - so its presence rests on the source-level chain described above and it is treated as present, the conservative reading. The licence-consequence sentence is unchanged. Method, controls and reproduction: docs/release/evidence/ffmpeg/libzvbi-gpl2-linkage-measurement.md.",
+      "prior_probe_retracted": "A string probe of the shipped ffmpeg.exe searched for the literals 'Europe/London' and 'Indefinite time window' and found neither, which was read as evidence the objects were not linked. That probe was incapable of a positive result and is retracted as evidence in either direction: both literals occur ONLY inside C comments in pdc.c (lines 804, 994, 1382 and 1237, 1452), and the preprocessor strips comments before compilation, so they could never appear in any binary whether or not the file was linked."
+    }
+  ],
+  "toolchain_components": [
+    {
+      "name": "libgomp",
+      "upstream_project": "GCC OpenMP runtime",
+      "upstream_url": "https://gcc.gnu.org/",
+      "license_id": "GPL-3.0-or-later WITH GCC-exception-3.1",
+      "obligation_class": "see notes",
+      "notes": "Pulled in by --extra-libs=-lgomp, not by any --enable- flag, so it is invisible to a configure-line-only inventory. VERIFIED LINKED: 'GOMP_target_enter_exit_data' plus 36 distinct omp_* symbols in ffmpeg.exe. This is GPL-3 code inside an LGPL-3 binary; the GCC Runtime Library Exception is what makes that lawful, and it holds here because the build used GCC 15.2.0 (an Eligible Compilation Process). Worth stating explicitly so a later audit does not read it as GPL contamination."
+    },
+    {
+      "name": "libgcc / libstdc++",
+      "upstream_project": "GCC runtime libraries",
+      "upstream_url": "https://gcc.gnu.org/",
+      "license_id": "GPL-3.0-or-later WITH GCC-exception-3.1",
+      "obligation_class": "see notes",
+      "notes": "Statically linked by the mingw-w64 toolchain. Same Runtime Library Exception reasoning as libgomp."
+    },
+    {
+      "name": "winpthreads",
+      "upstream_project": "mingw-w64 winpthreads",
+      "upstream_url": "https://www.mingw-w64.org/",
+      "license_id": "MIT AND Zope-2.1-style",
+      "obligation_class": "see notes",
+      "notes": "Pulled in by --enable-pthreads on a mingw32 target. mingw-w64 runtime carries a mix of permissive licences by directory."
+    },
+    {
+      "name": "mingw-w64 CRT",
+      "upstream_project": "mingw-w64 runtime / import libraries",
+      "upstream_url": "https://www.mingw-w64.org/",
+      "license_id": "permissive (per-file; ZPL-2.1 / MIT / public domain)",
+      "obligation_class": "see notes",
+      "notes": "Standard mingw-w64 redistribution; attribution only."
+    }
+  ]
+}

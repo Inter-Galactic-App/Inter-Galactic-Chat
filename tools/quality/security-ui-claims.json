@@ -1,0 +1,216 @@
+{
+  "schemaVersion": 1,
+  "mode": "report-only",
+  "reviewedAtCommit": "9cc5c950066f99b537a5da4ebb92e5ac7a44b27d",
+  "claims": [
+    {
+      "id": "call-room-encrypted-warning",
+      "surface": {"path": "intergalactic/lib/ui/organisms/voip_room_view/voip_room_view.dart", "anchor": "_VoipRoomViewState.unjoinedView"},
+      "displayedText": "Messages in this room are encrypted. Calls are not end-to-end encrypted - the call server that relays them can access them.",
+      "kind": "property", "scope": {"platforms": ["all"], "roomState": "encrypted room, pre-join", "featureFlags": ["LiveKit calls"], "data": ["room messages", "call audio/video"]},
+      "assertion": "Message encryption is room-scoped; relayed call media is not E2EE.", "excludes": "No claim that call media or its relay is private from the call server.",
+      "evidence": {"status": "missing", "paths": ["intergalactic/lib/client/matrix/components/voip_room/matrix_livekit_backend.dart"], "symbols": ["LiveKit Room creation and room.isE2EE condition"], "tests": ["intergalactic/test/ui/organisms/voip_room_view/voip_room_e2ee_claims_test.dart"]},
+      "reviewStatus": "pending_sc_review", "reviewedAt": null, "reviewedAtCommit": "9cc5c950066f99b537a5da4ebb92e5ac7a44b27d", "reviewDue": null,
+      "invalidationPaths": ["intergalactic/lib/client/matrix/components/voip_room/matrix_livekit_backend.dart", "intergalactic/lib/ui/organisms/voip_room_view/voip_room_view.dart"]
+    },
+    {
+      "id": "call-room-plain-warning",
+      "surface": {"path": "intergalactic/lib/ui/organisms/voip_room_view/voip_room_view.dart", "anchor": "_VoipRoomViewState.unjoinedView"},
+      "displayedText": "This room is not encrypted, and calls are not end-to-end encrypted - the call server that relays them can access them.",
+      "kind": "limitation", "scope": {"platforms": ["all"], "roomState": "unencrypted room, pre-join", "featureFlags": ["LiveKit calls"], "data": ["room messages", "call audio/video"]},
+      "assertion": "Neither this room nor relayed call media is E2EE.", "excludes": "No claim of call-media E2EE or relay confidentiality.",
+      "evidence": {"status": "needs_review", "paths": ["intergalactic/lib/client/matrix/components/voip_room/matrix_livekit_backend.dart"], "symbols": ["LiveKit Room creation"], "tests": ["intergalactic/test/ui/organisms/voip_room_view/voip_room_e2ee_claims_test.dart"]},
+      "reviewStatus": "pending_sc_review", "reviewedAt": null, "reviewedAtCommit": "9cc5c950066f99b537a5da4ebb92e5ac7a44b27d", "reviewDue": null,
+      "invalidationPaths": ["intergalactic/lib/client/matrix/components/voip_room/matrix_livekit_backend.dart", "intergalactic/lib/ui/organisms/voip_room_view/voip_room_view.dart"]
+    },
+    {
+      "id": "room-settings-call-warning",
+      "surface": {"path": "intergalactic/lib/ui/pages/settings/categories/room/security/room_security_settings_page.dart", "anchor": "_RoomSecuritySettingsPageState.buildCallEncryptionNote"},
+      "displayedText": "Room encryption covers messages, not calls. Calls are not end-to-end encrypted - the call server that relays them can access the audio and video.",
+      "kind": "property", "scope": {"platforms": ["all"], "roomState": "room security settings", "featureFlags": ["LiveKit calls"], "data": ["messages", "call audio/video"]},
+      "assertion": "Room encryption covers messages while call media remains accessible to its relay.", "excludes": "Room padlock does not cover calls.",
+      "evidence": {"status": "missing", "paths": ["intergalactic/lib/client/matrix/components/voip_room/matrix_livekit_backend.dart"], "symbols": ["LiveKit Room creation"], "tests": ["intergalactic/test/ui/organisms/voip_room_view/voip_room_e2ee_claims_test.dart"]},
+      "reviewStatus": "pending_sc_review", "reviewedAt": null, "reviewedAtCommit": "9cc5c950066f99b537a5da4ebb92e5ac7a44b27d", "reviewDue": null,
+      "invalidationPaths": ["intergalactic/lib/client/matrix/components/voip_room/matrix_livekit_backend.dart", "intergalactic/lib/ui/pages/settings/categories/room/security/room_security_settings_page.dart"]
+    },
+    {
+      "id": "help-encryption-boundaries",
+      "surface": {"path": "intergalactic/lib/ui/pages/settings/categories/help/help_safety_page.dart", "anchor": "HelpPoliciesPage._documents"},
+      "displayedText": "Inter Galactic is a Matrix client. Messages, media, room membership, account details, and account deletion are primarily controlled by the homeserver selected by the user. End-to-end encrypted messages are designed so Inter Galactic and homeserver operators cannot read message contents. Calls are not end-to-end encrypted: audio and video are relayed by a call server that can access them. Metadata, push notification routing, backups, bridges, URL previews, GIF search, diagnostics, and third-party integrations can also involve separate services.",
+      "kind": "completeness", "affirmativeProtection": true,
+      "scope": {"platforms": ["all"], "roomState": "Help & Safety policy page", "featureFlags": ["Matrix messaging", "LiveKit calls"], "data": ["messages", "call media", "metadata", "previews", "backups"]},
+      "assertion": "Enumeration of message-E2EE limits and service access includes call media.", "excludes": "Message E2EE does not imply call-media E2EE or hide listed metadata and third-party disclosures.",
+      "evidence": {"status": "missing", "paths": ["intergalactic/lib/client/matrix/components/voip_room/matrix_livekit_backend.dart"], "symbols": ["LiveKit Room creation; Matrix message encryption boundary"], "tests": ["intergalactic/test/ui/pages/settings/help_safety_encryption_scope_test.dart"]},
+      "reviewStatus": "pending_sc_review", "reviewedAt": null, "reviewedAtCommit": "9cc5c950066f99b537a5da4ebb92e5ac7a44b27d", "reviewDue": null,
+      "completeAsOf": null,
+      "requiredTopics": [{"name": "call-media-E2EE-limit", "allOf": ["Calls are not end-to-end encrypted", "audio and video", "call server that can access them"]}],
+      "invalidationPaths": ["intergalactic/lib/client/matrix/components/voip_room/**", "intergalactic/lib/client/matrix/components/voip/**", "intergalactic/lib/client/matrix/components/url_preview/**", "intergalactic/lib/client/components/push_notification/**", "intergalactic/lib/client/matrix/biometric_recovery_key_store.dart", "intergalactic/lib/client/matrix/matrix_client.dart", "intergalactic/lib/ui/pages/settings/categories/help/help_safety_page.dart"],
+      "watchCoverageGaps": ["Matrix bridge services and policy outside this app repository need manual S&C review; an app-path watch cannot establish their data disclosures."]
+    },
+    {
+      "id": "dm-pin-never-leaves",
+      "surface": {"path": "intergalactic/lib/ui/pages/main/main_page.dart", "anchor": "MainPageState._selectRoom"},
+      "displayedText": "Enter your local PIN to open this direct message. This PIN never leaves this device.",
+      "kind": "property", "scope": {"platforms": ["all"], "roomState": "PIN-locked DM", "featureFlags": ["DM lock"], "data": ["DM PIN"]},
+      "assertion": "PIN remains on this device.", "excludes": "Does not imply that message content is device-only or immune to OS backup.",
+      "evidence": {"status": "missing", "paths": ["intergalactic/lib/utils/dm_lock_controller.dart", "intergalactic/lib/config/preferences.dart", "intergalactic/android/app/src/main/AndroidManifest.xml", "intergalactic/android/app/src/main/res/xml/data_extraction_rules.xml"], "symbols": ["DmLockController.setPinForClient", "Preferences.setDmLockPinMetadata"], "tests": [], "proofGap": "Dart derives a salted hash and persists metadata through SharedPreferences; Android manifest and extraction rules exclude backup. This does not establish device-only behavior for iOS, macOS, Windows, Linux, web, or every OS backup/sync path. Do not mark supported from the local write alone."},
+      "reviewStatus": "pending_sc_review", "reviewedAt": null, "reviewedAtCommit": "9cc5c950066f99b537a5da4ebb92e5ac7a44b27d", "reviewDue": null,
+      "invalidationPaths": ["intergalactic/lib/utils/dm_lock_controller.dart", "intergalactic/lib/config/preferences.dart", "intergalactic/lib/ui/pages/main/main_page.dart", "pubspec.lock", "intergalactic/android/app/src/main/AndroidManifest.xml", "intergalactic/android/app/src/main/res/xml/data_extraction_rules.xml", "intergalactic/ios/Runner/**", "intergalactic/macos/Runner/**", "intergalactic/windows/**", "intergalactic/linux/**", "intergalactic/web/**"]
+    },
+    {
+      "id": "dm-pin-preferences-local-only",
+      "surface": {"path": "intergalactic/lib/ui/pages/settings/categories/account/preferences/preferences_dm_lock.dart", "anchor": "_DmLockPreferencesState.build"},
+      "displayedText": "Protect sensitive direct messages with a local PIN on this device. The PIN is stored locally only and is never sent to Matrix.",
+      "kind": "property", "scope": {"platforms": ["all"], "roomState": "DM lock settings", "featureFlags": ["DM lock"], "data": ["DM PIN"]},
+      "assertion": "PIN metadata is local and is not sent to Matrix.", "excludes": "Does not establish confidentiality against OS storage or backups.",
+      "evidence": {"status": "missing", "paths": ["intergalactic/lib/utils/dm_lock_controller.dart", "intergalactic/lib/config/preferences.dart", "intergalactic/android/app/src/main/AndroidManifest.xml", "intergalactic/android/app/src/main/res/xml/data_extraction_rules.xml"], "symbols": ["DmLockController.setPinForClient", "Preferences.setDmLockPinMetadata"], "tests": [], "proofGap": "The local SharedPreferences write is not all-platform proof that the PIN or derived metadata cannot enter backup or sync. Android backup exclusions are present; iOS and desktop/web storage and backup/sync behavior remain unverified."},
+      "reviewStatus": "pending_sc_review", "reviewedAt": null, "reviewedAtCommit": "9cc5c950066f99b537a5da4ebb92e5ac7a44b27d", "reviewDue": null,
+      "invalidationPaths": ["intergalactic/lib/utils/dm_lock_controller.dart", "intergalactic/lib/config/preferences.dart", "intergalactic/lib/ui/pages/settings/categories/account/preferences/preferences_dm_lock.dart", "pubspec.lock", "intergalactic/android/app/src/main/AndroidManifest.xml", "intergalactic/android/app/src/main/res/xml/data_extraction_rules.xml", "intergalactic/ios/Runner/**", "intergalactic/macos/Runner/**", "intergalactic/windows/**", "intergalactic/linux/**", "intergalactic/web/**"]
+    },
+    {
+      "id": "faq-verification-e2ee",
+      "surface": {"path": "intergalactic/lib/ui/pages/settings/categories/help/help_faq_page.dart", "anchor": "faqEntries"},
+      "displayedText": "Session verification is an important part of end-to-end encryption. You can start verification from Settings > Security.",
+      "kind": "property", "scope": {"platforms": ["all"], "roomState": "Help FAQ", "featureFlags": ["Matrix E2EE"], "data": ["message encryption"]},
+      "assertion": "Session verification contributes to message E2EE trust.", "excludes": "Does not say verification alone enables call-media E2EE.",
+      "evidence": {"status": "missing", "paths": ["intergalactic/lib/client/matrix/matrix_e2ee_diagnostics.dart"], "symbols": ["MatrixE2eeDiagnostics"], "tests": []},
+      "reviewStatus": "pending_sc_review", "reviewedAt": null, "reviewedAtCommit": "9cc5c950066f99b537a5da4ebb92e5ac7a44b27d", "reviewDue": null,
+      "invalidationPaths": ["intergalactic/lib/client/matrix/matrix_e2ee_diagnostics.dart", "intergalactic/lib/ui/pages/settings/categories/help/help_faq_page.dart"]
+    },
+    {
+      "id": "e2ee-ready-status",
+      "surface": {"path": "intergalactic/lib/ui/pages/settings/categories/account/security/matrix/matrix_security_tab.dart", "anchor": "_MatrixSecurityTabState._statusChips"},
+      "displayedText": "E2EE ready",
+      "expectedOccurrences": 2,
+      "kind": "property", "scope": {"platforms": ["all"], "roomState": "account security status", "displayCondition": "Compact text when MediaQuery width is below 420 logical pixels on either Layout.mobile or desktop branch; semantic label remains Encryption ready", "featureFlags": ["Matrix E2EE"], "data": ["message encryption readiness"]},
+      "assertion": "Current Matrix session reports encryption available.", "excludes": "Does not imply all history decrypts or calls are E2EE.",
+      "evidence": {"status": "missing", "paths": ["intergalactic/lib/client/matrix/matrix_e2ee_diagnostics.dart"], "symbols": ["MatrixE2eeTrustStatus.encryptionAvailable"], "tests": []},
+      "reviewStatus": "pending_sc_review", "reviewedAt": null, "reviewedAtCommit": "9cc5c950066f99b537a5da4ebb92e5ac7a44b27d", "reviewDue": null,
+      "invalidationPaths": ["intergalactic/lib/client/matrix/matrix_e2ee_diagnostics.dart", "intergalactic/lib/ui/pages/settings/categories/account/security/matrix/matrix_security_tab.dart"]
+    },
+    {
+      "id": "e2ee-off-status",
+      "surface": {"path": "intergalactic/lib/ui/pages/settings/categories/account/security/matrix/matrix_security_tab.dart", "anchor": "_MatrixSecurityTabState._statusChips"},
+      "displayedText": "E2EE off",
+      "expectedOccurrences": 2,
+      "kind": "limitation", "scope": {"platforms": ["all"], "roomState": "account security status", "displayCondition": "Compact text when MediaQuery width is below 420 logical pixels on either Layout.mobile or desktop branch; semantic label remains Encryption unavailable", "featureFlags": ["Matrix E2EE"], "data": ["message encryption readiness"]},
+      "assertion": "Current Matrix session reports encryption unavailable.", "excludes": "Does not classify all rooms or calls.",
+      "evidence": {"status": "needs_review", "paths": ["intergalactic/lib/client/matrix/matrix_e2ee_diagnostics.dart"], "symbols": ["MatrixE2eeTrustStatus.encryptionAvailable"], "tests": []},
+      "reviewStatus": "pending_sc_review", "reviewedAt": null, "reviewedAtCommit": "9cc5c950066f99b537a5da4ebb92e5ac7a44b27d", "reviewDue": null,
+      "invalidationPaths": ["intergalactic/lib/client/matrix/matrix_e2ee_diagnostics.dart", "intergalactic/lib/ui/pages/settings/categories/account/security/matrix/matrix_security_tab.dart"]
+    },
+    {
+      "id": "preview-e2ee-direct-ui",
+      "surface": {"path": "intergalactic/lib/ui/pages/settings/categories/app/general_settings_page.dart", "anchor": "GeneralSettingsPageState.labelDirectPreviewFallbackE2EEDescription"},
+      "displayedText": "Off by default. The app first tries a configured preview service if available, then may try your homeserver. If the preview remains incomplete, this option may fetch from TikTok, Instagram, or Reddit. A card with enough text but no image may still fetch a provider site icon. The service, homeserver, and link site may each receive the URL; the provider or image host may see your device's IP address when fetching a thumbnail or icon.",
+      "kind": "property", "scope": {"platforms": ["all"], "roomState": "encrypted chat", "featureFlags": ["direct URL preview fallback opt-in"], "data": ["links", "device requests"]},
+      "assertion": "Configured service or homeserver preview fetching precedes optional direct metadata or thumbnail fallback; an imageless card may also fetch a site icon even when metadata is complete.", "excludes": "Does not imply encrypted-chat URLs are hidden from the preview service or homeserver.",
+      "evidence": {"status": "missing", "paths": ["intergalactic/lib/client/matrix/components/url_preview/matrix_url_preview_component.dart", "intergalactic/lib/client/matrix/components/url_preview/url_preview_fallback_fetcher.dart"], "symbols": ["Matrix URL preview routing", "direct fallback fetch"], "tests": ["intergalactic/test/client/components/url_preview/url_preview_direct_fallback_consent_test.dart"]},
+      "reviewStatus": "pending_sc_review", "reviewedAt": null, "reviewedAtCommit": "9cc5c950066f99b537a5da4ebb92e5ac7a44b27d", "reviewDue": null,
+      "invalidationPaths": ["intergalactic/lib/client/matrix/components/url_preview/matrix_url_preview_component.dart", "intergalactic/lib/client/matrix/components/url_preview/url_preview_fallback_fetcher.dart", "intergalactic/lib/config/preferences.dart"]
+    },
+    {
+      "id": "preview-plain-direct-ui",
+      "surface": {"path": "intergalactic/lib/ui/pages/settings/categories/app/general_settings_page.dart", "anchor": "GeneralSettingsPageState.labelDirectPreviewFallbackUnencryptedDescription"},
+      "displayedText": "Off by default. The app first tries a configured preview service if available, then may try your homeserver. If the preview remains incomplete, this option may fetch from TikTok, Instagram, or Reddit. A card with enough text but no image may still fetch a provider site icon. Your homeserver already sees unencrypted links; the service and link site may also receive the URL. The provider or image host may see your device's IP address when fetching a thumbnail or icon.",
+      "kind": "property", "scope": {"platforms": ["all"], "roomState": "unencrypted chat", "featureFlags": ["direct URL preview fallback opt-in"], "data": ["links", "device requests"]},
+      "assertion": "The homeserver already sees unencrypted message links; optional direct metadata or thumbnail fallback and independent imageless-card site-icon fetching may add recipients.", "excludes": "Does not assign a fixed number of URL recipients.",
+      "evidence": {"status": "missing", "paths": ["intergalactic/lib/client/matrix/components/url_preview/matrix_url_preview_component.dart", "intergalactic/lib/client/matrix/components/url_preview/url_preview_fallback_fetcher.dart"], "symbols": ["Matrix URL preview routing", "direct fallback fetch"], "tests": ["intergalactic/test/client/components/url_preview/url_preview_direct_fallback_consent_test.dart"]},
+      "reviewStatus": "pending_sc_review", "reviewedAt": null, "reviewedAtCommit": "9cc5c950066f99b537a5da4ebb92e5ac7a44b27d", "reviewDue": null,
+      "invalidationPaths": ["intergalactic/lib/client/matrix/components/url_preview/matrix_url_preview_component.dart", "intergalactic/lib/client/matrix/components/url_preview/url_preview_fallback_fetcher.dart", "intergalactic/lib/config/preferences.dart"]
+    },
+    {
+      "id": "preview-e2ee-direct-arb",
+      "surface": {"path": "intergalactic/assets/l10n/intl_en.arb", "anchor": "labelDirectPreviewFallbackE2EEDescription"},
+      "displayedText": "Off by default. The app first tries a configured preview service if available, then may try your homeserver. If the preview remains incomplete, this option may fetch from TikTok, Instagram, or Reddit. A card with enough text but no image may still fetch a provider site icon. The service, homeserver, and link site may each receive the URL; the provider or image host may see your device's IP address when fetching a thumbnail or icon.",
+      "kind": "property", "scope": {"platforms": ["all"], "roomState": "encrypted chat English ARB", "featureFlags": ["direct URL preview fallback opt-in"], "data": ["links", "device requests"]},
+      "assertion": "English ARB duplicates the encrypted-chat direct fallback disclosure.", "excludes": "No broader confidentiality claim.",
+      "evidence": {"status": "missing", "paths": ["intergalactic/lib/client/matrix/components/url_preview/matrix_url_preview_component.dart"], "symbols": ["Matrix URL preview routing"], "tests": ["intergalactic/test/client/components/url_preview/url_preview_direct_fallback_consent_test.dart"]},
+      "reviewStatus": "pending_sc_review", "reviewedAt": null, "reviewedAtCommit": "9cc5c950066f99b537a5da4ebb92e5ac7a44b27d", "reviewDue": null,
+      "invalidationPaths": ["intergalactic/lib/client/matrix/components/url_preview/matrix_url_preview_component.dart", "intergalactic/lib/config/preferences.dart"]
+    },
+    {
+      "id": "preview-plain-direct-arb",
+      "surface": {"path": "intergalactic/assets/l10n/intl_en.arb", "anchor": "labelDirectPreviewFallbackUnencryptedDescription"},
+      "displayedText": "Off by default. The app first tries a configured preview service if available, then may try your homeserver. If the preview remains incomplete, this option may fetch from TikTok, Instagram, or Reddit. A card with enough text but no image may still fetch a provider site icon. Your homeserver already sees unencrypted links; the service and link site may also receive the URL. The provider or image host may see your device's IP address when fetching a thumbnail or icon.",
+      "kind": "property", "scope": {"platforms": ["all"], "roomState": "unencrypted chat English ARB", "featureFlags": ["direct URL preview fallback opt-in"], "data": ["links", "device requests"]},
+      "assertion": "English ARB duplicates the plain-chat direct fallback disclosure.", "excludes": "No claim that direct fallback avoids the homeserver.",
+      "evidence": {"status": "missing", "paths": ["intergalactic/lib/client/matrix/components/url_preview/matrix_url_preview_component.dart"], "symbols": ["Matrix URL preview routing"], "tests": ["intergalactic/test/client/components/url_preview/url_preview_direct_fallback_consent_test.dart"]},
+      "reviewStatus": "pending_sc_review", "reviewedAt": null, "reviewedAtCommit": "9cc5c950066f99b537a5da4ebb92e5ac7a44b27d", "reviewDue": null,
+      "invalidationPaths": ["intergalactic/lib/client/matrix/components/url_preview/matrix_url_preview_component.dart", "intergalactic/lib/config/preferences.dart"]
+    },
+    {
+      "id": "biometric-cancel-no-store", "surface": {"path": "intergalactic/lib/ui/pages/settings/categories/account/security/matrix/biometric_recovery_key_panel.dart", "anchor": "_BiometricRecoveryKeySetupDialogState._safeSetupError"},
+      "displayedText": "Biometric unlock was cancelled. The recovery key was not stored.", "kind": "property", "scope": {"platforms": ["android", "ios"], "roomState": "biometric recovery setup cancelled", "featureFlags": ["biometric recovery"], "data": ["recovery key"]},
+      "assertion": "Cancelled setup did not store the recovery key.", "excludes": "Does not claim no earlier key exists.",
+      "evidence": {"status": "missing", "paths": ["intergalactic/lib/client/matrix/biometric_recovery_key_store.dart"], "symbols": ["BiometricRecoveryKeyStore"], "tests": ["intergalactic/test/client/matrix/biometric_recovery_key_store_test.dart"]},
+      "reviewStatus": "pending_sc_review", "reviewedAt": null, "reviewedAtCommit": "9cc5c950066f99b537a5da4ebb92e5ac7a44b27d", "reviewDue": null,
+      "invalidationPaths": ["intergalactic/lib/client/matrix/biometric_recovery_key_store.dart", "intergalactic/lib/ui/pages/settings/categories/account/security/matrix/biometric_recovery_key_panel.dart"]
+    },
+    {
+      "id": "biometric-fail-no-store", "surface": {"path": "intergalactic/lib/ui/pages/settings/categories/account/security/matrix/biometric_recovery_key_panel.dart", "anchor": "_BiometricRecoveryKeySetupDialogState._safeSetupError"},
+      "displayedText": "Biometric unlock did not complete. The recovery key was not stored.", "kind": "property", "scope": {"platforms": ["android", "ios"], "roomState": "biometric authentication failed", "featureFlags": ["biometric recovery"], "data": ["recovery key"]},
+      "assertion": "Failed setup did not store the recovery key.", "excludes": "Does not claim no earlier key exists.",
+      "evidence": {"status": "missing", "paths": ["intergalactic/lib/client/matrix/biometric_recovery_key_store.dart"], "symbols": ["BiometricRecoveryKeyStore"], "tests": ["intergalactic/test/client/matrix/biometric_recovery_key_store_test.dart"]},
+      "reviewStatus": "pending_sc_review", "reviewedAt": null, "reviewedAtCommit": "9cc5c950066f99b537a5da4ebb92e5ac7a44b27d", "reviewDue": null,
+      "invalidationPaths": ["intergalactic/lib/client/matrix/biometric_recovery_key_store.dart", "intergalactic/lib/ui/pages/settings/categories/account/security/matrix/biometric_recovery_key_panel.dart"]
+    },
+    {
+      "id": "biometric-unavailable-no-store", "surface": {"path": "intergalactic/lib/ui/pages/settings/categories/account/security/matrix/biometric_recovery_key_panel.dart", "anchor": "_BiometricRecoveryKeySetupDialogState._safeSetupError"},
+      "displayedText": "Biometric unlock is not available. The recovery key was not stored.", "kind": "property", "scope": {"platforms": ["android", "ios"], "roomState": "biometrics unavailable", "featureFlags": ["biometric recovery"], "data": ["recovery key"]},
+      "assertion": "Unavailable biometric setup did not store the recovery key.", "excludes": "Does not claim no earlier key exists.",
+      "evidence": {"status": "missing", "paths": ["intergalactic/lib/client/matrix/biometric_recovery_key_store.dart"], "symbols": ["BiometricRecoveryKeyStore"], "tests": ["intergalactic/test/client/matrix/biometric_recovery_key_store_test.dart"]},
+      "reviewStatus": "pending_sc_review", "reviewedAt": null, "reviewedAtCommit": "9cc5c950066f99b537a5da4ebb92e5ac7a44b27d", "reviewDue": null,
+      "invalidationPaths": ["intergalactic/lib/client/matrix/biometric_recovery_key_store.dart", "intergalactic/lib/ui/pages/settings/categories/account/security/matrix/biometric_recovery_key_panel.dart"]
+    },
+    {
+      "id": "biometric-invalid-key-no-store", "surface": {"path": "intergalactic/lib/ui/pages/settings/categories/account/security/matrix/biometric_recovery_key_panel.dart", "anchor": "_BiometricRecoveryKeySetupDialogState._safeSetupError"},
+      "displayedText": "The recovery key could not unlock this Matrix account, so it was not stored.", "kind": "property", "scope": {"platforms": ["android", "ios"], "roomState": "recovery secret validation failed", "featureFlags": ["biometric recovery"], "data": ["recovery key"]},
+      "assertion": "Invalid recovery key was not stored by this setup.", "excludes": "Does not claim no earlier key exists.",
+      "evidence": {"status": "missing", "paths": ["intergalactic/lib/client/matrix/biometric_recovery_key_store.dart"], "symbols": ["BiometricRecoveryKeyStore"], "tests": ["intergalactic/test/client/matrix/biometric_recovery_key_store_test.dart"]},
+      "reviewStatus": "pending_sc_review", "reviewedAt": null, "reviewedAtCommit": "9cc5c950066f99b537a5da4ebb92e5ac7a44b27d", "reviewDue": null,
+      "invalidationPaths": ["intergalactic/lib/client/matrix/biometric_recovery_key_store.dart", "intergalactic/lib/ui/pages/settings/categories/account/security/matrix/biometric_recovery_key_panel.dart"]
+    },
+    {
+      "id": "cross-signing-encryption-unavailable", "surface": {"path": "intergalactic/lib/ui/pages/settings/categories/account/security/matrix/cross_signing/cross_signing_page.dart", "anchor": "MatrixCrossSigningPageState._encryptionUnavailableMessage"},
+      "displayedText": "End to end encryption could not be prepared for this session. On the web app, reload the page to reinitialize encryption. If this keeps happening, sign out and sign back in again.",
+      "kind": "limitation", "scope": {"platforms": ["web", "all"], "roomState": "session encryption initialization failed", "featureFlags": ["Matrix E2EE"], "data": ["messages"]},
+      "assertion": "Encryption could not be prepared for this session.", "excludes": "No claim that another session or calls are E2EE.",
+      "evidence": {"status": "needs_review", "paths": ["intergalactic/lib/ui/pages/settings/categories/account/security/matrix/cross_signing/encryption_readiness_waiter.dart"], "symbols": ["EncryptionReadinessWaiter"], "tests": []},
+      "reviewStatus": "pending_sc_review", "reviewedAt": null, "reviewedAtCommit": "9cc5c950066f99b537a5da4ebb92e5ac7a44b27d", "reviewDue": null,
+      "invalidationPaths": ["intergalactic/lib/ui/pages/settings/categories/account/security/matrix/cross_signing/encryption_readiness_waiter.dart", "intergalactic/lib/client/matrix/matrix_client.dart"]
+    },
+    {
+      "id": "session-encryption-unavailable", "surface": {"path": "intergalactic/lib/ui/pages/settings/categories/account/security/matrix/session/matrix_session.dart", "anchor": "_MatrixSessionState.beginVerification"},
+      "displayedText": "End to end encryption is not available for this session yet. Wait for the client to finish syncing, then try verification again. If this keeps happening, sign out and sign back in again.",
+      "kind": "limitation", "scope": {"platforms": ["all"], "roomState": "verification before encryption readiness", "featureFlags": ["Matrix E2EE"], "data": ["messages"]},
+      "assertion": "This session has not reached E2EE readiness.", "excludes": "No claim about call encryption.",
+      "evidence": {"status": "needs_review", "paths": ["intergalactic/lib/client/matrix/matrix_e2ee_diagnostics.dart"], "symbols": ["MatrixE2eeTrustStatus.encryptionAvailable"], "tests": []},
+      "reviewStatus": "pending_sc_review", "reviewedAt": null, "reviewedAtCommit": "9cc5c950066f99b537a5da4ebb92e5ac7a44b27d", "reviewDue": null,
+      "invalidationPaths": ["intergalactic/lib/client/matrix/matrix_e2ee_diagnostics.dart", "intergalactic/lib/ui/pages/settings/categories/account/security/matrix/session/matrix_session.dart"]
+    },
+    {
+      "id": "vodozemac-missing-e2ee-unavailable", "surface": {"path": "intergalactic/assets/l10n/intl_en.arb", "anchor": "matrixClientVodozemacMissingMessage"},
+      "displayedText": "Encryption could not be initialized for this session. End-to-end encrypted messages will not be available until this is resolved.",
+      "kind": "limitation", "scope": {"platforms": ["all"], "roomState": "encryption initialization exhausted retries in this session", "featureFlags": ["Matrix E2EE"], "data": ["messages"]},
+      "assertion": "Message E2EE is unavailable in this session after initialization fails.", "excludes": "Does not diagnose a missing installation or describe call media.",
+      "evidence": {"status": "needs_review", "paths": ["intergalactic/lib/client/matrix/matrix_client.dart"], "symbols": ["MatrixClient._checkSystem exhausted initialization attempts"], "tests": []},
+      "reviewStatus": "pending_sc_review", "reviewedAt": null, "reviewedAtCommit": "9cc5c950066f99b537a5da4ebb92e5ac7a44b27d", "reviewDue": null,
+      "invalidationPaths": ["intergalactic/lib/client/matrix/matrix_client.dart", "intergalactic/assets/l10n/intl_en.arb"]
+    }
+  ],
+  "exclusions": [
+    {"surface": {"path": "intergalactic/lib/ui/pages/login/post_login_matrix_recovery_dialog.dart", "anchor": "_PostLoginMatrixRecoveryDialogState.labelPreparingSecureSession"}, "displayedText": "Preparing secure session", "reason": "Progress title while session preparation is underway, not an assertion that encryption succeeded; S&C reclassification pending.", "reviewedAt": "2026-09-28", "reviewStatus": "pending_sc_review", "expires": "2026-12-26"},
+    {"surface": {"path": "intergalactic/assets/l10n/intl_en.arb", "anchor": "labelPreparingSecureSession"}, "displayedText": "Preparing secure session", "reason": "English ARB duplicate of the progress title, not a protection assertion; S&C reclassification pending.", "reviewedAt": "2026-09-28", "reviewStatus": "pending_sc_review", "expires": "2026-12-26"},
+    {"surface": {"path": "intergalactic/assets/l10n/intl_en.arb", "anchor": "matrixClientOlmMissingMessage"}, "displayedText": "libolm is not installed or was not found. End to End Encryption will not be available until this is resolved", "reason": "Orphaned localization: matrix_client.dart declares the getter but no lib or test call site uses it at this reviewed head; recheck reachability if matrix_client.dart changes.", "reviewedAt": "2026-09-28", "reviewStatus": "pending_sc_review", "expires": "2026-12-26"},
+    {"surface": {"path": "intergalactic/lib/ui/pages/settings/categories/account/security/matrix/biometric_recovery_key_panel.dart", "anchor": "_BiometricRecoveryKeySetupDialogState._validateRecoverySecretAgainstConnectedSsss"}, "displayedText": "End to end encryption not available!", "reason": "Thrown internal exception text, not a presented security assurance; S&C to confirm propagation behavior.", "reviewedAt": "2026-09-27", "reviewStatus": "pending_sc_review", "expires": "2026-12-26"},
+    {"surface": {"path": "intergalactic/lib/ui/pages/settings/categories/account/security/matrix/cross_signing/cross_signing_page.dart", "anchor": "MatrixCrossSigningPageState.build"}, "displayedText": "Preparing end-to-end encryption…", "reason": "Progress label, not an assertion that encryption is ready; S&C to confirm.", "reviewedAt": "2026-09-27", "reviewStatus": "pending_sc_review", "expires": "2026-12-26"},
+    {"surface": {"path": "intergalactic/lib/ui/pages/settings/categories/account/security/matrix/matrix_security_tab.dart", "anchor": "_MatrixSecurityTabState.labelMatrixDeveloperPersistentRepairComplete"}, "displayedText": "Developer E2EE repair simulation complete", "reason": "Developer-only simulation completion label, not a protection claim.", "reviewedAt": "2026-09-27", "reviewStatus": "pending_sc_review", "expires": "2026-12-26"},
+    {"surface": {"path": "intergalactic/assets/l10n/intl_en.arb", "anchor": "labelMatrixDeveloperPersistentRepairComplete"}, "displayedText": "Developer E2EE repair simulation complete", "reason": "English ARB of developer-only simulation completion label.", "reviewedAt": "2026-09-27", "reviewStatus": "pending_sc_review", "expires": "2026-12-26"},
+    {"surface": {"path": "intergalactic/lib/ui/accessibility/accessibility_preferences.dart", "anchor": "AccessibilityColorPreference.colorSafe"}, "displayedText": "Color-safe", "reason": "Color accessibility preference, not data or cryptographic safety.", "reviewedAt": "2026-09-27", "reviewStatus": "pending_sc_review", "expires": "2026-12-26"},
+    {"surface": {"path": "intergalactic/lib/ui/pages/settings/categories/app/accessibility_settings_page.dart", "anchor": "_AccessibilityPresetGrid.build"}, "displayedText": "Color-safe", "reason": "Color accessibility preset, not a security guarantee.", "reviewedAt": "2026-09-27", "reviewStatus": "pending_sc_review", "expires": "2026-12-26"},
+    {"surface": {"path": "intergalactic/lib/ui/onboarding/demo_tutorial_content.dart", "anchor": "demoTutorialSteps"}, "displayedText": "Privacy and Encryption", "reason": "Standalone navigation title; does not assert a protection property.", "reviewedAt": "2026-09-27", "reviewStatus": "pending_sc_review", "expires": "2026-12-26"},
+    {"surface": {"path": "intergalactic/lib/ui/onboarding/mobile_tutorial_content.dart", "anchor": "mobileTutorialSteps"}, "displayedText": "Privacy and Encryption", "reason": "Standalone navigation title; does not assert a protection property.", "reviewedAt": "2026-09-27", "reviewStatus": "pending_sc_review", "expires": "2026-12-26"},
+    {"surface": {"path": "intergalactic/lib/ui/onboarding/onboarding_content.dart", "anchor": "initialOnboardingSteps"}, "displayedText": "Privacy and Encryption", "reason": "Standalone navigation title; does not assert a protection property.", "reviewedAt": "2026-09-27", "reviewStatus": "pending_sc_review", "expires": "2026-12-26"}
+  ]
+}

@@ -1,0 +1,73 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: pub
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:30"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: pub
+    directory: /intergalactic
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:45"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: pub
+    directory: /tiamat
+    schedule:
+      interval: weekly
+      day: monday
+      time: "10:00"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: pub
+    directory: /widgets/calendar
+    schedule:
+      interval: weekly
+      day: monday
+      time: "10:15"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: pub
+    directory: /widgets/matrix_widget_api
+    schedule:
+      interval: weekly
+      day: monday
+      time: "10:30"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: pub
+    directory: /plugins/intergalactic_noise_suppression
+    schedule:
+      interval: weekly
+      day: monday
+      time: "10:45"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: pub
+    directory: /plugins/intergalactic_windows_share
+    schedule:
+      interval: weekly
+      day: monday
+      time: "11:00"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: gradle
+    directory: /intergalactic/android
+    schedule:
+      interval: weekly
+      day: monday
+      time: "11:15"
+    open-pull-requests-limit: 5

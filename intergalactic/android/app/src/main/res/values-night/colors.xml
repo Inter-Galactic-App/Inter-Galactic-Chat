@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#111111</color>
+    <!-- Matches the Flutter startup shell's initial ThemeDarkMatter surface so
+         the native launch window hands off without a color flash. -->
+    <color name="launch_background_color">#1B1C20</color>
+</resources>

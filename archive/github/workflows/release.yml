@@ -1,0 +1,515 @@
+
+name: release
+on:
+  release:
+    types:
+      - created
+  workflow_dispatch:
+
+env:
+  PROJECT_PATH: intergalactic
+  INTERGALACTIC_PROD: 1
+
+jobs:
+  release-android:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      # we were having issues running out of disk space on workers, so...
+      - name: Aggressive cleanup
+        run: |
+          # Remove .NET SDKs
+          sudo rm -rf /usr/share/dotnet
+
+          # Remove Haskell (GHC)
+          sudo rm -rf /usr/local/.ghcup
+
+          # Remove Julia
+          sudo rm -rf /usr/local/julia*
+
+          # Remove Chromium (optional if not using for browser tests)
+          sudo rm -rf /usr/local/share/chromium
+
+          # Remove Microsoft/Edge and Google Chrome builds
+          sudo rm -rf /opt/microsoft /opt/google
+
+          # Remove Azure CLI
+          sudo rm -rf /opt/az
+
+          # Remove CodeQL and other toolcaches
+          sudo rm -rf /opt/hostedtoolcache
+
+          docker system prune -af || true
+          docker builder prune -af || true
+          df -h
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: 'true'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@051d80c5bb3aedb8aa4e52c0b6c2ba54afc91a08
+        with:
+          flutter-version: '3.41.1'
+          channel: 'stable'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: 17
+
+      - name: Setup Tools
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y ninja-build libgtk-3-dev libmpv-dev mpv ffmpeg
+
+      - name: Code Generation
+        run: |
+          cd $PROJECT_PATH
+          dart run scripts/codegen.dart
+
+      - name: Setup Signatures
+        run: |
+          cd $PROJECT_PATH
+          dart run scripts/setup_android_release.dart --key_password ${{ secrets.ANDROID_KEY_PASSWORD }} --key_b64 ${{ secrets.ANDROID_KEY_STORE_B64 }}
+
+      - name: Build APK
+        run: |
+          cd $PROJECT_PATH
+          dart run scripts/build_release.dart --platform android --version_tag ${{ github.event.release.tag_name || 'v0.0.0-artifact' }} --git_hash ${{ github.sha }}
+
+      - name: Upload to release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ github.event.release.tag_name }}" intergalactic/build/app/outputs/flutter-apk/app-release.apk#intergalactic-android.apk --clobber
+
+      - name: Configure SSH
+        if: github.event_name == 'release'
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST:    ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT:    ${{ secrets.DEPLOY_PORT || '22' }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${DEPLOY_SSH_KEY}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p "${DEPLOY_PORT}" "${DEPLOY_HOST}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Deploy APK to app.ourgalaxy.space
+        if: github.event_name == 'release'
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          VERSION="${TAG#v}"
+          SCP_OPTS=( -i ~/.ssh/deploy_key -P "${DEPLOY_PORT}" -o StrictHostKeyChecking=yes )
+          DEST="${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}"
+          scp "${SCP_OPTS[@]}" \
+            intergalactic/build/app/outputs/flutter-apk/app-release.apk \
+            "${DEST}/downloads/InterGalactic-${VERSION}.apk"
+          echo "Deployed APK ${VERSION} to ${DEPLOY_HOST}"
+
+      - name: Upload Artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: intergalactic-android.apk
+          path: intergalactic/build/app/outputs/flutter-apk/app-release.apk
+
+  release-linux-debian:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      # we were having issues running out of disk space on workers, so...
+      - name: Aggressive cleanup
+        run: |
+          # Remove .NET SDKs
+          sudo rm -rf /usr/share/dotnet
+
+          # Remove Haskell (GHC)
+          sudo rm -rf /usr/local/.ghcup
+
+          # Remove Julia
+          sudo rm -rf /usr/local/julia*
+
+          # Remove Chromium (optional if not using for browser tests)
+          sudo rm -rf /usr/local/share/chromium
+
+          # Remove Microsoft/Edge and Google Chrome builds
+          sudo rm -rf /opt/microsoft /opt/google
+
+          # Remove Azure CLI
+          sudo rm -rf /opt/az
+
+          # Remove CodeQL and other toolcaches
+          sudo rm -rf /opt/hostedtoolcache
+
+          docker system prune -af || true
+          docker builder prune -af || true
+          df -h
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: 'true'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@051d80c5bb3aedb8aa4e52c0b6c2ba54afc91a08
+        with:
+          flutter-version: '3.41.1'
+          channel: 'stable'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: 17
+
+      - name: Setup Tools
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y ninja-build libgtk-3-dev libmpv-dev mpv ffmpeg
+
+      - name: Code Generation
+        run: |
+          cd $PROJECT_PATH
+          git apply scripts/apply_google_services.patch
+          dart run scripts/codegen.dart
+
+      - name: Setup Signatures
+        run: |
+          cd $PROJECT_PATH
+          dart run scripts/setup_android_release.dart --key_password ${{ secrets.ANDROID_KEY_PASSWORD }} --key_b64 ${{ secrets.ANDROID_KEY_STORE_B64 }}
+
+      - name: Build APK
+        run: |
+          cd $PROJECT_PATH
+          dart run scripts/build_release.dart --platform android --version_tag ${{ github.event.release.tag_name || 'v0.0.0-artifact' }} --git_hash ${{ github.sha }} --enable_google_services true --build_detail google_services
+
+      - name: Upload to release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ github.event.release.tag_name }}" intergalactic/build/app/outputs/flutter-apk/app-release.apk#intergalactic-android-google-services.apk --clobber
+
+      - name: Upload Artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: intergalactic-android-google-services.apk
+          path: intergalactic/build/app/outputs/flutter-apk/app-release.apk
+
+  release-linux-debian:
+
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    steps:
+      # we were having issues running out of disk space on workers, so...
+      - name: Aggressive cleanup
+        run: |
+          # Remove .NET SDKs
+          sudo rm -rf /usr/share/dotnet
+
+          # Remove Haskell (GHC)
+          sudo rm -rf /usr/local/.ghcup
+
+          # Remove Julia
+          sudo rm -rf /usr/local/julia*
+
+          # Remove Chromium (optional if not using for browser tests)
+          sudo rm -rf /usr/local/share/chromium
+
+          # Remove Microsoft/Edge and Google Chrome builds
+          sudo rm -rf /opt/microsoft /opt/google
+
+          # Remove Azure CLI
+          sudo rm -rf /opt/az
+
+          # Remove CodeQL and other toolcaches
+          sudo rm -rf /opt/hostedtoolcache
+
+          docker system prune -af || true
+          docker builder prune -af || true
+          df -h
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: 'true'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@051d80c5bb3aedb8aa4e52c0b6c2ba54afc91a08
+        with:
+          flutter-version: '3.41.1'
+          channel: 'stable'
+
+      - name: Setup Tools
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y ninja-build libgtk-3-dev libmpv-dev mpv ffmpeg libmimalloc-dev webkit2gtk-4.1 libasound2-dev keybinder-3.0
+
+      - name: Code Generation
+        run: |
+          cd $PROJECT_PATH
+          dart run scripts/codegen.dart
+
+      - name: Build Linux
+        run: |
+          cd $PROJECT_PATH
+          dart run scripts/build_release.dart --platform linux --version_tag ${{ github.event.release.tag_name || 'v0.0.0-artifact' }} --git_hash ${{ github.sha }} --build_detail debian
+
+      - name: Create Package
+        run: |
+          mv $PROJECT_PATH/linux/debian/DEBIAN/control-${{ matrix.os }} $PROJECT_PATH/linux/debian/DEBIAN/control
+          cp -r $PROJECT_PATH/linux/debian ./intergalactic-pkg
+          cp -r $PROJECT_PATH/build/linux/x64/release/bundle ./intergalactic-pkg/usr/lib/chat.intergalactic.app
+          version=$(echo ${{ github.event.release.tag_name || 'v0.0.0-artifact' }} | grep -oP '[0-9]+([.][0-9]+)+')
+          echo $version
+          cd ./intergalactic-pkg
+          sed -i "s/{{VERSION_TAG}}/$version/g" ./DEBIAN/control
+          dpkg-deb --build ./ intergalactic-linux-x64.deb
+
+      - name: Upload to release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ github.event.release.tag_name }}" intergalactic-pkg/intergalactic-linux-x64.deb#intergalactic-${{ matrix.os }}-x64.deb --clobber
+
+      - name: Upload Artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: intergalactic-${{ matrix.os }}-x64.deb
+          path: intergalactic-pkg/intergalactic-linux-x64.deb
+
+  release-linux-flatpak:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      # we were having issues running out of disk space on workers, so...
+      - name: Aggressive cleanup
+        run: |
+          # Remove .NET SDKs
+          sudo rm -rf /usr/share/dotnet
+
+          # Remove Haskell (GHC)
+          sudo rm -rf /usr/local/.ghcup
+
+          # Remove Julia
+          sudo rm -rf /usr/local/julia*
+
+          # Remove Chromium (optional if not using for browser tests)
+          sudo rm -rf /usr/local/share/chromium
+
+          # Remove Microsoft/Edge and Google Chrome builds
+          sudo rm -rf /opt/microsoft /opt/google
+
+          # Remove Azure CLI
+          sudo rm -rf /opt/az
+
+          # Remove CodeQL and other toolcaches
+          sudo rm -rf /opt/hostedtoolcache
+
+          docker system prune -af || true
+          docker builder prune -af || true
+          df -h
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: 'true'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@051d80c5bb3aedb8aa4e52c0b6c2ba54afc91a08
+        with:
+          flutter-version: '3.41.1'
+          channel: 'stable'
+
+      - name: Setup Tools
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y ninja-build libgtk-3-dev libmpv-dev mpv ffmpeg libmimalloc-dev flatpak-builder flatpak webkit2gtk-4.1 keybinder-3.0
+
+      - name: Code Generation
+        run: |
+          cd $PROJECT_PATH
+          dart run scripts/codegen.dart
+
+      - name: Build Linux
+        run: |
+          cd $PROJECT_PATH
+          dart run scripts/build_release.dart --platform linux --version_tag ${{ github.event.release.tag_name || 'v0.0.0-artifact' }} --git_hash ${{ github.sha }} --build_detail flatpak
+
+      - name: Create Flatpak
+        run: |
+          sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          sudo flatpak install -y flathub org.gnome.Platform//48 org.gnome.Sdk//48
+          mkdir -p intergalactic/linux/flatpak/intergalactic
+          cp -r $PROJECT_PATH/build/linux/x64/release/bundle $PROJECT_PATH/linux/flatpak/intergalactic/bundle
+          version=$(echo ${{ github.event.release.tag_name || 'v0.0.0-artifact' }} | grep -oP '[0-9]+([.][0-9]+)+')
+          echo $version
+          cd $PROJECT_PATH/linux/flatpak
+          sed -i "s/{{VERSION_TAG}}/$version/g" ./chat.intergalactic.app.desktop
+          sed -i "s/{{VERSION_TAG}}/$version/g" ./chat.intergalactic.app.metainfo.xml
+          flatpak-builder --force-clean build-dir chat.intergalactic.app.yaml --repo=repo
+          flatpak build-bundle repo chat.intergalactic.app.flatpak chat.intergalactic.app
+
+      - name: Upload to release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ github.event.release.tag_name }}" intergalactic/linux/flatpak/chat.intergalactic.app.flatpak --clobber
+
+      - name: Upload Artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: chat.intergalactic.app.flatpak
+          path: intergalactic/linux/flatpak/chat.intergalactic.app.flatpak
+
+  release-linux-portable:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      # we were having issues running out of disk space on workers, so...
+      - name: Aggressive cleanup
+        run: |
+          # Remove .NET SDKs
+          sudo rm -rf /usr/share/dotnet
+
+          # Remove Haskell (GHC)
+          sudo rm -rf /usr/local/.ghcup
+
+          # Remove Julia
+          sudo rm -rf /usr/local/julia*
+
+          # Remove Chromium (optional if not using for browser tests)
+          sudo rm -rf /usr/local/share/chromium
+
+          # Remove Microsoft/Edge and Google Chrome builds
+          sudo rm -rf /opt/microsoft /opt/google
+
+          # Remove Azure CLI
+          sudo rm -rf /opt/az
+
+          # Remove CodeQL and other toolcaches
+          sudo rm -rf /opt/hostedtoolcache
+
+          docker system prune -af || true
+          docker builder prune -af || true
+          df -h
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: 'true'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@051d80c5bb3aedb8aa4e52c0b6c2ba54afc91a08
+        with:
+          flutter-version: '3.41.1'
+          channel: 'stable'
+
+      - name: Setup Tools
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y ninja-build libgtk-3-dev libmpv-dev mpv ffmpeg libmimalloc-dev webkit2gtk-4.1 keybinder-3.0
+
+      - name: Code Generation
+        run: |
+          cd $PROJECT_PATH
+          dart run scripts/codegen.dart
+
+      - name: Build Linux
+        run: |
+          cd $PROJECT_PATH
+          dart run scripts/build_release.dart --platform linux --version_tag ${{ github.event.release.tag_name || 'v0.0.0-artifact' }} --git_hash ${{ github.sha }} --build_detail linux-x64
+
+      - name: Create archive
+        run: |
+          cd $PROJECT_PATH/build/linux/x64/release
+          tar -czf intergalactic-linux-portable-x64.tar.gz bundle
+
+      - name: Upload to release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ github.event.release.tag_name }}" intergalactic/build/linux/x64/release/intergalactic-linux-portable-x64.tar.gz --clobber
+
+      - name: Upload Artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: intergalactic-linux-portable-x64.tar.gz
+          path: intergalactic/build/linux/x64/release/intergalactic-linux-portable-x64.tar.gz
+
+
+  release-web:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: 'true'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@051d80c5bb3aedb8aa4e52c0b6c2ba54afc91a08
+        with:
+          flutter-version: '3.41.1'
+          channel: 'stable'
+
+      - name: Setup Tools
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y ninja-build libgtk-3-dev libmpv-dev mpv ffmpeg webkit2gtk-4.1
+
+      - name: Code Generation
+        run: |
+          cd $PROJECT_PATH
+          dart run scripts/codegen.dart
+
+      - uses: moonrepo/setup-rust@ede6de059f8046a5e236c94046823e2af11ca670
+      - run: rustup component add rust-src --toolchain nightly-x86_64-unknown-linux-gnu
+
+      - name: Prepare web
+        run: |
+          cd $PROJECT_PATH
+          ./scripts/prepare-web.sh
+
+      - name: Build Web
+        run: |
+          cd $PROJECT_PATH
+          dart run scripts/build_release.dart --platform web --version_tag ${{ github.event.release.tag_name || 'v0.0.0-artifact' }} --git_hash ${{ github.sha }}
+
+      - name: Create archive
+        run: |
+          cd $PROJECT_PATH/build
+          tar -czf intergalactic-web.tar.gz web
+
+      - name: Upload to release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ github.event.release.tag_name }}" intergalactic/build/intergalactic-web.tar.gz --clobber
+
+      - name: Upload Artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: intergalactic-web.tar.gz
+          path: intergalactic/build/intergalactic-web.tar.gz

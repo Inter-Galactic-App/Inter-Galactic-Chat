@@ -1,0 +1,508 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.13/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :gradle:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :gradle:compileKotlin UP-TO-DATE
+> Task :gradle:compileJava NO-SOURCE
+> Task :gradle:compileGroovy NO-SOURCE
+> Task :gradle:pluginDescriptors UP-TO-DATE
+> Task :gradle:processResources UP-TO-DATE
+> Task :gradle:classes UP-TO-DATE
+> Task :gradle:jar UP-TO-DATE
+
+> Task :app:tasks
+
+------------------------------------------------------------
+Tasks runnable from project ':app'
+------------------------------------------------------------
+
+Android tasks
+-------------
+androidDependencies - Displays the Android dependencies of the project.
+signingReport - Displays the signing info for the base and test modules
+sourceSets - Prints out all the source sets defined in this project.
+
+Build tasks
+-----------
+assemble - Assemble main outputs for all the variants.
+assembleAndroidTest - Assembles all the Test applications.
+assembleUnitTest - Assembles all the unit test applications.
+build - Assembles and tests this project.
+buildDependents - Assembles and tests this project and all projects that depend on it.
+buildKotlinToolingMetadata - Build metadata json file containing information about the used Kotlin tooling
+buildNeeded - Assembles and tests this project and all projects it depends on.
+bundle - Assemble bundles for all the variants.
+clean - Deletes the build directory.
+compileDebugAndroidTestSources
+compileDebugSources
+compileDebugUnitTestSources
+compileProfileSources
+compileProfileUnitTestSources
+compileReleaseSources
+compileReleaseUnitTestSources
+
+Help tasks
+----------
+artifactTransforms - Displays the Artifact Transforms that can be executed in project ':app'.
+buildEnvironment - Displays all buildscript dependencies declared in project ':app'.
+dependencies - Displays all dependencies declared in project ':app'.
+dependencyInsight - Displays the insight into a specific dependency in project ':app'.
+help - Displays a help message.
+javaToolchains - Displays the detected java toolchains.
+kotlinDslAccessorsReport - Prints the Kotlin code for accessing the currently available project extensions and conventions.
+outgoingVariants - Displays the outgoing variants of project ':app'.
+projects - Displays the sub-projects of project ':app'.
+properties - Displays the properties of project ':app'.
+resolvableConfigurations - Displays the configurations that can be resolved in project ':app'.
+tasks - Displays the tasks runnable from project ':app'.
+
+Install tasks
+-------------
+installDebug - Installs the Debug build.
+installDebugAndroidTest - Installs the android (on device) tests for the Debug build.
+installProfile - Installs the Profile build.
+installRelease - Installs the Release build.
+uninstallAll - Uninstall all applications.
+uninstallDebug - Uninstalls the Debug build.
+uninstallDebugAndroidTest - Uninstalls the android (on device) tests for the Debug build.
+uninstallProfile - Uninstalls the Profile build.
+uninstallRelease - Uninstalls the Release build.
+
+Verification tasks
+------------------
+check - Runs all checks.
+checkJetifier - Checks whether Jetifier is needed for the current project
+checkKotlinGradlePluginConfigurationErrors - Checks that Kotlin Gradle Plugin hasn't reported project configuration errors, failing otherwise. This task always runs before compileKotlin* or similar tasks.
+connectedAndroidTest - Installs and runs instrumentation tests for all flavors on connected devices.
+connectedCheck - Runs all device checks on currently connected devices.
+connectedDebugAndroidTest - Installs and runs the tests for debug on connected devices.
+deviceAndroidTest - Installs and runs instrumentation tests using all Device Providers.
+deviceCheck - Runs all device checks using Device Providers and Test Servers.
+lint - Runs lint on the default variant.
+lintDebug - Print text output from the corresponding lint report task
+lintFix - Runs lint on the default variant and applies any safe suggestions to the source code.
+lintProfile - Print text output from the corresponding lint report task
+lintRelease - Print text output from the corresponding lint report task
+lintVitalRelease - Print text output from the corresponding lint report task
+test - Run unit tests for all variants.
+testDebugUnitTest - Run unit tests for the debug build.
+testProfileUnitTest - Run unit tests for the profile build.
+testReleaseUnitTest - Run unit tests for the release build.
+updateLintBaseline - Updates the lint baseline using the default variant.
+
+Other tasks
+-----------
+analyzeDebugAndroidTestDependencies
+analyzeDebugDependencies
+analyzeDebugUnitTestDependencies
+analyzeProfileDependencies
+analyzeProfileUnitTestDependencies
+analyzeReleaseDependencies
+analyzeReleaseUnitTestDependencies
+asarToCompatSplitsForDebug
+asarToCompatSplitsForProfile
+asarToCompatSplitsForRelease
+assembleDebug - Assembles main output for variant debug
+assembleDebugAndroidTest - Assembles main output for variant debugAndroidTest
+assembleDebugUnitTest - Assembles main output for variant debugUnitTest
+assembleProfile - Assembles main output for variant profile
+assembleProfileUnitTest - Assembles main output for variant profileUnitTest
+assembleRelease - Assembles main output for variant release
+assembleReleaseUnitTest - Assembles main output for variant releaseUnitTest
+buildCMakeDebug
+buildCMakeDebug[arm64-v8a]
+buildCMakeDebug[armeabi-v7a]
+buildCMakeDebug[x86_64]
+buildCMakeProfile
+buildCMakeProfile[arm64-v8a]
+buildCMakeProfile[armeabi-v7a]
+buildCMakeProfile[x86_64]
+buildCMakeRelease
+buildCMakeRelease[arm64-v8a]
+buildCMakeRelease[armeabi-v7a]
+buildCMakeRelease[x86_64]
+buildDebugPreBundle
+buildProfilePreBundle
+buildReleasePreBundle
+bundleDebug - Assembles bundle for variant debug
+bundleDebugClassesToCompileJar
+bundleDebugClassesToRuntimeJar
+bundleDebugResources
+bundleProfile - Assembles bundle for variant profile
+bundleProfileClassesToCompileJar
+bundleProfileClassesToRuntimeJar
+bundleProfileResources
+bundleRelease - Assembles bundle for variant release
+bundleReleaseClassesToCompileJar
+bundleReleaseClassesToRuntimeJar
+bundleReleaseResources
+checkDebugAarMetadata
+checkDebugAndroidTestAarMetadata
+checkDebugAndroidTestDuplicateClasses
+checkDebugDuplicateClasses
+checkDebugManifest
+checkProfileAarMetadata
+checkProfileDuplicateClasses
+checkProfileManifest
+checkReleaseAarMetadata
+checkReleaseDuplicateClasses
+checkReleaseManifest
+collectReleaseDependencies
+compileDebugAndroidTestJavaWithJavac
+compileDebugAndroidTestKotlin - Compiles the debugAndroidTest kotlin.
+compileDebugAndroidTestShaders
+compileDebugArtProfile
+compileDebugJavaWithJavac
+compileDebugKotlin - Compiles the debug kotlin.
+compileDebugShaders
+compileDebugUnitTestJavaWithJavac
+compileDebugUnitTestKotlin - Compiles the debugUnitTest kotlin.
+compileFlutterBuildDebug
+compileFlutterBuildProfile
+compileFlutterBuildRelease
+compileLint
+compileLintChecks
+compileProfileArtProfile
+compileProfileJavaWithJavac
+compileProfileKotlin - Compiles the profile kotlin.
+compileProfileShaders
+compileProfileUnitTestJavaWithJavac
+compileProfileUnitTestKotlin - Compiles the profileUnitTest kotlin.
+compileReleaseArtProfile
+compileReleaseJavaWithJavac
+compileReleaseKotlin - Compiles the release kotlin.
+compileReleaseShaders
+compileReleaseUnitTestJavaWithJavac
+compileReleaseUnitTestKotlin - Compiles the releaseUnitTest kotlin.
+components - Displays the components produced by project ':app'. [deprecated]
+compressDebugAndroidTestAssets
+compressDebugAssets
+compressProfileAssets
+compressReleaseAssets
+configureCMakeDebug
+configureCMakeDebug[arm64-v8a]
+configureCMakeDebug[armeabi-v7a]
+configureCMakeDebug[x86_64]
+configureCMakeProfile
+configureCMakeProfile[arm64-v8a]
+configureCMakeProfile[armeabi-v7a]
+configureCMakeProfile[x86_64]
+configureCMakeRelease
+configureCMakeRelease[arm64-v8a]
+configureCMakeRelease[armeabi-v7a]
+configureCMakeRelease[x86_64]
+configureReleaseDependencies
+consumeConfigAttr
+convertLinkedResourcesToBinaryRelease
+convertShrunkResourcesToBinaryRelease
+copyFlutterAssetsDebug
+copyFlutterAssetsProfile
+copyFlutterAssetsRelease
+createDebugAndroidTestApkListingFileRedirect
+createDebugApkListingFileRedirect
+createDebugApksFromBundleListingFileRedirect
+createDebugBundleListingFileRedirect
+createDebugCompatibleScreenManifests
+createMockableJar
+createProfileApkListingFileRedirect
+createProfileApksFromBundleListingFileRedirect
+createProfileBundleListingFileRedirect
+createProfileCompatibleScreenManifests
+createReleaseApkListingFileRedirect
+createReleaseApksFromBundleListingFileRedirect
+createReleaseBundleListingFileRedirect
+createReleaseCompatibleScreenManifests
+DebugMinSdkCheck
+debugOssDependencyTask
+debugOssLicensesTask
+dependentComponents - Displays the dependent components of components in project ':app'. [deprecated]
+desugarDebugAndroidTestFileDependencies
+desugarDebugFileDependencies
+desugarProfileFileDependencies
+dexBuilderDebug
+dexBuilderDebugAndroidTest
+dexBuilderProfile
+expandReleaseArtProfileWildcards
+expandReleaseL8ArtProfileWildcards
+externalNativeBuildCleanDebug
+externalNativeBuildCleanProfile
+externalNativeBuildCleanRelease
+externalNativeBuildDebug
+externalNativeBuildProfile
+externalNativeBuildRelease
+extractApksForDebug
+extractApksForProfile
+extractApksForRelease
+extractApksFromBundleForDebug
+extractApksFromBundleForProfile
+extractApksFromBundleForRelease
+extractDebugNativeDebugMetadata
+extractDebugNativeSymbolTables
+extractDeepLinksDebug
+extractDeepLinksProfile
+extractDeepLinksRelease
+extractProfileNativeDebugMetadata
+extractProfileNativeSymbolTables
+extractProguardFiles
+extractReleaseNativeDebugMetadata
+extractReleaseNativeSymbolTables
+extractReleaseVersionControlInfo
+generateDebugAndroidTestAssets
+generateDebugAndroidTestLintModel
+generateDebugAndroidTestResources
+generateDebugAndroidTestResValues
+generateDebugAndroidTestSources
+generateDebugAssets
+generateDebugFeatureMetadata
+generateDebugFeatureTransitiveDeps
+generateDebugLintModel
+generateDebugLintReportModel
+generateDebugManifestClass
+generateDebugResources
+generateDebugResValues
+generateDebugSources
+generateDebugUnitTestAssets
+generateDebugUnitTestLintModel
+generateDebugUnitTestResources
+generateDebugUnitTestSources
+generateJsonModelDebug
+generateJsonModelProfile
+generateJsonModelRelease
+generateProfileAssets
+generateProfileFeatureMetadata
+generateProfileFeatureTransitiveDeps
+generateProfileLintModel
+generateProfileLintReportModel
+generateProfileManifestClass
+generateProfileResources
+generateProfileResValues
+generateProfileSources
+generateProfileUnitTestAssets
+generateProfileUnitTestLintModel
+generateProfileUnitTestResources
+generateProfileUnitTestSources
+generateReleaseAssets
+generateReleaseFeatureMetadata
+generateReleaseFeatureTransitiveDeps
+generateReleaseLintModel
+generateReleaseLintReportModel
+generateReleaseLintVitalReportModel
+generateReleaseManifestClass
+generateReleaseResources
+generateReleaseResValues
+generateReleaseSources
+generateReleaseUnitTestAssets
+generateReleaseUnitTestLintModel
+generateReleaseUnitTestResources
+generateReleaseUnitTestSources
+javaPreCompileDebug
+javaPreCompileDebugAndroidTest
+javaPreCompileDebugUnitTest
+javaPreCompileProfile
+javaPreCompileProfileUnitTest
+javaPreCompileRelease
+javaPreCompileReleaseUnitTest
+javaVersion - Print the current java version used by gradle. see: https://docs.gradle.org/current/javadoc/org/gradle/api/JavaVersion.html
+kgpVersion - Print the current kgp version used by the project.
+l8DexDesugarLibDebug
+l8DexDesugarLibProfile
+l8DexDesugarLibRelease
+lintAnalyzeDebug - Run lint analysis on the debug component
+lintAnalyzeDebugAndroidTest - Run lint analysis on the debugAndroidTest component
+lintAnalyzeDebugUnitTest - Run lint analysis on the debugUnitTest component
+lintAnalyzeProfile - Run lint analysis on the profile component
+lintAnalyzeProfileUnitTest - Run lint analysis on the profileUnitTest component
+lintAnalyzeRelease - Run lint analysis on the release component
+lintAnalyzeReleaseUnitTest - Run lint analysis on the releaseUnitTest component
+lintFixDebug - Fix lint on the debug variant
+lintFixProfile - Fix lint on the profile variant
+lintFixRelease - Fix lint on the release variant
+lintReportDebug - Run lint on the debug variant
+lintReportProfile - Run lint on the profile variant
+lintReportRelease - Run lint on the release variant
+lintVitalAnalyzeRelease - Run lint analysis with only the fatal issues enabled 
+lintVitalReportRelease - Run lint with only the fatal issues enabled on the release variant
+makeApkFromBundleForDebug
+makeApkFromBundleForProfile
+makeApkFromBundleForRelease
+mapDebugAndroidTestSourceSetPaths
+mapDebugSourceSetPaths
+mapProfileSourceSetPaths
+mapReleaseSourceSetPaths
+mergeDebugAndroidTestAssets
+mergeDebugAndroidTestGeneratedProguardFiles
+mergeDebugAndroidTestGlobalSynthetics
+mergeDebugAndroidTestJavaResource
+mergeDebugAndroidTestJniLibFolders
+mergeDebugAndroidTestNativeLibs
+mergeDebugAndroidTestResources
+mergeDebugAndroidTestShaders
+mergeDebugArtProfile
+mergeDebugAssets
+mergeDebugGeneratedProguardFiles
+mergeDebugGlobalSynthetics
+mergeDebugJavaResource
+mergeDebugJniLibFolders
+mergeDebugNativeDebugMetadata
+mergeDebugNativeLibs
+mergeDebugResources
+mergeDebugShaders
+mergeDebugStartupProfile
+mergeExtDexDebug
+mergeExtDexDebugAndroidTest
+mergeExtDexProfile
+mergeLibDexDebug
+mergeLibDexDebugAndroidTest
+mergeLibDexProfile
+mergeProfileArtProfile
+mergeProfileAssets
+mergeProfileGeneratedProguardFiles
+mergeProfileGlobalSynthetics
+mergeProfileJavaResource
+mergeProfileJniLibFolders
+mergeProfileNativeDebugMetadata
+mergeProfileNativeLibs
+mergeProfileResources
+mergeProfileShaders
+mergeProfileStartupProfile
+mergeProjectDexDebug
+mergeProjectDexDebugAndroidTest
+mergeProjectDexProfile
+mergeReleaseArtProfile
+mergeReleaseAssets
+mergeReleaseGeneratedProguardFiles
+mergeReleaseJavaResource
+mergeReleaseJniLibFolders
+mergeReleaseNativeDebugMetadata
+mergeReleaseNativeLibs
+mergeReleaseResources
+mergeReleaseShaders
+mergeReleaseStartupProfile
+minifyReleaseWithR8
+model - Displays the configuration model of project ':app'. [deprecated]
+optimizeReleaseResources
+outputDebugAppLinkSettings
+outputProfileAppLinkSettings
+outputReleaseAppLinkSettings
+packageDebug
+packageDebugAndroidTest
+packageDebugBundle
+packageDebugResources
+packageDebugUniversalApk
+packageProfile
+packageProfileBundle
+packageProfileResources
+packageProfileUniversalApk
+packageRelease
+packageReleaseBundle
+packageReleaseResources
+packageReleaseUniversalApk
+packJniLibsflutterBuildDebug
+packJniLibsflutterBuildProfile
+packJniLibsflutterBuildRelease
+parseDebugIntegrityConfig
+parseDebugLocalResources
+parseProfileIntegrityConfig
+parseProfileLocalResources
+parseReleaseIntegrityConfig
+parseReleaseLocalResources
+preBuild
+preDebugAndroidTestBuild
+preDebugBuild
+preDebugUnitTestBuild
+prepareLintJarForPublish
+preProfileBuild
+preProfileUnitTestBuild
+preReleaseBuild
+preReleaseUnitTestBuild
+printBuildVariants - Prints out all build variants for this Android project
+processApplicationManifestDebugForBundle
+processApplicationManifestProfileForBundle
+processApplicationManifestReleaseForBundle
+processDebugAndroidTestJavaRes
+processDebugAndroidTestManifest
+processDebugAndroidTestResources
+processDebugGoogleServices
+processDebugJavaRes
+processDebugMainManifest
+processDebugManifest
+processDebugManifestForPackage
+processDebugResources
+processDebugUnitTestJavaRes
+processManifestDebugForFeature
+processManifestProfileForFeature
+processManifestReleaseForFeature
+processProfileGoogleServices
+processProfileJavaRes
+processProfileMainManifest
+processProfileManifest
+processProfileManifestForPackage
+processProfileResources
+processProfileUnitTestJavaRes
+processReleaseGoogleServices
+processReleaseJavaRes
+processReleaseMainManifest
+processReleaseManifest
+processReleaseManifestForPackage
+processReleaseResources
+processReleaseUnitTestJavaRes
+produceDebugBundleIdeListingFile
+produceProfileBundleIdeListingFile
+produceReleaseBundleIdeListingFile
+ProfileMinSdkCheck
+profileOssDependencyTask
+profileOssLicensesTask
+ReleaseMinSdkCheck
+releaseOssDependencyTask
+releaseOssLicensesTask
+resolveConfigAttr
+sdkReleaseDependencyData
+signDebugBundle
+signingConfigWriterDebug
+signingConfigWriterDebugAndroidTest
+signingConfigWriterProfile
+signingConfigWriterRelease
+signProfileBundle
+signReleaseBundle
+stripDebugAndroidTestDebugSymbols
+stripDebugDebugSymbols
+stripProfileDebugSymbols
+stripReleaseDebugSymbols
+updateLintBaselineDebug - Update the lint baseline using the debug variant
+updateLintBaselineProfile - Update the lint baseline using the profile variant
+updateLintBaselineRelease - Update the lint baseline using the release variant
+validateSigningDebug
+validateSigningDebugAndroidTest
+validateSigningProfile
+validateSigningRelease
+writeDebugAndroidTestSigningConfigVersions
+writeDebugApplicationId
+writeDebugAppMetadata
+writeDebugModuleMetadata
+writeDebugSigningConfigVersions
+writeProfileApplicationId
+writeProfileAppMetadata
+writeProfileModuleMetadata
+writeProfileSigningConfigVersions
+writeReleaseApplicationId
+writeReleaseAppMetadata
+writeReleaseModuleMetadata
+writeReleaseSigningConfigVersions
+zipApksForDebug
+zipApksForProfile
+zipApksForRelease
+
+Rules
+-----
+Pattern: clean<TaskName>: Cleans the output files of a task.
+Pattern: build<ConfigurationName>: Assembles the artifacts of a configuration.
+
+[Incubating] Problems report is available at: repo:/intergalactic/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.13/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 37s
+5 actionable tasks: 1 executed, 4 up-to-date

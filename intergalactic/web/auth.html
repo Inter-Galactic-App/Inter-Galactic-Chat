@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<title>Authentication complete</title>
+<p>Authentication is complete. Return to Inter Galactic to continue. If this page does not close automatically, you can close it manually.</p>
+<script>
+    const payload = {
+        'flutter-web-auth-2': window.location.href,
+    };
+
+    try {
+        if (window.opener) {
+            window.opener.postMessage(payload, window.location.origin);
+        } else {
+            sessionStorage.setItem('flutter-web-auth-2', window.location.href);
+            localStorage.setItem('flutter-web-auth-2', window.location.href);
+        }
+    } catch (_) {}
+
+    window.close();
+</script>

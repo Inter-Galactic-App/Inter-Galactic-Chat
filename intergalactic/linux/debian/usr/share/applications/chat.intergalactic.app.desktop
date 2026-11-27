@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Inter Galactic
+Exec=/usr/lib/chat.intergalactic.app/intergalactic %U
+Terminal=false
+Type=Application
+Icon=chat.intergalactic.app
+StartupWMClass=Inter Galactic
+Comment=Your space to connect!
+Categories=Network;InstantMessaging;Chat;

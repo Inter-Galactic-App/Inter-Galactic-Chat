@@ -1,0 +1,141 @@
+# Web build, split out of build.yml on 2026-08-01 by CI.
+#
+# WHY IT IS ITS OWN FILE: this job is the reason the native Windows gate was
+# lost. build.yml used to carry build-windows, build-android-debug and
+# build-web together and ran on pull_request. build-windows was passing;
+# build-web was failing. Demoting the whole workflow to workflow_dispatch to
+# silence build-web also took down the only pipeline step that compiled the
+# Windows C++, and nobody noticed for three months.
+#
+# Separate files mean that cannot recur: a red build-web is a red build-web,
+# not a disabled native gate. Do not merge this job back into build.yml.
+#
+# WHAT THE 2026-08-02 EVIDENCE ACTUALLY IS (corrected 2026-08-03 by REVIEW):
+# a maintainer-local `flutter build web` succeeded and produced a real artifact.
+# That is NOT the same as this workflow succeeding on a hosted runner - it never
+# exercised check-flutter-pin.sh, flutter-action resolving the pin on
+# ubuntu-latest, the apt package set, or codegen against a clean checkout.
+#
+# REVIEW dispatched this workflow against GitHub main on 2026-08-03 (run
+# 30849311716) and it FAILED:
+#   home_story_video_tools.dart:61:24
+#   Error: The method 'setProperty' isn't defined for the type 'NativePlayer'.
+#
+# That failure is NOT a defect in this workflow. GitHub main was 81 commits
+# behind Forgejo main, so it did not yet carry e153c179, the merged fix that
+# isolates the native mpv `vid=auto` call behind dart.library.io. The product
+# fix is real; GitHub simply had not been synced. Sequence, unchanged from the
+# original note: sync GitHub main, dispatch this workflow, and only if it is
+# green does the pull_request trigger below mean anything.
+#
+# Tracked in integration-queue.json.
+
+name: build-web
+
+on:
+  # ALLOW-LIST, narrowed 2026-08-03 by REVIEW. It was a paths-ignore covering
+  # only docs and markdown, on the reasoning that the web build's inputs are too
+  # broad to enumerate. That reasoning is sound on unlimited minutes and wrong
+  # on a limited plan, and it was measured rather than argued: over the last 60
+  # commits on main, 36 would have triggered this ~20-minute job while only 19
+  # touch anything a web build actually compiles. It fired on PR #92, which
+  # changed nothing but two workflow files.
+  #
+  # An allow-list that occasionally misses beats a deny-list that spends 20
+  # minutes proving a workflow edit did not break the web build. If a web break
+  # ever slips through, widen this list - do not go back to paths-ignore.
+  #
+  # Everything below is genuinely compiled into, or consumed by, `flutter build
+  # web`. The workspace members are listed individually because the app depends
+  # on all of them by path, and the original failure this gate exists to catch
+  # lived in intergalactic/lib (a NativePlayer call type-checked against
+  # media_kit's web stub).
+  pull_request:
+    # DRAFT GUARD, added 2026-08-03 by REVIEW. `ready_for_review` must be listed
+    # explicitly: the default set is opened/synchronize/reopened, so without it a
+    # PR opened as a draft would never run this gate when marked ready.
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'intergalactic/lib/**'
+      - 'intergalactic/web/**'
+      - 'intergalactic/assets/**'
+      # codegen runs before the build and can fail on its own.
+      - 'intergalactic/scripts/**'
+      - 'intergalactic/tool/**'
+      - 'intergalactic/pubspec.yaml'
+      - 'intergalactic/pubspec.lock'
+      - 'intergalactic/analysis_options.yaml'
+      # Workspace members: all are path dependencies of the app, so their Dart
+      # compiles into the web bundle.
+      - 'tiamat/**'
+      - 'widgets/**'
+      - 'plugins/*/lib/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      # The pin is verified as a step in this job.
+      - '.flutter-version'
+      # Changing the gate itself must re-run the gate.
+      - '.github/workflows/build-web.yml'
+      #
+      # DELIBERATELY ABSENT: native trees (windows/, android/, ios/, macos/,
+      # linux/, **/*.cpp, CMakeLists) - none of it is compiled by a web build,
+      # and each has its own gate. Also absent: docs/, *.md, and the other
+      # workflow files, which cannot affect a web compile.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-web-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PROJECT_PATH: intergalactic
+
+jobs:
+  build-web:
+    # Skipped while the PR is a draft. GitHub evaluates a pull_request `paths:`
+    # filter against the PR's WHOLE DIFF, not the individual push - so on a sync
+    # batch, which contains native, Kotlin and Dart files by definition, every
+    # gate matches on every push and the filters cannot help. Measured on PR #94:
+    # six pushes re-ran every heavy gate six times, ~636 billed minutes on one PR,
+    # about a third of a monthly allowance.
+    #
+    # Work the review rounds with the PR as a DRAFT, then mark it ready once. The
+    # gate then runs on the final state, which is the state that actually matters.
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
+    name: Web build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: 'true'
+          persist-credentials: false
+
+      - name: Verify the Flutter pin matches .flutter-version
+        shell: bash
+        run: bash scripts/ci/check-flutter-pin.sh
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: '3.41.1'
+          channel: 'stable'
+
+      - name: Setup Tools
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y ninja-build libgtk-3-dev libmpv-dev mpv ffmpeg
+
+      - name: Code Generation
+        run: |
+          cd $PROJECT_PATH
+          dart run scripts/codegen.dart
+
+      - name: Build Web
+        run: |
+          cd $PROJECT_PATH
+          flutter build web --release --dart-define PLATFORM=web

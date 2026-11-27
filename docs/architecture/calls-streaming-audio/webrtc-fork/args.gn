@@ -1,0 +1,11 @@
+target_os = "win"
+target_cpu = "x64"
+is_component_build = false
+is_clang = true
+is_debug = false
+rtc_use_h264 = true
+ffmpeg_branding = "Chrome"
+rtc_include_tests = false
+rtc_build_examples = false
+libwebrtc_desktop_capture = true
+libwebrtc_intel_media_sdk = true

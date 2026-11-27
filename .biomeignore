@@ -1,0 +1,3 @@
+# Flutter expands these template tokens during web builds; before expansion
+# they are not valid JavaScript and should not be parsed by Biome.
+**/web/flutter_bootstrap.js

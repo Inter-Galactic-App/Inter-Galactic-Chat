@@ -1,0 +1,141 @@
+FFmpeg build configuration - BtbN win64-lgpl-shared CANDIDATE (not shipped)
+===========================================================================
+
+This describes a CANDIDATE archive captured for provenance on 2026-08-09. It is
+NOT the binary currently staged at intergalactic/windows/third_party/ffmpeg/bin/,
+and nothing in that directory was changed. The shipped build's configuration
+remains docs/release/evidence/ffmpeg/BUILD-CONFIGURATION.txt.
+
+Release      autobuild-2026-08-09-13-03  (BtbN/FFmpeg-Builds)
+Asset        ffmpeg-n8.1.2-34-g9b6c8969e0-win64-lgpl-shared-8.1.zip
+Variant      win64-lgpl-shared, addin 8.1
+Builder SHA  2437e7b868da3c11872367b15f3c613b87c24819
+
+Version string
+--------------
+  n8.1.2-34-g9b6c8969e0-20260809
+  (from include/libavutil/ffversion.h inside the archive)
+
+How this configure line was obtained
+------------------------------------
+  Extracted statically from the embedded FFMPEG_CONFIGURATION string in
+  bin/avcodec-62.dll. The binary was NOT executed. This is the build's own
+  reported configuration, recorded without running an unverified executable.
+
+Licence-relevant assertions (mechanical, from the line below)
+-------------------------------------------------------------
+  --enable-gpl      ABSENT
+  --enable-nonfree  ABSENT
+  --enable-version3 PRESENT
+  --enable-shared / --disable-static PRESENT (this is the shared variant)
+  GPL-only libraries explicitly disabled:
+    --disable-libx264 --disable-libx265 --disable-libxavs2 --disable-libxvid
+    --disable-avisynth --disable-libdavs2 --disable-libdvdread --disable-libdvdnav
+    --disable-frei0r --disable-librubberband --disable-libvidstab
+  Non-free libraries explicitly disabled:
+    --disable-libfdk-aac
+
+  These are statements about flags, not a legal conclusion. See
+  component-set-diff.md for a measured finding the configure line does not show.
+
+Configure line
+--------------
+  --prefix=/ffbuild/prefix
+  --pkg-config-flags=--static
+  --pkg-config=pkg-config
+  --cross-prefix=x86_64-w64-mingw32-
+  --arch=x86_64
+  --target-os=mingw32
+  --enable-version3
+  --disable-debug
+  --enable-shared
+  --disable-static
+  --disable-w32threads
+  --enable-pthreads
+  --enable-iconv
+  --enable-zlib
+  --enable-libxml2
+  --enable-libvmaf
+  --enable-fontconfig
+  --enable-libharfbuzz
+  --enable-libfreetype
+  --enable-libfribidi
+  --enable-vulkan
+  --enable-libshaderc
+  --enable-libvorbis
+  --disable-libxcb
+  --disable-xlib
+  --disable-libpulse
+  --enable-gmp
+  --enable-lzma
+  --enable-liblcevc-dec
+  --enable-opencl
+  --enable-amf
+  --enable-libaom
+  --enable-libaribb24
+  --disable-avisynth
+  --enable-chromaprint
+  --enable-libdav1d
+  --disable-libdavs2
+  --disable-libdvdread
+  --disable-libdvdnav
+  --disable-libfdk-aac
+  --enable-ffnvcodec
+  --enable-cuda-llvm
+  --disable-frei0r
+  --enable-libgme
+  --enable-libkvazaar
+  --enable-libaribcaption
+  --enable-libass
+  --enable-libbluray
+  --enable-libjxl
+  --enable-libmp3lame
+  --enable-libopus
+  --enable-libplacebo
+  --enable-librist
+  --enable-libssh
+  --enable-libtheora
+  --enable-libvpx
+  --enable-libwebp
+  --enable-libzmq
+  --enable-lv2
+  --enable-libvpl
+  --enable-openal
+  --enable-liboapv
+  --enable-libopencore-amrnb
+  --enable-libopencore-amrwb
+  --enable-libopenh264
+  --enable-libopenjpeg
+  --enable-libopenmpt
+  --enable-librav1e
+  --disable-librubberband
+  --enable-schannel
+  --enable-sdl2
+  --enable-libsnappy
+  --enable-libsoxr
+  --enable-libsrt
+  --enable-libsvtav1
+  --enable-libtwolame
+  --enable-libuavs3d
+  --disable-libdrm
+  --enable-vaapi
+  --disable-libvidstab
+  --enable-libvvenc
+  --disable-whisper
+  --disable-libx264
+  --disable-libx265
+  --disable-libxavs2
+  --disable-libxvid
+  --enable-libzimg
+  --enable-libzvbi
+  --extra-cflags=-DLIBTWOLAME_STATIC
+  --extra-cxxflags=
+  --extra-libs=-lgomp
+  --extra-ldflags=-pthread
+  --extra-ldexeflags=
+  --cc=x86_64-w64-mingw32-gcc
+  --cxx=x86_64-w64-mingw32-g++
+  --ar=x86_64-w64-mingw32-gcc-ar
+  --ranlib=x86_64-w64-mingw32-gcc-ranlib
+  --nm=x86_64-w64-mingw32-gcc-nm
+  --extra-version=20260809

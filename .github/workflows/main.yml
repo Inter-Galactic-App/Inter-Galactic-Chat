@@ -1,0 +1,78 @@
+name: pr-validation
+
+on:
+  pull_request:
+  push:
+    branches:
+      - 'codex/**'
+      - 'feature/**'
+      - 'debug/**'
+      - 'docs/**'
+      - 'audio/**'
+      - 'review/**'
+      - 'qa/**'
+      - 'release-pipeline/**'
+      - 'security/**'
+      - 'operations/**'
+      - 'community/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repo-checks:
+    name: PR / agent branch repo checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      CI_MINIPC_MODE: hosted
+      MINIPC_CI_NO_DOCKER: '1'
+      MINIPC_CI_NO_SECRETS: '1'
+
+    steps:
+      - name: Checkout PR or branch source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: false
+
+      - name: Safety boundary
+        shell: bash
+        env:
+          IG_EVENT_NAME: ${{ github.event_name }}
+          IG_REF: ${{ github.ref }}
+          IG_RUNNER_OS: ${{ runner.os }}
+        run: |
+          set -euo pipefail
+          echo "Event: ${IG_EVENT_NAME}"
+          echo "Ref: ${IG_REF}"
+          echo "Runner OS: ${IG_RUNNER_OS}"
+          echo "This workflow runs on GitHub-hosted infrastructure."
+          echo "No repo secrets, Docker, deploy, signing, or mirror access are requested."
+
+      - name: Check JSON
+        shell: bash
+        run: bash scripts/ci/check-json.sh
+
+      - name: Check agent docs
+        shell: bash
+        run: bash scripts/ci/check-agent-docs.sh
+
+      - name: Check release docs
+        shell: bash
+        run: bash scripts/ci/check-release-docs.sh
+
+      - name: Check security docs
+        shell: bash
+        run: bash scripts/ci/check-security-docs.sh
+
+      # Mirrors the Forgejo gate of the same name. Two gates that disagree are
+      # worse than one gate, so this must stay in step with forgejo-ci.yml.
+      - name: Check tooltip component
+        shell: bash
+        run: bash scripts/ci/check-tooltip-component.sh

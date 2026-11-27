@@ -1,0 +1,519 @@
+{
+  "schema_version": 1,
+  "purpose": "Source and policy evidence for Android release runtime modules whose local Maven POM metadata is absent or does not declare licenses. The Gradle collector applies these only when POM license metadata is unavailable.",
+  "rules": [
+    {
+      "id": "androidx-apache-2.0",
+      "group_prefix": "androidx.",
+      "description": "AndroidX runtime artifacts",
+      "rationale": "AndroidX source is distributed under Apache License 2.0; local Gradle cache may contain AAR/JAR artifacts without their POM license metadata.",
+      "evidence_url": "https://android.googlesource.com/platform/frameworks/support/+/androidx-main/LICENSE.txt",
+      "evidence_note": "AndroidX source license",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "spdx": "Apache-2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+          "distribution": "repo",
+          "evidence_url": "https://android.googlesource.com/platform/frameworks/support/+/androidx-main/LICENSE.txt",
+          "evidence_note": "AndroidX source license"
+        }
+      ]
+    },
+    {
+      "id": "google-material-apache-2.0",
+      "group": "com.google.android.material",
+      "description": "Material Components for Android",
+      "rationale": "Material Components for Android is published from Google's open-source Material Components Android project.",
+      "evidence_url": "https://github.com/material-components/material-components-android/blob/master/LICENSE",
+      "evidence_note": "Material Components Android source license",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "spdx": "Apache-2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+          "distribution": "repo",
+          "evidence_url": "https://github.com/material-components/material-components-android/blob/master/LICENSE",
+          "evidence_note": "Material Components Android source license"
+        }
+      ]
+    },
+    {
+      "id": "kotlin-apache-2.0",
+      "group": "org.jetbrains.kotlin",
+      "description": "Kotlin runtime artifacts",
+      "rationale": "Kotlin source and runtime libraries are distributed under Apache License 2.0.",
+      "evidence_url": "https://github.com/JetBrains/kotlin/blob/v2.2.0/license/LICENSE.txt",
+      "evidence_note": "Kotlin source license",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "spdx": "Apache-2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+          "distribution": "repo",
+          "evidence_url": "https://github.com/JetBrains/kotlin/blob/v2.2.0/license/LICENSE.txt",
+          "evidence_note": "Kotlin source license"
+        }
+      ]
+    },
+    {
+      "id": "jetbrains-annotations-apache-2.0",
+      "group": "org.jetbrains",
+      "name": "annotations",
+      "description": "JetBrains annotations",
+      "rationale": "JetBrains annotations are distributed under Apache License 2.0.",
+      "evidence_url": "https://github.com/JetBrains/java-annotations/blob/master/LICENSE.txt",
+      "evidence_note": "JetBrains annotations source license",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "spdx": "Apache-2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+          "distribution": "repo",
+          "evidence_url": "https://github.com/JetBrains/java-annotations/blob/master/LICENSE.txt",
+          "evidence_note": "JetBrains annotations source license"
+        }
+      ]
+    },
+    {
+      "id": "kotlinx-coroutines-apache-2.0",
+      "module_prefix": "org.jetbrains.kotlinx:kotlinx-coroutines",
+      "description": "Kotlinx coroutines runtime artifacts",
+      "rationale": "Kotlinx coroutines source is distributed under Apache License 2.0.",
+      "evidence_url": "https://github.com/Kotlin/kotlinx.coroutines/blob/1.9.0/LICENSE.txt",
+      "evidence_note": "Kotlinx coroutines source license",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "spdx": "Apache-2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+          "distribution": "repo",
+          "evidence_url": "https://github.com/Kotlin/kotlinx.coroutines/blob/1.9.0/LICENSE.txt",
+          "evidence_note": "Kotlinx coroutines source license"
+        }
+      ]
+    },
+    {
+      "id": "kotlinx-atomicfu-apache-2.0",
+      "module_prefix": "org.jetbrains.kotlinx:atomicfu",
+      "description": "Kotlinx atomicfu runtime artifacts",
+      "rationale": "Kotlinx atomicfu source is distributed under Apache License 2.0.",
+      "evidence_url": "https://github.com/Kotlin/kotlinx-atomicfu/blob/0.28.0/LICENSE.txt",
+      "evidence_note": "Kotlinx atomicfu source license",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "spdx": "Apache-2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+          "distribution": "repo",
+          "evidence_url": "https://github.com/Kotlin/kotlinx-atomicfu/blob/0.28.0/LICENSE.txt",
+          "evidence_note": "Kotlinx atomicfu source license"
+        }
+      ]
+    },
+    {
+      "id": "firebase-android-sdk-apache-2.0",
+      "group_prefix": "com.google.firebase",
+      "description": "Firebase Android SDK runtime artifacts",
+      "rationale": "Firebase Android SDK source is distributed under Apache License 2.0; FCM package-level evidence is generated separately by collect_android_fcm_license_evidence.ps1.",
+      "evidence_url": "https://github.com/firebase/firebase-android-sdk/blob/master/LICENSE",
+      "evidence_note": "Firebase Android SDK source license",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "spdx": "Apache-2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+          "distribution": "repo",
+          "evidence_url": "https://github.com/firebase/firebase-android-sdk/blob/master/LICENSE",
+          "evidence_note": "Firebase Android SDK source license"
+        }
+      ]
+    },
+    {
+      "id": "google-datatransport-apache-2.0",
+      "group_prefix": "com.google.android.datatransport",
+      "description": "Google Android DataTransport runtime artifacts",
+      "rationale": "DataTransport artifacts are part of the Google/Firebase Android runtime stack and are covered by Google/Firebase source license evidence plus the Google OSS license baseline.",
+      "evidence_url": "https://github.com/firebase/firebase-android-sdk/blob/master/LICENSE",
+      "evidence_note": "Firebase Android SDK source license used for DataTransport family evidence",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "spdx": "Apache-2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+          "distribution": "repo",
+          "evidence_url": "https://github.com/firebase/firebase-android-sdk/blob/master/LICENSE",
+          "evidence_note": "Firebase Android SDK source license used for DataTransport family evidence"
+        }
+      ]
+    },
+    {
+      "id": "google-play-services-oss-baseline",
+      "group_prefix": "com.google.android.gms",
+      "description": "Google Play services runtime artifacts",
+      "rationale": "Google's Android OSS notice guidance says Play services SDKs can include or depend on OSS libraries, and the oss-licenses plugin/SDK collects and packages notices from POM data and Play services transitive closure. This is policy/baseline evidence, not a blanket Apache claim for Google Play services modules.",
+      "evidence_url": "https://developers.google.com/android/guides/opensource",
+      "evidence_note": "Google Play services OSS notice guidance and baseline tool",
+      "licenses": [
+        {
+          "name": "Google Play services OSS notices baseline",
+          "spdx": null,
+          "url": "https://developers.google.com/android/guides/opensource",
+          "distribution": "repo",
+          "evidence_url": "https://developers.google.com/android/guides/opensource",
+          "evidence_note": "Google Play services OSS notice guidance and baseline tool"
+        }
+      ]
+    },
+    {
+      "id": "flutter-engine-bsd-3-clause",
+      "group": "io.flutter",
+      "description": "Flutter Android engine embedding artifacts",
+      "rationale": "Flutter engine and embedding artifacts are distributed under the Flutter BSD-style license.",
+      "evidence_url": "https://github.com/flutter/flutter/blob/3.32.4/LICENSE",
+      "evidence_note": "Flutter source license",
+      "licenses": [
+        {
+          "name": "BSD 3-Clause License",
+          "spdx": "BSD-3-Clause",
+          "url": "https://opensource.org/license/bsd-3-clause",
+          "distribution": "repo",
+          "evidence_url": "https://github.com/flutter/flutter/blob/3.32.4/LICENSE",
+          "evidence_note": "Flutter source license"
+        }
+      ]
+    },
+    {
+      "id": "google-guava-apache-2.0",
+      "group": "com.google.guava",
+      "description": "Guava runtime artifacts",
+      "rationale": "Guava source is distributed under Apache License 2.0.",
+      "evidence_url": "https://github.com/google/guava/blob/v33.5.0/LICENSE",
+      "evidence_note": "Guava source license",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "spdx": "Apache-2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+          "distribution": "repo",
+          "evidence_url": "https://github.com/google/guava/blob/v33.5.0/LICENSE",
+          "evidence_note": "Guava source license"
+        }
+      ]
+    },
+    {
+      "id": "google-error-prone-apache-2.0",
+      "group": "com.google.errorprone",
+      "description": "Error Prone annotations",
+      "rationale": "Error Prone annotations are distributed under Apache License 2.0.",
+      "evidence_url": "https://github.com/google/error-prone/blob/master/LICENSE",
+      "evidence_note": "Error Prone source license",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "spdx": "Apache-2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+          "distribution": "repo",
+          "evidence_url": "https://github.com/google/error-prone/blob/master/LICENSE",
+          "evidence_note": "Error Prone source license"
+        }
+      ]
+    },
+    {
+      "id": "jsr305-apache-2.0",
+      "module_id": "com.google.code.findbugs:jsr305:3.0.2",
+      "description": "JSR305 annotations",
+      "rationale": "The packaged jar manifest declares Bundle-License as Apache License 2.0.",
+      "evidence_url": "https://repo1.maven.org/maven2/com/google/code/findbugs/jsr305/3.0.2/jsr305-3.0.2.jar",
+      "evidence_note": "META-INF/MANIFEST.MF Bundle-License",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "spdx": "Apache-2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+          "distribution": "repo",
+          "evidence_url": "https://repo1.maven.org/maven2/com/google/code/findbugs/jsr305/3.0.2/jsr305-3.0.2.jar",
+          "evidence_note": "META-INF/MANIFEST.MF Bundle-License"
+        }
+      ]
+    },
+    {
+      "id": "google-gson-apache-2.0",
+      "group": "com.google.code.gson",
+      "description": "Gson runtime artifacts",
+      "rationale": "Gson source is distributed under Apache License 2.0.",
+      "evidence_url": "https://github.com/google/gson/blob/main/LICENSE",
+      "evidence_note": "Gson source license",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "spdx": "Apache-2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+          "distribution": "repo",
+          "evidence_url": "https://github.com/google/gson/blob/main/LICENSE",
+          "evidence_note": "Gson source license"
+        }
+      ]
+    },
+    {
+      "id": "google-auto-value-apache-2.0",
+      "group": "com.google.auto.value",
+      "description": "AutoValue annotations",
+      "rationale": "Google AutoValue source is distributed under Apache License 2.0.",
+      "evidence_url": "https://github.com/google/auto/blob/master/LICENSE.txt",
+      "evidence_note": "Google AutoValue source license",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "spdx": "Apache-2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+          "distribution": "repo",
+          "evidence_url": "https://github.com/google/auto/blob/master/LICENSE.txt",
+          "evidence_note": "Google AutoValue source license"
+        }
+      ]
+    },
+    {
+      "id": "google-tink-apache-2.0",
+      "group": "com.google.crypto.tink",
+      "description": "Tink Android runtime artifacts",
+      "rationale": "Tink source is distributed under Apache License 2.0.",
+      "evidence_url": "https://github.com/tink-crypto/tink-java/blob/main/LICENSE",
+      "evidence_note": "Tink Java source license",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "spdx": "Apache-2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+          "distribution": "repo",
+          "evidence_url": "https://github.com/tink-crypto/tink-java/blob/main/LICENSE",
+          "evidence_note": "Tink Java source license"
+        }
+      ]
+    },
+    {
+      "id": "okio-apache-2.0",
+      "group": "com.squareup.okio",
+      "description": "Okio runtime artifacts",
+      "rationale": "Okio source is distributed under Apache License 2.0.",
+      "evidence_url": "https://github.com/square/okio/blob/master/LICENSE.txt",
+      "evidence_note": "Okio source license",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "spdx": "Apache-2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+          "distribution": "repo",
+          "evidence_url": "https://github.com/square/okio/blob/master/LICENSE.txt",
+          "evidence_note": "Okio source license"
+        }
+      ]
+    },
+    {
+      "id": "apache-commons-io-apache-2.0",
+      "module_id": "commons-io:commons-io:2.20.0",
+      "description": "Apache Commons IO",
+      "rationale": "Apache Commons IO source is distributed under Apache License 2.0.",
+      "evidence_url": "https://github.com/apache/commons-io/blob/master/LICENSE.txt",
+      "evidence_note": "Apache Commons IO source license",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "spdx": "Apache-2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+          "distribution": "repo",
+          "evidence_url": "https://github.com/apache/commons-io/blob/master/LICENSE.txt",
+          "evidence_note": "Apache Commons IO source license"
+        }
+      ]
+    },
+    {
+      "id": "apache-tika-apache-2.0",
+      "group": "org.apache.tika",
+      "description": "Apache Tika",
+      "rationale": "Apache Tika source is distributed under Apache License 2.0.",
+      "evidence_url": "https://github.com/apache/tika/blob/main/LICENSE.txt",
+      "evidence_note": "Apache Tika source license",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "spdx": "Apache-2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+          "distribution": "repo",
+          "evidence_url": "https://github.com/apache/tika/blob/main/LICENSE.txt",
+          "evidence_note": "Apache Tika source license"
+        }
+      ]
+    },
+    {
+      "id": "jspecify-apache-2.0",
+      "group": "org.jspecify",
+      "description": "JSpecify annotations",
+      "rationale": "JSpecify source is distributed under Apache License 2.0.",
+      "evidence_url": "https://github.com/jspecify/jspecify/blob/main/LICENSE",
+      "evidence_note": "JSpecify source license",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "spdx": "Apache-2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+          "distribution": "repo",
+          "evidence_url": "https://github.com/jspecify/jspecify/blob/main/LICENSE",
+          "evidence_note": "JSpecify source license"
+        }
+      ]
+    },
+    {
+      "id": "javax-inject-apache-2.0",
+      "module_id": "javax.inject:javax.inject:1",
+      "description": "javax.inject",
+      "rationale": "javax.inject source is distributed under Apache License 2.0.",
+      "evidence_url": "https://github.com/javax-inject/javax-inject/blob/main/LICENSE.txt",
+      "evidence_note": "javax.inject source license",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "spdx": "Apache-2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+          "distribution": "repo",
+          "evidence_url": "https://github.com/javax-inject/javax-inject/blob/main/LICENSE.txt",
+          "evidence_note": "javax.inject source license"
+        }
+      ]
+    },
+    {
+      "id": "relinker-apache-2.0",
+      "group": "com.getkeepsafe.relinker",
+      "description": "ReLinker",
+      "rationale": "ReLinker source is distributed under Apache License 2.0.",
+      "evidence_url": "https://github.com/KeepSafe/ReLinker/blob/master/LICENSE",
+      "evidence_note": "ReLinker source license",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "spdx": "Apache-2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+          "distribution": "repo",
+          "evidence_url": "https://github.com/KeepSafe/ReLinker/blob/master/LICENSE",
+          "evidence_note": "ReLinker source license"
+        }
+      ]
+    },
+    {
+      "id": "slf4j-mit",
+      "group": "org.slf4j",
+      "description": "SLF4J API",
+      "rationale": "SLF4J source is distributed under the MIT License.",
+      "evidence_url": "https://www.slf4j.org/license.html",
+      "evidence_note": "SLF4J project license",
+      "licenses": [
+        {
+          "name": "MIT License",
+          "spdx": "MIT",
+          "url": "https://opensource.org/license/mit",
+          "distribution": "repo",
+          "evidence_url": "https://www.slf4j.org/license.html",
+          "evidence_note": "SLF4J project license"
+        }
+      ]
+    },
+    {
+      "id": "flutter-webrtc-mit",
+      "module_id": "com.github.davidliu:audioswitch:89582c47c9a04c62f90aa5e57251af4800a62c9a",
+      "description": "AudioSwitch fork used by flutter_webrtc",
+      "rationale": "The runtime dependency is pulled by flutter_webrtc; local flutter_webrtc package license is MIT. The upstream AudioSwitch project lineage is Apache-2.0, so this remains source-evidence based and should be rechecked on dependency changes.",
+      "evidence_url": "https://github.com/flutter-webrtc/flutter-webrtc/blob/main/LICENSE",
+      "evidence_note": "flutter_webrtc package license for the dependency owner path",
+      "licenses": [
+        {
+          "name": "MIT License",
+          "spdx": "MIT",
+          "url": "https://opensource.org/license/mit",
+          "distribution": "repo",
+          "evidence_url": "https://github.com/flutter-webrtc/flutter-webrtc/blob/main/LICENSE",
+          "evidence_note": "flutter_webrtc package license for the dependency owner path"
+        }
+      ]
+    },
+    {
+      "id": "webrtc-bsd-3-clause",
+      "module_id": "io.github.webrtc-sdk:android:137.7151.04",
+      "description": "WebRTC Android SDK artifact",
+      "rationale": "The release WebRTC notice bundle records WebRTC's BSD-style license and shiguredo/webrtc-sdk Apache-2.0 modifications.",
+      "evidence_url": "repo:/docs/release/evidence/webrtc/LICENSE.md",
+      "evidence_note": "Local WebRTC release evidence bundle",
+      "licenses": [
+        {
+          "name": "BSD 3-Clause License",
+          "spdx": "BSD-3-Clause",
+          "url": "https://opensource.org/license/bsd-3-clause",
+          "distribution": "repo",
+          "evidence_url": "repo:/docs/release/evidence/webrtc/LICENSE.md",
+          "evidence_note": "Local WebRTC release evidence bundle"
+        },
+        {
+          "name": "Apache License, Version 2.0",
+          "spdx": "Apache-2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+          "distribution": "repo",
+          "evidence_url": "repo:/docs/release/evidence/webrtc/NOTICE",
+          "evidence_note": "webrtc-sdk modification notice"
+        }
+      ]
+    },
+    {
+      "id": "livekit-client-apache-2.0",
+      "module_id": "io.livekit:noise:2.0.0",
+      "description": "LiveKit noise artifact used by livekit_client",
+      "rationale": "The Android noise artifact is pulled by the LiveKit Flutter client; the local livekit_client package license is Apache-2.0.",
+      "evidence_url": "https://github.com/livekit/client-sdk-flutter/blob/main/LICENSE",
+      "evidence_note": "LiveKit Flutter client source license",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "spdx": "Apache-2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+          "distribution": "repo",
+          "evidence_url": "https://github.com/livekit/client-sdk-flutter/blob/main/LICENSE",
+          "evidence_note": "LiveKit Flutter client source license"
+        }
+      ]
+    },
+    {
+      "id": "sqlite3-flutter-libs-mit",
+      "module_id": "eu.simonbinder:sqlite3-native-library:3.52.0",
+      "description": "sqlite3 native Android artifact used by sqlite3_flutter_libs",
+      "rationale": "The Android native artifact is pulled by sqlite3_flutter_libs; the local package license is MIT.",
+      "evidence_url": "https://github.com/simolus3/sqlite3.dart/blob/v2/sqlite3_flutter_libs/LICENSE",
+      "evidence_note": "sqlite3_flutter_libs source license",
+      "licenses": [
+        {
+          "name": "MIT License",
+          "spdx": "MIT",
+          "url": "https://opensource.org/license/mit",
+          "distribution": "repo",
+          "evidence_url": "https://github.com/simolus3/sqlite3.dart/blob/v2/sqlite3_flutter_libs/LICENSE",
+          "evidence_note": "sqlite3_flutter_libs source license"
+        }
+      ]
+    },
+    {
+      "id": "unifiedpush-android-apache-2.0",
+      "module_id": "org.unifiedpush.android:connector:2.5.0",
+      "description": "UnifiedPush Android connector",
+      "rationale": "The Android connector is pulled by unifiedpush_android; the local package license is Apache-2.0.",
+      "evidence_url": "https://codeberg.org/UnifiedPush/flutter-connector/src/branch/main/unifiedpush_android/LICENSE",
+      "evidence_note": "UnifiedPush Android package source license",
+      "licenses": [
+        {
+          "name": "Apache License, Version 2.0",
+          "spdx": "Apache-2.0",
+          "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+          "distribution": "repo",
+          "evidence_url": "https://codeberg.org/UnifiedPush/flutter-connector/src/branch/main/unifiedpush_android/LICENSE",
+          "evidence_note": "UnifiedPush Android package source license"
+        }
+      ]
+    }
+  ]
+}

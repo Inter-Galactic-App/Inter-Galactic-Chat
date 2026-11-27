@@ -1,0 +1,186 @@
+// CI-owned: SHA-256 integrity gate for the media_kit Android native jars.
+//
+// media_kit_libs_android_video's own android/build.gradle downloads four
+// prebuilt libmpv/FFmpeg jars and verifies them with MD5 only. MD5 is not an
+// adequate sole integrity check for an artefact that ships inside the APK, and
+// that file is upstream code this repository does not control.
+//
+// SHA-256 for all four jars is already recorded in
+// docs/release/THIRD_PARTY_LICENSES.json. This file performs the comparison the
+// record makes possible, and fails the Android build when it does not hold.
+//
+// The digests are read from the record rather than copied here on purpose:
+// a second copy drifts, and the record is the licence lane's source of truth.
+
+import java.security.MessageDigest
+
+ext.mediaKitJarProjectPath = ':media_kit_libs_android_video'
+ext.EXPECTED_JAR_COUNT = 4
+
+// Repository root, from <repo>/intergalactic/android.
+def licenceRecord = rootProject.file('../../docs/release/THIRD_PARTY_LICENSES.json')
+
+// Every failure below is a hard stop. A skipped check that reports success is
+// the exact failure this gate exists to remove, so there is no lenient path:
+// absent record, absent project, absent jar and unexpected extra jar all fail.
+def readRecordedDigests = {
+    if (!licenceRecord.exists()) {
+        throw new GradleException(
+            "media_kit jar integrity gate: licence record not found at ${licenceRecord}. " +
+            "The recorded SHA-256 values are the only thing this gate can verify against.")
+    }
+
+    def record
+    try {
+        record = new groovy.json.JsonSlurper().parse(licenceRecord, 'UTF-8')
+    } catch (Exception e) {
+        throw new GradleException(
+            "media_kit jar integrity gate: could not parse ${licenceRecord}: ${e.message}")
+    }
+
+    def components = record?.native_components
+    if (!(components instanceof List)) {
+        throw new GradleException(
+            "media_kit jar integrity gate: ${licenceRecord} has no native_components list. " +
+            "The record schema changed; fix this gate rather than removing it.")
+    }
+
+    def carriers = components.findAll { it?.artefact_digests?.jars instanceof Map }
+    if (carriers.size() != 1) {
+        throw new GradleException(
+            "media_kit jar integrity gate: expected exactly one native_components entry " +
+            "carrying artefact_digests.jars, found ${carriers.size()}. Resolve the ambiguity " +
+            "in ${licenceRecord} before building.")
+    }
+
+    def jars = carriers[0].artefact_digests.jars
+    def digests = [:]
+    jars.each { name, info ->
+        def sha = info?.sha256
+        if (!(sha instanceof String) || !(sha ==~ /(?i)[0-9a-f]{64}/)) {
+            throw new GradleException(
+                "media_kit jar integrity gate: recorded sha256 for ${name} is missing or malformed.")
+        }
+        digests[name as String] = [
+            sha256: sha.toLowerCase(),
+            bytes : (info?.bytes instanceof Number) ? (info.bytes as long) : -1L,
+        ]
+    }
+
+    if (digests.isEmpty()) {
+        throw new GradleException(
+            "media_kit jar integrity gate: the record lists zero jars. A gate that verifies " +
+            "nothing must fail, not pass.")
+    }
+
+    // Upstream's own downloadDependencies task (media_kit_libs_android_video's
+    // android/build.gradle) lists exactly these four ABI jars, unconditionally -
+    // arm64-v8a, armeabi-v7a, x86, x86_64. A record with fewer than four is not
+    // "check what you have and pass" - it is a gate that quietly checks less
+    // than the payload actually contains, which is the same failure shape as
+    // checking zero, just with a nonzero number attached to make it look sound.
+    if (digests.size() != EXPECTED_JAR_COUNT) {
+        throw new GradleException(
+            "media_kit jar integrity gate: expected exactly ${EXPECTED_JAR_COUNT} recorded jar " +
+            "digests (one per ABI), found ${digests.size()} in ${licenceRecord.name}: " +
+            "${digests.keySet().sort().join(', ')}. Either the record lost an entry, or upstream " +
+            "changed its ABI set - resolve which before building; do not lower this number to " +
+            "match whatever the record currently has.")
+    }
+    return digests
+}
+
+def sha256Of = { File f ->
+    def digest = MessageDigest.getInstance('SHA-256')
+    f.withInputStream { input ->
+        byte[] buffer = new byte[1 << 16]
+        int read
+        while ((read = input.read(buffer)) != -1) {
+            digest.update(buffer, 0, read)
+        }
+    }
+    return digest.digest().collect { String.format('%02x', it) }.join()
+}
+
+tasks.register('verifyMediaKitJarDigests') {
+    group = 'verification'
+    description = 'Verifies the media_kit libmpv/FFmpeg Android jars against the recorded SHA-256 digests.'
+
+    doLast {
+        def digests = readRecordedDigests()
+
+        def jarProject = rootProject.findProject(mediaKitJarProjectPath)
+        if (jarProject == null) {
+            throw new GradleException(
+                "media_kit jar integrity gate: project ${mediaKitJarProjectPath} is not in this " +
+                "build. If the dependency was removed, remove this gate and its licence record " +
+                "row deliberately; do not let it pass silently.")
+        }
+
+        // Upstream's downloadDependencies copies the verified jars here, and its
+        // own `implementation fileTree(dir: "$buildDir/output", include: "*.jar")`
+        // is what puts exactly these files on the classpath. Verifying anywhere
+        // else verifies something the build does not consume: the AGP copies
+        // under intermediates/aar_libs_directory/ are rewritten stubs whose four
+        // digests are identical to each other.
+        def outputDir = new File(jarProject.buildDir, 'output')
+        if (!outputDir.isDirectory()) {
+            throw new GradleException(
+                "media_kit jar integrity gate: ${outputDir} does not exist, so the jars this " +
+                "build will consume could not be hashed.")
+        }
+
+        def present = (outputDir.listFiles({ File f -> f.name.endsWith('.jar') } as FileFilter) ?: [])
+            .collectEntries { [(it.name): it] }
+
+        def failures = []
+
+        // Assert the count explicitly, not just per-name: this is the line that
+        // fails when the directory holds zero jars, not only the per-name
+        // "missing" messages below. A gate that only ever reports individual
+        // absences can still be misread as "checked what it found and passed";
+        // this makes "found 0 of 4" appear as its own, unambiguous line.
+        def foundCount = digests.keySet().count { present.containsKey(it) }
+        if (foundCount < EXPECTED_JAR_COUNT) {
+            failures << "found ${foundCount} of ${EXPECTED_JAR_COUNT} expected jars in ${outputDir}"
+        }
+
+        digests.each { name, expected ->
+            def jar = present[name]
+            if (jar == null) {
+                failures << "${name}: expected jar is missing from ${outputDir}"
+                return
+            }
+            if (expected.bytes >= 0 && jar.length() != expected.bytes) {
+                failures << "${name}: size ${jar.length()} B, recorded ${expected.bytes} B"
+            }
+            def actual = sha256Of(jar)
+            if (actual != expected.sha256) {
+                failures << "${name}: sha256 ${actual}, recorded ${expected.sha256}"
+            }
+        }
+
+        // An unrecorded jar in the same directory joins the classpath unverified,
+        // which defeats the gate as thoroughly as a mismatch does.
+        (present.keySet() - digests.keySet()).each { name ->
+            failures << "${name}: present in ${outputDir} but not recorded in the licence record"
+        }
+
+        if (!failures.isEmpty()) {
+            throw new GradleException(
+                "media_kit jar integrity check FAILED against ${licenceRecord.name}:\n  " +
+                failures.join('\n  ') +
+                "\nThese jars ship inside the APK. Do not build past this.")
+        }
+
+        logger.lifecycle(
+            "media_kit jar integrity: ${digests.size()} jar(s) match the SHA-256 recorded in " +
+            "docs/release/THIRD_PARTY_LICENSES.json")
+    }
+}
+
+// Gate the app build itself, not just an opt-in task: preBuild is upstream of
+// every assemble/bundle variant.
+tasks.matching { it.name == 'preBuild' }.configureEach {
+    dependsOn 'verifyMediaKitJarDigests'
+}

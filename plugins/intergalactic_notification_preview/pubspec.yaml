@@ -1,0 +1,21 @@
+name: intergalactic_notification_preview
+description: Android notification preview URI bridge for every Flutter engine.
+publish_to: none
+version: 0.0.1
+
+environment:
+  sdk: '>=3.6.0 <4.0.0'
+  flutter: '>=3.24.0'
+
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: chat.intergalactic.notification_preview
+        pluginClass: IntergalacticNotificationPreviewPlugin

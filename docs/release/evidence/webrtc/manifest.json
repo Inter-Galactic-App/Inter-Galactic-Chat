@@ -1,0 +1,53 @@
+{
+  "artifact_zip": "workspace-artifact:artifacts/libwebrtc/windows-hardware-h264/libwebrtc.zip",
+  "artifact_zip_sha256": "f9dc095f1c1d06704598a3125771b926ff123c563ad0a13d8fab4acf600eb1fc",
+  "build_args_path": "workspace-source:webrtc-build/src/out-release/Windows-x64/args.gn",
+  "build_dir": "workspace-source:webrtc-build/src/out-release/Windows-x64",
+  "component": "patched libwebrtc Windows artifact",
+  "evidence_files": {
+    "LICENSE.md": "4e5c9dbb5890703782531c541fef498077b9851cdcd993ad19a0f3a4bf7e93e1",
+    "NOTICE": "e00ec4edd5966821115deb6c73e0e158524b310250fbda3a50e8d542b2a501c2",
+    "args.gn": "df7b9aa58d0ab1ea89107ff60088d4c7e68218899f08ed4dcb1c902b8c562645",
+    "libwebrtc.ninja": "fe0e2ffbdb46a703b324942ff583f74f61e1c4715996151dab16d430ff4a508c",
+    "source_LICENSE": "5d57f76601b87e2069605ccef52e5caaa5eeb7a2f76e34aa65a0102637d28376",
+    "source_NOTICE": "bc557a34714d0a5976b1fa9968e2e2af9739aa0e15b7637908ed735f0ffe3a0c"
+  },
+  "generated_at_utc": "2026-06-13T22:48:52+00:00",
+  "generation_method": "Generated from WebRTC tools_webrtc/libs/generate_licenses.py license mappings and the already-generated obj/libwebrtc/libwebrtc.ninja dependency graph for the shipped Windows-x64 DLL. A direct gn desc rerun was attempted, but the local checkout required toolchain re-evaluation; no WebRTC source/build files were modified for this notice pass.",
+  "included_libraries": [
+    "webrtc",
+    "abseil-cpp",
+    "boringssl",
+    "compiler-rt",
+    "crc32c",
+    "dav1d",
+    "ffmpeg",
+    "fft",
+    "g711",
+    "g722",
+    "libaom",
+    "libc++",
+    "libjpeg_turbo",
+    "libsrtp",
+    "libvpx",
+    "libyuv",
+    "ooura",
+    "openh264",
+    "opus",
+    "perfetto",
+    "pffft",
+    "protobuf",
+    "rnnoise",
+    "sigslot",
+    "spl_sqrt_floor"
+  ],
+  "license_generator_source": "workspace-source:webrtc-build/src/tools_webrtc/libs/generate_licenses.py",
+  "normalized_dependencies": {
+    "llvm-build": "Linker path for clang_rt.builtins from third_party/llvm-build; covered by mapped compiler-rt license entry used by the generated WebRTC build graph."
+  },
+  "release_version": "0.7.4+985",
+  "source_git_head": "1c6009d7be65e1a20a17ffb6eaf897fc86e9f994",
+  "source_git_status_short": "M BUILD.gn\n M api/audio/audio_device_defines.h\n M api/create_peerconnection_factory.cc\n M api/create_peerconnection_factory.h\n M api/enable_media.cc\n M api/peer_connection_interface.h\n M audio/audio_receive_stream.cc\n M audio/audio_receive_stream.h\n M audio/audio_state.cc\n M audio/audio_state.h\n M audio/audio_transport_impl.h\n M call/audio_state.h\n M media/engine/webrtc_voice_engine.cc\n M media/engine/webrtc_voice_engine.h\n M modules/desktop_capture/desktop_capture_options.h\n M modules/desktop_capture/win/wgc_capture_session.cc\n M modules/desktop_capture/win/wgc_capture_session.h\n M modules/desktop_capture/win/window_capturer_win_gdi.cc\n M modules/desktop_capture/win/window_capturer_win_gdi.h",
+  "source_root": "workspace-source:webrtc-build/src",
+  "target": "//libwebrtc:libwebrtc"
+}

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>chat.intergalactic.app</id>
+  <name>Inter Galactic</name>
+  <summary>Your space to connect!</summary>
+  <developer_name>Airyz</developer_name>
+  <url type="homepage">https://commet.chat</url>
+  <metadata_license>CC-BY-SA-4.0</metadata_license>
+  <project_license>AGPL-3.0-only</project_license>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+    <control>touch</control>
+  </supports>
+  <description>
+    <p>Inter Galactic is a modified fork of Commet, the Matrix client originally created by commetchat. It keeps the same goal of providing a feature rich, privacy-respecting experience while clearly crediting the original project. </p>
+  </description>
+  <launchable type="desktop-id">chat.intergalactic.app.desktop</launchable>
+  <content_rating type="oars-1.1" />
+  <releases>
+    <release version="{{VERSION_TAG}}" />
+  </releases>
+</component>

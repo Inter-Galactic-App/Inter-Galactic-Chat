@@ -1,0 +1,135 @@
+{
+  "component": "FFmpeg Windows desktop story-video export tools",
+  "reviewed_at": "2026-06-13",
+  "reviewed_by": "REVIEW",
+  "provider": {
+    "name": "BtbN FFmpeg Builds",
+    "repository": "https://github.com/BtbN/FFmpeg-Builds",
+    "release_tag": "autobuild-2026-06-13-13-31",
+    "release_url": "https://github.com/BtbN/FFmpeg-Builds/releases/tag/autobuild-2026-06-13-13-31",
+    "asset_name": "ffmpeg-n8.1.1-13-g83e8541aa6-win64-lgpl-8.1.zip",
+    "asset_url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-06-13-13-31/ffmpeg-n8.1.1-13-g83e8541aa6-win64-lgpl-8.1.zip",
+    "asset_sha256": "6C1C443C762A8D8AD9C9303AF26E2144DC711B0E7277E1B03FD72CDF2DEAA9DB",
+    "asset_size_bytes": 198755840,
+    "availability": {
+      "status": "UNAVAILABLE UPSTREAM",
+      "verified_on": "2026-08-06",
+      "release_tag_lookup": "HTTP 404",
+      "asset_url_fetch": "HTTP 404",
+      "note": "BtbN prunes its autobuild releases. The repository is alive and pushing daily; this release is not retained. The recorded release_url and asset_url above are preserved as the historical provenance record and MUST NOT be treated as a working source route."
+    }
+  },
+  "source": {
+    "project": "FFmpeg",
+    "official_download_page": "https://ffmpeg.org/download.html",
+    "repository": "https://git.ffmpeg.org/ffmpeg.git",
+    "github_mirror_commit": "https://github.com/FFmpeg/FFmpeg/commit/83e8541aa601935a610b1b8958d56e8d0331318b",
+    "revision": "83e8541aa601935a610b1b8958d56e8d0331318b",
+    "version_string": "n8.1.1-13-g83e8541aa6-20260613",
+    "commit_date": "2026-06-12T13:07:35Z"
+  },
+  "staged_files": [
+    {
+      "path": "intergalactic/windows/third_party/ffmpeg/bin/ffmpeg.exe",
+      "sha256": "C5C6E92D80884470A4D09C80A801989757DB1E80837E5018B636AF76DD826FEC",
+      "size_bytes": 173416960,
+      "retired_in": "app PR #174, 2026-08-15",
+      "still_staged": false,
+      "why_retained": "CORRECTED 2026-08-15 by S&C: this field read still_staged: true for eight days after the binary was deleted. The sibling ffprobe.exe entry below was updated correctly when IT was retired on 2026-08-07, and this one was not when ffmpeg.exe followed on 2026-08-15 - so the same file carried a correct boolean and a false one side by side, and the false one was the machine-readable claim any tooling would have believed. The entry is KEPT, not deleted, on exactly the same reasoning as ffprobe.exe: every public release from 0.7.4+985 through 0.8.0+993 shipped this binary and the digest above is what the live source offer answers for. Deleting it would orphan that offer. The whole intergalactic/windows/third_party/ tree is gone from the checkout, and intergalactic/windows/CMakeLists.txt now raises FATAL_ERROR if anything is staged back into ffmpeg/bin - so re-staging to make this field true again is a build failure, not a fix."
+    },
+    {
+      "path": "intergalactic/windows/third_party/ffmpeg/bin/ffprobe.exe",
+      "sha256": "134B9BC17D0FE3B1F81ECA108615356F4C304C58C7750CE85592E8CFDBB3F523",
+      "size_bytes": 173210624,
+      "retired_in": "app PR #101, 2026-08-07",
+      "still_staged": false,
+      "why_retained": "ffprobe.exe was removed from the shipped payload but this entry is KEPT, not deleted: every public release up to and including 0.8.0+993 shipped it, and the digest below is what the live source offer answers for. Deleting it would orphan that offer. The binary is no longer staged in this checkout - see still_staged."
+    }
+  ],
+  "license": {
+    "license_id": "LGPL-3.0-or-later",
+    "license_file": "docs/release/evidence/ffmpeg/LICENSE-LGPL-3.0.txt",
+    "notes": [
+      "The selected BtbN variant is lgpl, not gpl or nonfree.",
+      "The reported FFmpeg configure line includes --enable-version3, so the bundled tool pair is treated as LGPL-3.0-or-later for release notices.",
+      "The app invokes the tools as subprocess executables and does not link FFmpeg libraries."
+    ]
+  },
+  "validation": {
+    "commands": [
+      "ffmpeg.exe -hide_banner -version",
+      "ffprobe.exe -hide_banner -version"
+    ],
+    "evidence_files": [
+      "docs/release/evidence/ffmpeg/ffmpeg-version.txt",
+      "docs/release/evidence/ffmpeg/ffprobe-version.txt"
+    ],
+    "configure_checks": {
+      "contains_enable_gpl": false,
+      "contains_enable_nonfree": false,
+      "contains_enable_version3": true,
+      "contains_enable_libx264": false,
+      "contains_enable_libx265": false,
+      "contains_enable_libxavs2": false,
+      "contains_enable_libxvid": false,
+      "observed_disabled_gpl_only_libraries": [
+        "--disable-libx264",
+        "--disable-libx265",
+        "--disable-libxavs2",
+        "--disable-libxvid"
+      ]
+    },
+    "accepted_for_windows_release_staging": true
+  },
+  "mirror": {
+    "recorded_by": "REVIEW",
+    "recorded_on": "2026-08-06",
+    "evidence": "docs/release/evidence/license-sources/ffmpeg/SOURCE.md",
+    "corresponding_source": {
+      "filename": "ffmpeg-n8.1.1-13-g83e8541aa6-source.tar.gz",
+      "sha256": "E1F42BA0646F50C7C6F8761ADCC05933F71D70FF131DA0F80CFC0E449199B4F5",
+      "size_bytes": 16878631,
+      "obtained_from": "https://codeload.github.com/FFmpeg/FFmpeg/tar.gz/83e8541aa601935a610b1b8958d56e8d0331318b",
+      "publication_record": "A temporary staging copy preceded the verified 2026-08-07 public release; the durable retrieval location is published_url.",
+      "published": "YES - 2026-08-07, live and verified",
+      "published_url": "https://app.ourgalaxy.space/source/ffmpeg-n8.1.1-13-g83e8541aa6-source.tar.gz",
+      "published_content_type": "application/gzip",
+      "published_size_bytes": 16878631,
+      "published_alongside": [
+        "https://app.ourgalaxy.space/source/ffmpeg-BUILD-CONFIGURATION.txt",
+        "https://app.ourgalaxy.space/source/ffmpeg-LICENSE-LGPL-3.0.txt"
+      ],
+      "publication_note": "Served from the same host as the binaries, which is what ffmpeg.org/legal.html asks for. The archive was deliberately NOT repacked to embed the configure line, because that would destroy the property that makes it independently checkable - it is byte-for-byte upstream's own export, so anyone can re-download from FFmpeg and compare hashes without trusting this server. The build configuration is a sibling file instead."
+    },
+    "binaries": {
+      "status": "RECOVERED AND BYTE-VERIFIED against the staged_files hashes above",
+      "shipped_in_public_release": "0.8.0+993 (last public release, a desktop hotfix of 0.8.0+992). Byte-identical ffmpeg.exe/ffprobe.exe in 0.8.0+992, 0.8.0+993 and the unreleased local 0.8.1 builds, so the recovered source covers the publicly distributed binary.",
+      "verified_copies": [
+        "intergalactic/windows/third_party/ffmpeg/bin/",
+        "Desktop_Builds/Inter-Galactic/0.8.0+993/windows-release/tools/ffmpeg/ (last public release)",
+        "Desktop_Builds/Inter-Galactic/0.8.0+992/windows-release/tools/ffmpeg/ (prior public release)",
+        ".worktrees/sb/intergalactic/windows/third_party/ffmpeg/bin/"
+      ],
+      "recovery_record": "Recovered-binary provenance is retained by the component hashes and source records above; its temporary staging directory is not a durable evidence location."
+    },
+    "build_recipe": {
+      "status": "LARGELY RECOVERED 2026-08-07, revising an earlier NOT RECOVERED verdict that was too pessimistic. GPLv3 s1 counts the scripts controlling compilation as Corresponding Source. The release tag is still pruned, but the tag was only one route to the build definition; the commit history is another.",
+      "builder_repository": "https://github.com/BtbN/FFmpeg-Builds",
+      "builder_commit": "a9410e4be2b3",
+      "builder_commit_date": "2026-06-10T17:39:42Z",
+      "how_established": "Last commit before the 2026-06-13T13:31Z build, with ZERO commits in between, so this is the repository state the build ran from. Verified against the live GitHub API on 2026-08-07.",
+      "confidence": "Tight inference, not proof. The artefact that would prove it - a release tag pointing at a commit - is exactly what was deleted. Recorded as evidence, not certainty.",
+      "rule_for_future_binaries": "Record the builder's own commit SHA at staging time, not just the release tag. And when a provenance route dies, test whether another route to the same information survives before recording it as lost."
+    },
+    "upstream_release_archive": {
+      "status": "HELD. The original artefact the dead asset_url pointed at, which is stronger provenance than the extracted binaries alone.",
+      "filename": "ffmpeg-n8.1.1-13-g83e8541aa6-win64-lgpl-8.1.zip",
+      "size_bytes": 198755840,
+      "sha256": "6C1C443C762A8D8AD9C9303AF26E2144DC711B0E7277E1B03FD72CDF2DEAA9DB",
+      "contents": "Valid zip, 48 entries. Carries upstream's own LICENSE.txt (LGPL-3 text only, no per-component attribution list), the doc/ tree, presets/, and all three executables including ffplay.exe which this project does not ship.",
+      "recovery_history": "The maintainer relocated this archive from temporary staging on 2026-08-07 and verified its hash before and after relocation. It is not the durable evidence location; the component digests and source records in this manifest are.",
+      "durability_caveat": "The recovered upstream archive is not version-controlled and is not a substitute for publication."
+    },
+    "source_availability_note": "The FFmpeg source commit 83e8541aa601935a610b1b8958d56e8d0331318b returns 200 from both the GitHub API and codeload as of 2026-08-07. The source was never at risk - only BtbN's built artefact and its release tag were lost. A fork of FFmpeg was considered and rejected: it would re-host the component that never went missing, would not contain the build scripts, and would move the single point of failure onto this project's own account."
+  }
+}

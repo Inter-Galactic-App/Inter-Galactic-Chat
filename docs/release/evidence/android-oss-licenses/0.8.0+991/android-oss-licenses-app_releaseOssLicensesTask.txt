@@ -1,0 +1,57 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.13/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :gradle:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :gradle:compileKotlin UP-TO-DATE
+> Task :gradle:compileJava NO-SOURCE
+> Task :gradle:compileGroovy NO-SOURCE
+> Task :gradle:pluginDescriptors UP-TO-DATE
+> Task :gradle:processResources UP-TO-DATE
+> Task :gradle:classes UP-TO-DATE
+> Task :gradle:jar UP-TO-DATE
+
+> Task :app:compileFlutterBuildRelease
+"ar": 360 untranslated message(s).
+"be": 368 untranslated message(s).
+"cs": 338 untranslated message(s).
+"de": 121 untranslated message(s).
+"es": 145 untranslated message(s).
+"et": 112 untranslated message(s).
+"eu": 112 untranslated message(s).
+"fa": 363 untranslated message(s).
+"fr": 112 untranslated message(s).
+"ja": 138 untranslated message(s).
+"ko": 153 untranslated message(s).
+"nb": 285 untranslated message(s).
+"pl": 219 untranslated message(s).
+"pt": 131 untranslated message(s).
+"pt_BR": 112 untranslated message(s).
+"ru": 112 untranslated message(s).
+"ta": 112 untranslated message(s).
+"uk": 112 untranslated message(s).
+"zh": 112 untranslated message(s).
+To see a detailed report, use the untranslated-messages-file 
+option in the l10n.yaml file:
+untranslated-messages-file: desiredFileName.txt
+<other option>: <other selection> 
+
+
+This will generate a JSON format file containing all messages that 
+need to be translated.
+
+> Task :app:packJniLibsflutterBuildRelease
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preReleaseBuild UP-TO-DATE
+> Task :app:collectReleaseDependencies
+> Task :app:releaseOssDependencyTask
+> Task :app:releaseOssLicensesTask
+
+[Incubating] Problems report is available at: file:/redacted/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.13/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 2m 25s
+9 actionable tasks: 5 executed, 4 up-to-date

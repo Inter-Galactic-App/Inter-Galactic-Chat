@@ -1,0 +1,153 @@
+name: static-analysis
+on:
+  pull_request:
+  merge_group:
+
+permissions:
+  contents: read
+
+env:
+  PROJECT_PATH: intergalactic
+
+jobs:
+  static-analysis:
+    name: Static Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout  ┏━┓ ︵ /(^.^/)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: 'true'
+          fetch-depth: 0
+          persist-credentials: false
+        
+      - name: Setup Flutter  ╰(✿˙ᗜ˙)੭━☆ﾟ.*･｡ﾟ
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: '3.41.1'
+          channel: 'stable'
+
+      - name: Setup Tools  ᕙ|” ◉ ◡ ◉ ”|ᕗ
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y ninja-build libgtk-3-dev libmpv-dev mpv libmimalloc-dev
+
+      - name: Configure Flutter (∩｀-´)⊃━☆ﾟ.*･｡ﾟ
+        run: flutter config --enable-linux-desktop
+
+      - name: Resolve Changed Files
+        id: changed-files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if ! git rev-parse HEAD^1 >/dev/null 2>&1; then
+            echo "Unable to resolve the merge-parent commit for changed-file diff."
+            exit 1
+          fi
+          base_sha="$(git rev-parse HEAD^1)"
+          changed_file_list="${RUNNER_TEMP}/changed-files.txt"
+          changed_dart_file_list="${RUNNER_TEMP}/changed-dart-files.txt"
+
+          git diff --diff-filter=ACMRT --name-only "$base_sha"...HEAD > "$changed_file_list"
+
+          # Deny-list, not allow-list. This used to be `grep "^${PROJECT_PATH}/"`,
+          # written when intergalactic was the whole app. The repo is now a pub
+          # workspace of six packages, and that filter silently ungated the other
+          # five - plugins/*, tiamat, widgets/* got neither a formatter nor an
+          # analyzer gate on any PR. Excluding generated output instead means a
+          # package added later is covered without anyone remembering to add it.
+          grep '\.dart$' "$changed_file_list" \
+            | grep -vE '(^|/)lib/generated/' \
+            | grep -vE '\.(g|freezed)\.dart$' > "$changed_dart_file_list" || true
+
+          changed_count="$(wc -l < "$changed_file_list" | tr -d ' ')"
+          changed_dart_count="$(wc -l < "$changed_dart_file_list" | tr -d ' ')"
+          echo "all_count=$changed_count" >> "$GITHUB_OUTPUT"
+          echo "all_path=$changed_file_list" >> "$GITHUB_OUTPUT"
+          echo "dart_count=$changed_dart_count" >> "$GITHUB_OUTPUT"
+          echo "dart_path=$changed_dart_file_list" >> "$GITHUB_OUTPUT"
+
+          if [[ "$changed_count" -eq 0 ]]; then
+            echo "No changed files found."
+          else
+            echo "Changed files:"
+            cat "$changed_file_list"
+          fi
+
+          if [[ "$changed_dart_count" -eq 0 ]]; then
+            echo "No reviewable Dart files changed in the workspace."
+            exit 0
+          fi
+
+          echo "Changed Dart files:"
+          cat "$changed_dart_file_list"
+
+      - name: Check Code Style
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          pushd "$PROJECT_PATH"
+          flutter doctor
+          flutter pub get
+          rm -rf lib/generated
+          popd
+
+          mapfile -t changed_dart_files < "${{ steps.changed-files.outputs.dart_path }}"
+
+          if [[ ${#changed_dart_files[@]} -eq 0 ]]; then
+            echo "No reviewable Dart files changed in the workspace; skipping formatter gate."
+            exit 0
+          fi
+
+          printf 'Checking formatting for:\n%s\n' "${changed_dart_files[@]}"
+          printf '%s\0' "${changed_dart_files[@]}" \
+            | xargs -0 dart format -o none --show all --set-exit-if-changed
+        
+      - name: Code Generation __φ(．．;)
+        run: |
+          cd $PROJECT_PATH
+          dart run scripts/codegen.dart
+
+      - name: Check Warnings
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mapfile -t changed_dart_files < "${{ steps.changed-files.outputs.dart_path }}"
+
+          if [[ ${#changed_dart_files[@]} -eq 0 ]]; then
+            echo "No reviewable Dart files changed in the workspace; skipping analyzer gate."
+            exit 0
+          fi
+
+          # Run from the repo root on repo-relative paths. This used to pushd
+          # into PROJECT_PATH and strip that prefix off every path, which both
+          # limited the gate to one package and would now break outright: a path
+          # like plugins/foo/lib/bar.dart has no intergalactic/ prefix to strip
+          # and does not resolve from inside intergalactic/. Root works because
+          # the pub workspace resolves to a single .dart_tool/package_config.json
+          # at the repo root, which the `flutter pub get` above already produces.
+          dart analyze "${changed_dart_files[@]}"
+
+      - name: Resolve Focused Flutter Tests
+        id: focused-tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash .github/scripts/resolve-focused-tests.sh \
+            "${{ steps.changed-files.outputs.all_path }}" \
+            "${RUNNER_TEMP}/focused-flutter-tests.txt"
+
+      - name: Run Focused Flutter Tests
+        if: steps.focused-tests.outputs.count != '0'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mapfile -t focused_tests < "${{ steps.focused-tests.outputs.path }}"
+
+          pushd "$PROJECT_PATH"
+          flutter test "${focused_tests[@]}"
+          popd

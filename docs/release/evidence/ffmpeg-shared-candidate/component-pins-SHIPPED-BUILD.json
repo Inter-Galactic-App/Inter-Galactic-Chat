@@ -1,0 +1,761 @@
+{
+  "_what_this_is": "Pinned upstream component versions for the FFmpeg build CURRENTLY SHIPPED (BtbN win64-lgpl, release autobuild-2026-06-13-13-31, FFmpeg 83e8541aa6). Recovered 2026-08-09 from the builder repository history AFTER the release tag was pruned.",
+  "_why_this_exists": "The bundle work was blocked on these versions being 'unrecoverable'. They are not: the tag was only one route to the build definition, and the commit history is another. The tag is gone; commit a9410e4b is not.",
+  "_confidence": "TIGHT INFERENCE, NOT PROOF - and weaker than the shared candidate's, which came from a live tag object. a9410e4be2b332e535000004a8ebf304d9b46689 (2026-06-10T17:39:42Z) is the last commit before the 2026-06-13T13:31Z build with ZERO commits in between, so it is the repository state the build ran from. The artefact that would prove it is the deleted tag. Treat these pins as evidence, not certainty, and say so in anything derived from them.",
+  "_not_legal_advice": "Engineering provenance only.",
+  "captured_by": "RELEASE PIPELINE",
+  "captured_on": "2026-08-09",
+  "builder": {
+    "repository": "https://github.com/BtbN/FFmpeg-Builds",
+    "release_tag": "autobuild-2026-06-13-13-31 (PRUNED - 404)",
+    "builder_commit_sha": "a9410e4be2b332e535000004a8ebf304d9b46689",
+    "builder_commit_date": "2026-06-10T17:39:42Z",
+    "builder_commit_subject": "Update and re-organize ffnvcodec versions",
+    "source_snapshot_url": "https://codeload.github.com/BtbN/FFmpeg-Builds/tar.gz/a9410e4be2b3",
+    "source_snapshot_sha256": "FB1B5ADCE1E50FFF727D3C4773C1238DCA58E40A1BE5C1E21337BD5D0B19EC43",
+    "variant": "win64-lgpl (static)",
+    "addin": "8.1"
+  },
+  "ffmpeg_revision": "83e8541aa601935a610b1b8958d56e8d0331318b",
+  "component_count": 58,
+  "components_enabled_in_ffmpeg_configure": [
+    {
+      "ffmpeg_configure_flag": "--enable-amf",
+      "builder_script": "scripts.d/50-amf.sh",
+      "upstream_repository": "https://github.com/GPUOpen-LibrariesAndSDKs/AMF.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "eadd00804d5f7e5cd8c85d540073198312870776"
+      },
+      "builder_script_depends_on": []
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-chromaprint",
+      "builder_script": "scripts.d/50-chromaprint.sh",
+      "upstream_repository": "https://github.com/acoustid/chromaprint.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "6b13ce3a81ae931e7477c4856a86bece99157cd8"
+      },
+      "builder_script_depends_on": [
+        "base",
+        "fftw3"
+      ]
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-ffnvcodec",
+      "builder_script": "scripts.d/50-ffnvcodec.sh",
+      "upstream_repository": "https://github.com/FFmpeg/nv-codec-headers.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "1b5a81ada8874efb2af0534ffe74049c557e212d"
+      },
+      "builder_script_depends_on": []
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-fontconfig",
+      "builder_script": "scripts.d/45-fonts/35-fontconfig.sh",
+      "upstream_repository": "https://gitlab.freedesktop.org/fontconfig/fontconfig.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "2c6cf188fb66092edc96b2f84528c5de7514f82a"
+      },
+      "builder_script_depends_on": [
+        "base",
+        "libxml2",
+        "libiconv"
+      ]
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-gmp",
+      "builder_script": "scripts.d/25-gmp.sh",
+      "upstream_repository": "https://github.com/BtbN/gmplib.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "9994908f090c694f8a152d660dc6852e0c48557a"
+      },
+      "builder_script_depends_on": []
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-iconv",
+      "builder_script": "scripts.d/20-libiconv.sh",
+      "upstream_repository": "https://git.savannah.gnu.org/git/libiconv.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "9d19c66d0a1768cffcf497b2db70bf4018b578d7"
+      },
+      "builder_script_depends_on": []
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-libaom",
+      "builder_script": "scripts.d/50-aom.sh",
+      "upstream_repository": "https://aomedia.googlesource.com/aom",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "129a2ed2cbb3a4ecbad067b52d78df1cef93fc74"
+      },
+      "builder_script_depends_on": [
+        "base",
+        "vmaf"
+      ]
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-libaribb24",
+      "builder_script": "scripts.d/50-aribb24/50-libaribb24.sh",
+      "upstream_repository": "https://github.com/nkoriyama/aribb24.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "5e9be272f96e00f15a2f3c5f8ba7e124862aec38"
+      },
+      "builder_script_depends_on": []
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-libaribcaption",
+      "builder_script": "scripts.d/50-libaribcaption.sh",
+      "upstream_repository": "https://github.com/xqq/libaribcaption.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "f9d8c50fe5e51c98d101f69d74591295cb568036"
+      },
+      "builder_script_depends_on": [
+        "base",
+        "fonts",
+        "openssl"
+      ]
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-libass",
+      "builder_script": "scripts.d/50-libass.sh",
+      "upstream_repository": "https://github.com/libass/libass.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "c425f6d7ec9ca7e5dfa3f8bbed29a6ddbf39a596"
+      },
+      "builder_script_depends_on": [
+        "base",
+        "fonts",
+        "fribidi",
+        "libiconv",
+        "libunibreak"
+      ]
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-libbluray",
+      "builder_script": "scripts.d/50-libbluray.sh",
+      "upstream_repository": "https://code.videolan.org/videolan/libbluray.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "4dfb9b0123b006ce5d66592dc8058f61e5c0cdc8"
+      },
+      "builder_script_depends_on": [
+        "base",
+        "libxml2",
+        "fonts",
+        "libudfread"
+      ]
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-libdav1d",
+      "builder_script": "scripts.d/50-dav1d.sh",
+      "upstream_repository": "https://code.videolan.org/videolan/dav1d.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "1718ff9aded99f0a89f5c7940d6afb8948301e33"
+      },
+      "builder_script_depends_on": []
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-libfreetype",
+      "builder_script": "scripts.d/45-fonts/50-freetype.sh",
+      "upstream_repository": "https://gitlab.freedesktop.org/freetype/freetype.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "7e0e56f84fd53cf38378d33c8fc8f92d12ab9ac6"
+      },
+      "builder_script_depends_on": []
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-libfribidi",
+      "builder_script": "scripts.d/25-fribidi.sh",
+      "upstream_repository": "https://github.com/fribidi/fribidi.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "5c85a174650ab8ef106ce85f13bcf2950d3fc65f"
+      },
+      "builder_script_depends_on": []
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-libgme",
+      "builder_script": "scripts.d/50-gme.sh",
+      "upstream_repository": "https://github.com/libgme/game-music-emu.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "dd3182a8bdae3ff761438632aace418fbcaed439"
+      },
+      "builder_script_depends_on": []
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-libharfbuzz",
+      "builder_script": "scripts.d/45-fonts/45-harfbuzz.sh",
+      "upstream_repository": "https://github.com/harfbuzz/harfbuzz.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "22ea52f42fa4fc168be91ef4e56aee3affda6e28"
+      },
+      "builder_script_depends_on": []
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-libjxl",
+      "builder_script": "scripts.d/50-libjxl/50-libjxl.sh",
+      "upstream_repository": "https://github.com/libjxl/libjxl.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "af2970e27fc61fd0b3ca7af3c7de32236a9e4fdf"
+      },
+      "builder_script_depends_on": []
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-libkvazaar",
+      "builder_script": "scripts.d/50-kvazaar.sh",
+      "upstream_repository": "https://github.com/ultravideo/kvazaar.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "d6815293f34a094e26ba6c50b8644660ddc13e09"
+      },
+      "builder_script_depends_on": []
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-liblcevc-dec",
+      "builder_script": "scripts.d/50-lcevcdec.sh",
+      "upstream_repository": "https://github.com/v-novaltd/LCEVCdec.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "b033a6d1f68a80ac1d972f34cf1740000b544571"
+      },
+      "builder_script_depends_on": []
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-libmp3lame",
+      "builder_script": "scripts.d/50-libmp3lame.sh",
+      "upstream_repository": "https://svn.code.sf.net/p/lame/svn/trunk/lame",
+      "pinned_at": {
+        "kind": "svn-rev",
+        "value": "6531"
+      },
+      "builder_script_depends_on": [
+        "base",
+        "libiconv"
+      ]
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-liboapv",
+      "builder_script": "scripts.d/50-openapv.sh",
+      "upstream_repository": "https://github.com/AcademySoftwareFoundation/openapv.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "dd4f9d5dc0fc522abd2c8dcab8bdfe9a832d6baf"
+      },
+      "builder_script_depends_on": []
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-libopencore-amrnb",
+      "builder_script": "scripts.d/50-opencore-amr.sh",
+      "upstream_repository": "https://git.code.sf.net/p/opencore-amr/code",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "7dba8c32238418ce0b316a852b2224df586ca896"
+      },
+      "builder_script_depends_on": []
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-libopencore-amrwb",
+      "builder_script": "scripts.d/50-opencore-amr.sh",
+      "upstream_repository": "https://git.code.sf.net/p/opencore-amr/code",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "7dba8c32238418ce0b316a852b2224df586ca896"
+      },
+      "builder_script_depends_on": []
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-libopenh264",
+      "builder_script": "scripts.d/50-openh264.sh",
+      "upstream_repository": "https://github.com/cisco/openh264.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "e3f5b10438e2bacc155cf54578222bd4236c9f06"
+      },
+      "builder_script_depends_on": []
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-libopenjpeg",
+      "builder_script": "scripts.d/50-openjpeg.sh",
+      "upstream_repository": "https://github.com/uclouvain/openjpeg.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "21b70b0d62807e270994f94302e323da4f0d776b"
+      },
+      "builder_script_depends_on": []
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-libopenmpt",
+      "builder_script": "scripts.d/50-openmpt.sh",
+      "upstream_repository": "https://github.com/OpenMPT/openmpt.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "0877aa7537e831e546770db5317f7748544c7d7e"
+      },
+      "builder_script_depends_on": [
+        "base",
+        "zlib",
+        "libogg",
+        "libvorbis"
+      ]
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-libopus",
+      "builder_script": "scripts.d/50-libopus.sh",
+      "upstream_repository": "https://github.com/xiph/opus.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "f8f99516092f4311a9b0784f190ff982df8eb2e6"
+      },
+      "builder_script_depends_on": []
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-libplacebo",
+      "builder_script": "scripts.d/50-libplacebo.sh",
+      "upstream_repository": "https://code.videolan.org/videolan/libplacebo.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "464d6eab8900c87a539943d0cd8575fffe566f72"
+      },
+      "builder_script_depends_on": [
+        "base",
+        "vulkan"
+      ]
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-librav1e",
+      "builder_script": "scripts.d/50-rav1e.sh",
+      "upstream_repository": "https://github.com/xiph/rav1e.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "564ae3b0007ae2b06893fd7166bf88c5a84c5b63"
+      },
+      "builder_script_depends_on": []
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-librist",
+      "builder_script": "scripts.d/50-librist/50-librist.sh",
+      "upstream_repository": "https://code.videolan.org/rist/librist.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "88467c0e4e3c9498e9a86d0df6da115848482c96"
+      },
+      "builder_script_depends_on": []
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-libshaderc",
+      "builder_script": "scripts.d/47-vulkan/50-shaderc.sh",
+      "upstream_repository": "https://github.com/google/shaderc.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "b16fb67935326f7ea1ead8bd2b131608b4148230"
+      },
+      "builder_script_depends_on": []
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-libsnappy",
+      "builder_script": "scripts.d/50-snappy.sh",
+      "upstream_repository": "https://github.com/google/snappy.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "27ab5f7f518430a021239bc26a5b2fd64affbc7b"
+      },
+      "builder_script_depends_on": []
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-libsoxr",
+      "builder_script": "scripts.d/50-soxr.sh",
+      "upstream_repository": "https://git.code.sf.net/p/soxr/code",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "945b592b70470e29f917f4de89b4281fbbd540c0"
+      },
+      "builder_script_depends_on": []
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-libsrt",
+      "builder_script": "scripts.d/50-srt.sh",
+      "upstream_repository": "https://github.com/Haivision/srt.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "2e2ab20ee0f2eb43cf0fe974695aafec9767654f"
+      },
+      "builder_script_depends_on": [
+        "base",
+        "openssl"
+      ]
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-libssh",
+      "builder_script": "scripts.d/50-libssh.sh",
+      "upstream_repository": "https://gitlab.com/libssh/libssh-mirror.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "d94a96bf23a982e6047cf5c128804b014e1f92eb"
+      },
+      "builder_script_depends_on": [
+        "base",
+        "zlib",
+        "openssl"
+      ]
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-libsvtav1",
+      "builder_script": "scripts.d/50-svtav1.sh",
+      "upstream_repository": "https://gitlab.com/AOMediaCodec/SVT-AV1.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "f4872c656727e9da5aac12b733a203e1f468cbad"
+      },
+      "builder_script_depends_on": []
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-libtheora",
+      "builder_script": "scripts.d/50-libtheora.sh",
+      "upstream_repository": "https://github.com/xiph/theora.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "28fd5ec77f0ad0e07a371cef1047828116f6bd8a"
+      },
+      "builder_script_depends_on": [
+        "base",
+        "libogg"
+      ]
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-libtwolame",
+      "builder_script": "scripts.d/50-twolame.sh",
+      "upstream_repository": "https://github.com/njh/twolame.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "6fced852d4d5cfad58cf9dbe3ea619b08e87d398"
+      },
+      "builder_script_depends_on": []
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-libuavs3d",
+      "builder_script": "scripts.d/50-uavs3d.sh",
+      "upstream_repository": "https://github.com/uavs3/uavs3d.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "0e20d2c291853f196c68922a264bcd8471d75b68"
+      },
+      "builder_script_depends_on": []
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-libvmaf",
+      "builder_script": "scripts.d/45-vmaf.sh",
+      "upstream_repository": "https://github.com/Netflix/vmaf.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "32780bd9b635532f3dd63a7eb202b8cc54574fc6"
+      },
+      "builder_script_depends_on": []
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-libvorbis",
+      "builder_script": "scripts.d/45-libvorbis.sh",
+      "upstream_repository": "https://github.com/xiph/vorbis.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "1c5f57a2c42ddac91e5c5bb70eb4c56099d442a9"
+      },
+      "builder_script_depends_on": [
+        "base",
+        "libogg"
+      ]
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-libvpl",
+      "builder_script": "scripts.d/50-onevpl.sh",
+      "upstream_repository": "https://github.com/intel/libvpl.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "778a66d6c6537f08eabb91955dbbf1bce3812894"
+      },
+      "builder_script_depends_on": []
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-libvpx",
+      "builder_script": "scripts.d/50-libvpx.sh",
+      "upstream_repository": "https://chromium.googlesource.com/webm/libvpx",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "1963b530e4b09d1edf1339d3ad26a3aa5a5a7ac6"
+      },
+      "builder_script_depends_on": []
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-libvvenc",
+      "builder_script": "scripts.d/50-vvenc.sh",
+      "upstream_repository": "https://github.com/fraunhoferhhi/vvenc.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "182ad990a15c5300702202f184b332b7d146a841"
+      },
+      "builder_script_depends_on": []
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-libwebp",
+      "builder_script": "scripts.d/50-libwebp.sh",
+      "upstream_repository": "https://chromium.googlesource.com/webm/libwebp",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "6178b1db7e5564da10c1ad41ea3a52706fd9dcd1"
+      },
+      "builder_script_depends_on": []
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-libxml2",
+      "builder_script": "scripts.d/25-libxml2.sh",
+      "upstream_repository": "https://github.com/GNOME/libxml2.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "c71154dad39f65ead334bd9aec4092392b1c63a7"
+      },
+      "builder_script_depends_on": [
+        "base",
+        "libiconv"
+      ]
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-libzimg",
+      "builder_script": "scripts.d/50-zimg.sh",
+      "upstream_repository": "https://github.com/sekrit-twc/zimg.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "fa52dee9ebd2d5bedb5a4068f72a4311ae88a419"
+      },
+      "builder_script_depends_on": []
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-libzmq",
+      "builder_script": "scripts.d/50-libzmq.sh",
+      "upstream_repository": "https://github.com/zeromq/libzmq.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "b946c18f676760387276cd095bbdd8c0e18c09bf"
+      },
+      "builder_script_depends_on": []
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-libzvbi",
+      "builder_script": "scripts.d/50-zvbi.sh",
+      "upstream_repository": "https://github.com/zapping-vbi/zvbi",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "41477c97c8edf7a01f1594b2a95b94f0117eed21"
+      },
+      "builder_script_depends_on": [
+        "base",
+        "libiconv"
+      ]
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-lv2",
+      "builder_script": "scripts.d/50-lilv/99-lilv.sh",
+      "upstream_repository": "https://github.com/lv2/lilv.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "5318c9e495c5404d7f0a623aeba2a8f617a26a9d"
+      },
+      "builder_script_depends_on": []
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-lzma",
+      "builder_script": "scripts.d/25-xz.sh",
+      "upstream_repository": "https://github.com/tukaani-project/xz.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "ebb0e6789cefe3be71756881aa8f2009fda9938c"
+      },
+      "builder_script_depends_on": [
+        "base",
+        "libiconv"
+      ]
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-openal",
+      "builder_script": "scripts.d/50-openal.sh",
+      "upstream_repository": "https://github.com/kcat/openal-soft.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "83ea7236c6f23fc98e2b62eb9c5b3abfd4b2be86"
+      },
+      "builder_script_depends_on": []
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-opencl",
+      "builder_script": "scripts.d/45-opencl.sh",
+      "upstream_repository": "https://github.com/KhronosGroup/OpenCL-Headers.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "6fe718c31a45fe25151362a72ef041c3a1047cbd"
+      },
+      "builder_script_depends_on": []
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-sdl2",
+      "builder_script": "scripts.d/50-sdl.sh",
+      "upstream_repository": "https://github.com/libsdl-org/SDL.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "1df9ae4338c43ad9dce4b27a77f807aa8d2b073b"
+      },
+      "builder_script_depends_on": [
+        "base",
+        "libiconv",
+        "x11",
+        "pulseaudio",
+        "libsamplerate"
+      ]
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-vaapi",
+      "builder_script": "scripts.d/50-vaapi/50-libva.sh",
+      "upstream_repository": "https://github.com/intel/libva.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "ad64eb9b616d1b66afaf4cb9f0ea0b8e0ec1169c"
+      },
+      "builder_script_depends_on": [
+        "base",
+        "x11"
+      ]
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-vulkan",
+      "builder_script": "scripts.d/47-vulkan/45-vulkan-loader.sh",
+      "upstream_repository": "https://github.com/BtbN/Vulkan-Shim-Loader.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "65b3936528cd92eb4ea3de485d03f858a3850484"
+      },
+      "builder_script_depends_on": []
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-whisper",
+      "builder_script": "scripts.d/50-whisper.sh",
+      "upstream_repository": "https://github.com/ggml-org/whisper.cpp.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "8443cf05e3fa8ce1b32348e1bcbcf8fc31f7f3ae"
+      },
+      "builder_script_depends_on": [
+        "base",
+        "vulkan",
+        "opencl"
+      ]
+    },
+    {
+      "ffmpeg_configure_flag": "--enable-zlib",
+      "builder_script": "scripts.d/20-zlib.sh",
+      "upstream_repository": "https://github.com/madler/zlib.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "f9dd6009be3ed32415edf1e89d1bc38380ecb95d"
+      },
+      "builder_script_depends_on": []
+    }
+  ],
+  "transitive_build_dependencies": [
+    {
+      "name": "fftw3",
+      "builder_script": "scripts.d/25-fftw3.sh",
+      "upstream_repository": "https://github.com/FFTW/fftw3.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "5d0f4db2fc157867b7dc972b40418f171d77a6bc"
+      }
+    },
+    {
+      "name": "libogg",
+      "builder_script": "scripts.d/25-libogg.sh",
+      "upstream_repository": "https://github.com/xiph/ogg.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "06a5e0262cdc28aa4ae6797627a783b5010440f0"
+      }
+    },
+    {
+      "name": "libsamplerate",
+      "builder_script": "scripts.d/45-libsamplerate.sh",
+      "upstream_repository": "https://github.com/libsndfile/libsamplerate.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "2ccde9568cca73c7b32c97fefca2e418c16ae5e3"
+      }
+    },
+    {
+      "name": "libudfread",
+      "builder_script": "scripts.d/45-libudfread.sh",
+      "upstream_repository": "https://code.videolan.org/videolan/libudfread.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "139a2194525f2745b98a98e4d8fa627d07440176"
+      }
+    },
+    {
+      "name": "libunibreak",
+      "builder_script": "scripts.d/45-libunibreak.sh",
+      "upstream_repository": "https://github.com/adah1972/libunibreak.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "3ce4bfa3129ff3738046a44a6db533d2ce25af2b"
+      }
+    },
+    {
+      "name": "mingw",
+      "builder_script": "scripts.d/10-mingw.sh",
+      "upstream_repository": "https://git.code.sf.net/p/mingw-w64/mingw-w64.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "734e01d475c1caec5019d8b8eecd528524ff962a"
+      }
+    },
+    {
+      "name": "mingw-std-threads",
+      "builder_script": "scripts.d/10-mingw-std-threads.sh",
+      "upstream_repository": "https://github.com/meganz/mingw-std-threads.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "c931bac289dd431f1dd30fc4a5d1a7be36668073"
+      }
+    },
+    {
+      "name": "openssl",
+      "builder_script": "scripts.d/25-openssl.sh",
+      "upstream_repository": "https://github.com/openssl/openssl.git",
+      "pinned_at": {
+        "kind": "git-tag",
+        "value": "openssl-3.6.3"
+      }
+    },
+    {
+      "name": "xorg-macros",
+      "builder_script": "scripts.d/10-xorg-macros.sh",
+      "upstream_repository": "https://gitlab.freedesktop.org/xorg/util/macros.git",
+      "pinned_at": {
+        "kind": "git-commit",
+        "value": "a9d71e3fd8e6758b70be31c586921bbbcd2a8449"
+      }
+    }
+  ],
+  "notes": [
+    "Component set is 58 here vs 57 in the shared candidate; whisper is the difference.",
+    "fftw3 is a static dependency of chromaprint here too - see component-set-diff.md."
+  ]
+}

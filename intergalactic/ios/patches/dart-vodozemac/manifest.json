@@ -1,0 +1,48 @@
+{
+  "schema": 1,
+  "upstream_url": "https://github.com/famedly/dart-vodozemac.git",
+  "upstream_tag": "0.5.0",
+  "baseline_commit": "1bdded7dd13d26b3f77c4287c9321f7cf924dec9",
+  "baseline_tree": "ef7825610cc462cc16b48d950959ab7325b52d5c",
+  "patch_file": "0001-feat-ios-port-bounded-backup-event-decrypt-to-0.5.0.patch",
+  "patch_sha256": "243a925e41af50ffee95004d4043f2cb3512abf45f88c95a1d6c67c545d96975",
+  "patched_tree": "111243677b895622b8a0659f55ec20e451420f23",
+  "changed_files": [
+    "flutter/ios/Classes/vodozemac_ios_ffi_bindings.h",
+    "rust/Cargo.lock",
+    "rust/Cargo.toml",
+    "rust/src/ios_ffi_bindings.rs"
+  ],
+  "baseline_files_sha256": {
+    "LICENSE": "499b339f40cfa26e7bb430bab2674c596422bbbef211a9c455fefaa130dcfdc5",
+    "dart/LICENSE": "499b339f40cfa26e7bb430bab2674c596422bbbef211a9c455fefaa130dcfdc5",
+    "dart/pubspec.yaml": "b119ce21b3a7e2f8c00b84b9373fc30f404bc2d0d5986505d8ec7c1f1fc200dd",
+    "flutter/LICENSE": "499b339f40cfa26e7bb430bab2674c596422bbbef211a9c455fefaa130dcfdc5",
+    "flutter/pubspec.yaml": "d7577359ad326442f3f85cb31e12ef1172d61a1091ca6f3dc9ed945b30fe1142",
+    "flutter/ios/Classes/vodozemac_ios_ffi_bindings.h": "501433cc4b9ec5a9034e064cc7d619f979aac3d25b00681cfa48c3a176e99e97",
+    "rust/Cargo.lock": "b754de92a5349e2521b6ab971bc5de122b242b580ab8a3cd178476afa47be011",
+    "rust/Cargo.toml": "551d4843fa3785411b82269103ed4250765c76a41be992ed6e2f4747d7168cb6",
+    "rust/src/ios_ffi_bindings.rs": "9f35f0139da6a83eab1c1f63df02874006258f405356c614f2ec5bc548a4f1ff"
+  },
+  "patched_files_sha256": {
+    "LICENSE": "499b339f40cfa26e7bb430bab2674c596422bbbef211a9c455fefaa130dcfdc5",
+    "dart/LICENSE": "499b339f40cfa26e7bb430bab2674c596422bbbef211a9c455fefaa130dcfdc5",
+    "dart/pubspec.yaml": "b119ce21b3a7e2f8c00b84b9373fc30f404bc2d0d5986505d8ec7c1f1fc200dd",
+    "flutter/LICENSE": "499b339f40cfa26e7bb430bab2674c596422bbbef211a9c455fefaa130dcfdc5",
+    "flutter/pubspec.yaml": "d7577359ad326442f3f85cb31e12ef1172d61a1091ca6f3dc9ed945b30fe1142",
+    "flutter/ios/Classes/vodozemac_ios_ffi_bindings.h": "cee9337b68fdd3b713e11d253b431fd95d6700bb8acc1e68f65906760035af50",
+    "rust/Cargo.lock": "397bfa865d9295922af94f234456a1f811a8e64121db250b11df2b3a6601cdb6",
+    "rust/Cargo.toml": "82749aebb78b8765dc9484bcd549c54970e4df28dfda110c70cbe046e0a3a680",
+    "rust/src/ios_ffi_bindings.rs": "908d11f94567a2f63cce576287422432b5ef3eb9ecd327b41e7b9c22c760c094"
+  },
+  "cargo_versions": {
+    "flutter_rust_bridge": "2.11.1",
+    "serde_json": "1.0.140",
+    "vodozemac": "0.9.0"
+  },
+  "cargo_checksums": {
+    "flutter_rust_bridge": "dde126295b2acc5f0a712e265e91b6fdc0ed38767496483e592ae7134db83725",
+    "serde_json": "20068b6e96dc6c9bd23e01df8827e6c7e1f2fddd43c21810382803c136b99373",
+    "vodozemac": "c022a277687e4e8685d72b95a7ca3ccfec907daa946678e715f8badaa650883d"
+  }
+}

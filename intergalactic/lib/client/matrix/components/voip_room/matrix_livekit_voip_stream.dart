@@ -1,0 +1,730 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:intergalactic/client/components/voip/call_local_playback_operation_queue.dart';
+import 'package:intergalactic/client/components/voip/voip_inbound_audio_energy.dart';
+import 'package:intergalactic/client/components/voip/voip_receive_quality_policy.dart';
+import 'package:intergalactic/client/components/voip/voip_remote_audio_reconciliation.dart';
+import 'package:intergalactic/client/components/voip/voip_stream.dart';
+import 'package:intergalactic/debug/log.dart';
+import 'package:intergalactic/main.dart';
+import 'package:crypto/crypto.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart' as rtc;
+import 'package:livekit_client/livekit_client.dart';
+
+bool isLiveKitAudioVisualizerPluginError(Object error) {
+  if (error is! MissingPluginException && error is! PlatformException) {
+    return false;
+  }
+
+  return error.toString().contains('io.livekit.audio.visualizer');
+}
+
+class MatrixLivekitVoipStream
+    implements
+        VoipStream,
+        LocalPlaybackVolumeStream,
+        InboundAudioEnergyStream,
+        NativePictureInPictureVideoTarget {
+  TrackPublication publication;
+  String userId;
+
+  AudioVisualizer? visualizer;
+  EventsListener<AudioVisualizerEvent>? _visualizerListener;
+  Future<void>? _visualizerStartFuture;
+  AudioTrack? _visualizedAudioTrack;
+
+  /// Local-only mute state (does not signal anything to the remote participant).
+  bool _locallyMuted = false;
+  bool get locallyMuted => _locallyMuted || _localVolume <= 0.0;
+
+  /// Local volume level (0.0 = silent, 1.0 = normal, >1.0 = boost).
+  double _localVolume = 1.0;
+  double get localVolume => _localVolume;
+  bool _hasLocalPlaybackVolumeOverride = false;
+
+  @override
+  bool get hasLocalPlaybackAudio => publication.kind == TrackType.AUDIO;
+
+  @override
+  bool get hasLocalPlaybackVolumeOverride => _hasLocalPlaybackVolumeOverride;
+
+  final StreamController<void> _onChanged = StreamController.broadcast();
+  VoipStreamReceivePriority _receivePriority = VoipStreamReceivePriority.high;
+  String? _receiveQualityLabel = VoipReceiveQualityApplication.fromPriority(
+    VoipStreamReceivePriority.high,
+  ).liveKitQualityLabel;
+  Future<void> _priorityUpdate = Future<void>.value();
+  final CallLocalPlaybackOperationQueue _localPlaybackOperationQueue =
+      CallLocalPlaybackOperationQueue();
+  bool _disposed = false;
+
+  bool get isScreenShareAudio =>
+      publication.source == TrackSource.screenShareAudio ||
+      publication.name == 'screenShareAudio';
+
+  bool get isMicrophoneAudio =>
+      publication.kind == TrackType.AUDIO && !isScreenShareAudio;
+
+  VoipRemoteAudioReconciliation? get remoteAudioReconciliation {
+    if (direction != VoipStreamDirection.incoming || !isMicrophoneAudio) {
+      return null;
+    }
+
+    final remotePublication = publication;
+    return VoipRemoteAudioReconciliationPolicy.evaluate(
+      VoipRemoteAudioState(
+        participantConnected: true,
+        audioPublicationExists: true,
+        publicationMuted: publication.muted,
+        // The app's own receive switch, not `publication.subscribed` — that
+        // getter is `subscriptionAllowed && track != null`, so feeding it here
+        // reported "unsubscribed" for every publication whose sink had not
+        // attached yet, which is the normal pre-attach state.
+        trackSubscribed: remotePublication is RemoteTrackPublication
+            ? remotePublication.enabled
+            : publication.subscribed,
+        subscriptionPermitted: remotePublication is RemoteTrackPublication
+            ? remotePublication.subscriptionAllowed
+            : true,
+        receiveDisabled: _receivePriority == VoipStreamReceivePriority.disabled,
+        streamObjectExists: true,
+        audioSinkAttached: publication.track is AudioTrack,
+        localVolume: _localVolume,
+        locallyMuted: _locallyMuted,
+        userMuted: _hasLocalPlaybackVolumeOverride && _localVolume <= 0,
+      ),
+    );
+  }
+
+  @override
+  Stream<void> get onStreamChanged => _onChanged.stream;
+
+  @override
+  VoipStreamReceivePriority get receivePriority => _receivePriority;
+
+  String? get receiveQualityLabel => _receiveQualityLabel;
+
+  @override
+  Future<void> setReceivePriority(VoipStreamReceivePriority priority) {
+    _priorityUpdate = _priorityUpdate.catchError((_) {}).then((_) async {
+      if (_disposed || _receivePriority == priority) {
+        return;
+      }
+
+      final application = VoipReceiveQualityApplication.fromPriority(priority);
+      var appliedQualityLabel = application.liveKitQualityLabel;
+      final remotePublication = publication;
+      if (remotePublication is RemoteTrackPublication &&
+          remotePublication.kind == TrackType.VIDEO) {
+        switch (application.videoQuality) {
+          case null:
+            await remotePublication.disable();
+            await remotePublication.unsubscribe();
+            break;
+          case VoipReceiveVideoQuality.low:
+            await remotePublication.subscribe();
+            await remotePublication.enable();
+            await remotePublication.setVideoQuality(VideoQuality.LOW);
+            break;
+          case VoipReceiveVideoQuality.medium:
+            await remotePublication.subscribe();
+            await remotePublication.enable();
+            await remotePublication.setVideoQuality(VideoQuality.MEDIUM);
+            break;
+          case VoipReceiveVideoQuality.high:
+            await remotePublication.subscribe();
+            await remotePublication.enable();
+            await remotePublication.setVideoQuality(VideoQuality.HIGH);
+            break;
+        }
+        _logReceivePriorityTransition(priority, application);
+      }
+
+      if (_disposed) {
+        return;
+      }
+
+      _receivePriority = priority;
+      _receiveQualityLabel = appliedQualityLabel;
+      _notifyChanged();
+    });
+
+    return _priorityUpdate;
+  }
+
+  void _logReceivePriorityTransition(
+    VoipStreamReceivePriority priority,
+    VoipReceiveQualityApplication application,
+  ) {
+    if (!preferences.showCallStreamStats.value) {
+      return;
+    }
+
+    Log.i(
+      'LiveKit receive priority applied: '
+      'stream=$streamId user=$_redactedUserId '
+      'source=${publication.source} name=${publication.name} '
+      'requested=${priority.name} '
+      'quality=${application.liveKitQualityLabel} '
+      'subscribed=${application.subscribe} enabled=${application.enable}',
+    );
+  }
+
+  MatrixLivekitVoipStream(
+    this.publication,
+    this.userId, {
+    String? participantIdentity,
+  }) : participantIdentity = participantIdentity ?? userId {
+    if (publication is RemoteTrackPublication && isScreenShareAudio) {
+      _locallyMuted = true;
+      unawaited(_queueLocalPlaybackOperation(_applyLocalPlaybackVolume));
+    }
+
+    if (publication.track is AudioTrack) {
+      _startAudioVisualizer(publication.track as AudioTrack);
+    }
+  }
+
+  @override
+  double audiolevel = 0.0;
+
+  final String participantIdentity;
+
+  void setAudioLevel(AudioVisualizerEvent e) {
+    final sample = e.event.isNotEmpty ? e.event[0] : null;
+    if (sample is num) {
+      audiolevel = sample.toDouble().clamp(0.0, 1.0).toDouble();
+    }
+  }
+
+  VoipInboundAudioEnergySample? _inboundAudioEnergy;
+
+  @override
+  VoipInboundAudioEnergySample? get inboundAudioEnergy => _inboundAudioEnergy;
+
+  /// Publishes the latest inbound-rtp energy reading collected by the session.
+  ///
+  /// Deliberately does *not* fire [onStreamChanged]: the collector runs on its
+  /// own periodic tick and this value drives measurement, not any widget. The
+  /// notification would be a rebuild per second per remote talker for a value
+  /// nothing in the UI reads.
+  void updateInboundAudioEnergy(VoipInboundAudioEnergySample? sample) {
+    if (_disposed) {
+      return;
+    }
+
+    _inboundAudioEnergy = sample;
+  }
+
+  void onStreamUpdatedEvent() {
+    if (_disposed) {
+      return;
+    }
+
+    if (publication.kind == TrackType.AUDIO) {
+      unawaited(_queueLocalPlaybackOperation(_applyLocalPlaybackVolume));
+    }
+    _notifyChanged();
+  }
+
+  void onTrackSubscribedEvent(Track track) {
+    if (_disposed) {
+      return;
+    }
+
+    if (track is AudioTrack) {
+      _startAudioVisualizer(track);
+      unawaited(_queueLocalPlaybackOperation(_applyLocalPlaybackVolume));
+    }
+    _notifyChanged();
+  }
+
+  void onTrackUnsubscribedEvent(Track track) {
+    if (_disposed) {
+      return;
+    }
+
+    if (track is AudioTrack) {
+      // The inbound-rtp counters belong to the receiver that just went away.
+      // A later reading comes from a fresh receiver starting at zero, and
+      // pairing it against this one describes two different tracks.
+      _inboundAudioEnergy = null;
+      if (identical(_visualizedAudioTrack, track)) {
+        unawaited(_disposeAudioVisualizer());
+      }
+    }
+    _notifyChanged();
+  }
+
+  Future<void> dispose() async {
+    _disposed = true;
+    _inboundAudioEnergy = null;
+    await _disposeAudioVisualizer();
+    if (!_onChanged.isClosed) {
+      // Broadcast close() futures only complete once every past subscriber has
+      // cancelled after close, so awaiting them can hang dispose forever. Every
+      // mounted call tile holds a live subscription to this stream, so the
+      // normal case - tearing down with the call UI still on screen - is
+      // precisely the case with live subscribers. `CallManager.dispose` and
+      // `DirectMessageAggregator.dispose` already avoid this the same way.
+      unawaited(_onChanged.close());
+    }
+  }
+
+  void _startAudioVisualizer(AudioTrack track) {
+    if (identical(_visualizedAudioTrack, track) && visualizer != null) {
+      return;
+    }
+    if (visualizer != null ||
+        _visualizerListener != null ||
+        _visualizerStartFuture != null) {
+      return;
+    }
+
+    try {
+      _visualizedAudioTrack = track;
+      final nextVisualizer = createVisualizer(
+        track,
+        options: AudioVisualizerOptions(barCount: 1, smoothTransition: false),
+      );
+      final nextListener = nextVisualizer.createListener();
+      nextListener.on<AudioVisualizerEvent>(setAudioLevel);
+
+      visualizer = nextVisualizer;
+      _visualizerListener = nextListener;
+      _visualizerStartFuture = nextVisualizer.start().catchError((
+        Object error,
+        StackTrace _,
+      ) {
+        _logAudioVisualizerWarning(error, action: 'start');
+      });
+    } catch (error, _) {
+      _visualizedAudioTrack = null;
+      _logAudioVisualizerWarning(error, action: 'create');
+    }
+  }
+
+  Future<void> _disposeAudioVisualizer() async {
+    final startFuture = _visualizerStartFuture;
+    _visualizerStartFuture = null;
+    if (startFuture != null) {
+      await _runAudioVisualizerStep('start completion', () => startFuture);
+    }
+
+    final listener = _visualizerListener;
+    _visualizerListener = null;
+    await _runAudioVisualizerStep('listener dispose', listener?.dispose);
+
+    final activeVisualizer = visualizer;
+    visualizer = null;
+    await _runAudioVisualizerStep('stop', activeVisualizer?.stop);
+    await _runAudioVisualizerStep('dispose', activeVisualizer?.dispose);
+    _visualizedAudioTrack = null;
+  }
+
+  Future<void> _runAudioVisualizerStep(
+    String action,
+    Future<void> Function()? step,
+  ) async {
+    if (step == null) {
+      return;
+    }
+
+    try {
+      await step();
+    } catch (error, _) {
+      _logAudioVisualizerWarning(error, action: action);
+    }
+  }
+
+  void _logAudioVisualizerWarning(Object error, {required String action}) {
+    final expectedPluginError = isLiveKitAudioVisualizerPluginError(error);
+    Log.w(
+      'LiveKit audio visualizer $action failed; call audio remains active '
+      '(${expectedPluginError ? 'plugin teardown' : error.runtimeType}: '
+      '$error)',
+      category: LogCategory.livekit,
+      source: 'audio-visualizer',
+    );
+  }
+
+  /// Mute or unmute this stream locally (only affects what the local user
+  /// hears — does not send any signal to the remote participant).
+  Future<void> setLocalMute(bool muted) {
+    return _queueLocalPlaybackOperation(() async {
+      if (_disposed) {
+        return;
+      }
+
+      _locallyMuted = muted;
+      await _applyLocalPlaybackVolume();
+      _notifyChanged();
+    });
+  }
+
+  /// Throttle window for the dropped-write warning below.
+  static const Duration _nullTrackVolumeWarnInterval = Duration(seconds: 30);
+  DateTime? _lastNullTrackVolumeWarnAt;
+  int _suppressedNullTrackVolumeWarnings = 0;
+
+  void _logNullTrackVolumeDrop() {
+    final now = DateTime.now();
+    final lastWarnAt = _lastNullTrackVolumeWarnAt;
+    if (lastWarnAt != null &&
+        now.difference(lastWarnAt) < _nullTrackVolumeWarnInterval) {
+      _suppressedNullTrackVolumeWarnings++;
+      return;
+    }
+
+    final suppressed = _suppressedNullTrackVolumeWarnings;
+    _suppressedNullTrackVolumeWarnings = 0;
+    _lastNullTrackVolumeWarnAt = now;
+    Log.w(
+      'LiveKit local playback volume dropped; publication has no track so the '
+      'write never reached the SFU, yet listeners are still notified: '
+      'stream=$streamId user=$_redactedUserId '
+      'subscribed=${publication.subscribed} muted=${publication.muted} '
+      'requestedVolume=${(_locallyMuted ? 0.0 : _localVolume).toStringAsFixed(2)} '
+      'locallyMuted=$_locallyMuted suppressedSinceLastWarning=$suppressed',
+      category: LogCategory.livekit,
+      source: 'call-participant-audio',
+    );
+  }
+
+  Future<void> _applyLocalPlaybackVolume() async {
+    if (_disposed) {
+      return;
+    }
+
+    final track = publication.track;
+    if (track == null) {
+      // The write is dropped, but every caller still fires `_notifyChanged()`
+      // afterwards, so the UI is told it succeeded. That is exactly the
+      // "volume slider does nothing" symptom, and until now it was completely
+      // invisible - no log, no re-arm, no failed future.
+      //
+      // Throttled because a hidden remote screen share is deliberately
+      // unsubscribed, which makes `publication.track` null for as long as it
+      // stays hidden; the build path then re-issues this write on every
+      // rebuild. Unthrottled it would be the loudest line in a capture.
+      _logNullTrackVolumeDrop();
+      return;
+    }
+
+    final effectiveVolume = _locallyMuted ? 0.0 : _localVolume;
+    final isRemote = publication is RemoteTrackPublication;
+    try {
+      await rtc.Helper.setVolume(effectiveVolume, track.mediaStreamTrack);
+      Log.i(
+        'LiveKit local playback volume applied via setVolume: '
+        'stream=$streamId user=$_redactedUserId '
+        'track=${_shortHash(track.mediaStreamTrack.id)} remote=$isRemote '
+        'volume=${effectiveVolume.toStringAsFixed(2)}',
+        category: LogCategory.livekit,
+        source: 'call-participant-audio',
+      );
+    } catch (error, stackTrace) {
+      if (_disposed) {
+        return;
+      }
+
+      // setVolume could not be applied. On desktop this is typically an
+      // "Unable to find provided track" error for a LiveKit Unified-Plan
+      // remote track, which flutter_webrtc does not register anywhere
+      // MediaTrackForId can resolve it. The enable/disable fallback below can
+      // only mute or fully restore, so a partial volume silently does not take
+      // effect -- which is why per-participant volume changes looked
+      // intermittent. Log it so the failure is visible. See BUG-282.
+      Log.w(
+        'LiveKit setVolume failed; falling back to enable/disable, which '
+        'cannot apply a partial volume: '
+        'stream=$streamId user=$_redactedUserId '
+        'track=${_shortHash(track.mediaStreamTrack.id)} remote=$isRemote '
+        'requestedVolume=${effectiveVolume.toStringAsFixed(2)} '
+        'fallback=${effectiveVolume == 0.0 ? 'disable' : 'enable'} '
+        'error=${error.runtimeType}',
+        category: LogCategory.livekit,
+        source: 'call-participant-audio',
+      );
+      Log.onError(
+        error,
+        stackTrace,
+        content: 'LiveKit local playback setVolume failure detail',
+        category: LogCategory.livekit,
+        source: 'call-participant-audio',
+      );
+
+      // Fall back to enable/disable if setVolume is unavailable.
+      //
+      // Guarded because this method is usually invoked through unawaited(...)
+      // (stream-updated, track-subscribed, and the constructor). If the track
+      // is torn down mid-race the fallback throws too, and an unguarded throw
+      // here becomes an unhandled Future rejection rather than the structured
+      // logging the primary failure path already gets.
+      try {
+        if (effectiveVolume == 0.0) {
+          await track.disable();
+        } else {
+          await track.enable();
+        }
+      } catch (fallbackError, fallbackStackTrace) {
+        Log.w(
+          'LiveKit local playback volume fallback failed '
+          'stream=$streamId user=$_redactedUserId '
+          'track=${_shortHash(track.mediaStreamTrack.id)} remote=$isRemote '
+          'requestedVolume=${effectiveVolume.toStringAsFixed(2)} '
+          'fallback=${effectiveVolume == 0.0 ? 'disable' : 'enable'} '
+          'error=${fallbackError.runtimeType}',
+          category: LogCategory.livekit,
+          source: 'call-participant-audio',
+        );
+        Log.onError(
+          fallbackError,
+          fallbackStackTrace,
+          content: 'LiveKit local playback volume fallback failure detail',
+          category: LogCategory.livekit,
+          source: 'call-participant-audio',
+        );
+      }
+    }
+  }
+
+  String get _redactedUserId => _shortHash(streamUserId);
+
+  /// Short pseudonymous hash for logging identifiers without writing the raw
+  /// user or WebRTC track id into the log.
+  ///
+  /// Not non-reversible: unsalted SHA-256 over an id drawn from a known, small
+  /// set (a room's members) can be confirmed by anyone who can guess the id.
+  /// See `ParticipantLoudnessMonitor.participantKeyFor` for the same caveat and
+  /// the note routed to the S&C agent.
+  static String _shortHash(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'none';
+    }
+    return sha256.convert(utf8.encode(value)).toString().substring(0, 12);
+  }
+
+  /// Set the local playback volume for this stream (0.0–2.0).
+  /// This only affects what the local user hears.
+  Future<void> setLocalVolume(double volume) {
+    return _setLocalVolume(volume, preserveMute: false, userOverride: true);
+  }
+
+  @override
+  Future<void> setDefaultLocalVolume(double volume) {
+    return _queueLocalPlaybackOperation(() async {
+      if (_disposed || _hasLocalPlaybackVolumeOverride) {
+        return;
+      }
+      await _setLocalVolumeInQueue(
+        volume,
+        preserveMute: false,
+        userOverride: false,
+      );
+    });
+  }
+
+  @override
+  void clearLocalPlaybackVolumeOverride() {
+    unawaited(
+      _queueLocalPlaybackOperation(() async {
+        if (_disposed) {
+          return;
+        }
+        _hasLocalPlaybackVolumeOverride = false;
+        _notifyChanged();
+      }),
+    );
+  }
+
+  /// Restore a saved playback volume without clearing a visibility mute.
+  ///
+  /// Remote screenshare audio starts muted while the matching video tile is
+  /// hidden. Restoring the user's saved volume must not briefly reopen that
+  /// audio before the tile reveal policy has a chance to run.
+  @override
+  Future<void> setLocalVolumePreservingMute(double volume) {
+    return _setLocalVolume(volume, preserveMute: true, userOverride: true);
+  }
+
+  Future<void> _setLocalVolume(
+    double volume, {
+    required bool preserveMute,
+    required bool userOverride,
+  }) {
+    return _queueLocalPlaybackOperation(
+      () => _setLocalVolumeInQueue(
+        volume,
+        preserveMute: preserveMute,
+        userOverride: userOverride,
+      ),
+    );
+  }
+
+  Future<void> _setLocalVolumeInQueue(
+    double volume, {
+    required bool preserveMute,
+    required bool userOverride,
+  }) async {
+    if (_disposed) {
+      return;
+    }
+
+    if (userOverride) {
+      _hasLocalPlaybackVolumeOverride = true;
+    }
+    _localVolume = volume.clamp(0.0, 2.0);
+    if (_localVolume == 0.0) {
+      _locallyMuted = true;
+    } else if (!preserveMute) {
+      _locallyMuted = false;
+    }
+
+    await _applyLocalPlaybackVolume();
+    _notifyChanged();
+  }
+
+  Future<T> _queueLocalPlaybackOperation<T>(Future<T> Function() operation) =>
+      _localPlaybackOperationQueue.run(operation);
+
+  void _notifyChanged() {
+    if (_disposed || _onChanged.isClosed) {
+      return;
+    }
+
+    try {
+      _onChanged.add(());
+    } catch (_) {
+      // Stream updates can race with call teardown.
+    }
+  }
+
+  @override
+  double? get aspectRatio {
+    if (publication.dimensions == null) {
+      return null;
+    }
+    return publication.dimensions!.width.toDouble() /
+        publication.dimensions!.height.toDouble();
+  }
+
+  @override
+  Widget? buildVideoRenderer(BoxFit fit, Key key) {
+    if (publication.track is VideoTrack) {
+      return VideoTrackRenderer(
+        publication.track as VideoTrack,
+        key: key,
+        fit: fit == BoxFit.cover ? VideoViewFit.cover : VideoViewFit.contain,
+      );
+    }
+
+    return null;
+  }
+
+  @override
+  String get nativePiPMediaStreamId {
+    final track = _nativePiPVideoTrack;
+    if (track != null) {
+      return track.mediaStream.id;
+    }
+    return '';
+  }
+
+  @override
+  String get nativePiPVideoTrackId {
+    final track = _nativePiPVideoTrack;
+    if (track != null) {
+      return track.mediaStreamTrack.id ?? '';
+    }
+    return '';
+  }
+
+  @override
+  String? get nativePiPOwnerTag {
+    return _nativePiPVideoTrack?.mediaStream.ownerTag;
+  }
+
+  VideoTrack? get _nativePiPVideoTrack {
+    final track = publication.track;
+    return track is VideoTrack ? track : null;
+  }
+
+  @override
+  VoipStreamDirection get direction => publication is LocalTrackPublication
+      ? VoipStreamDirection.outgoing
+      : VoipStreamDirection.incoming;
+
+  @override
+  String get label => "label";
+
+  @override
+  String get streamId => publication.sid;
+
+  @override
+  String get streamUserId => userId;
+
+  /// The kind of media this stream carries.
+  ///
+  /// Derived from the publication's declared `kind`/`source`, never from
+  /// `publication.track` (C-4). The track is transient — it is null before the
+  /// subscription attaches, after an unsubscribe, and for the whole time the
+  /// hidden-tile receive policy keeps an off-screen screen share detached — so
+  /// the previous `publication.track is AudioTrack` test reported
+  /// [VoipStreamType.video] for an audio publication in its *normal* state.
+  /// Two call sites already worked around that with comments
+  /// (`call_manager.dart` `_applyDeafenToStream` and the speaker-volume
+  /// default); roughly six others did not.
+  @override
+  VoipStreamType get type {
+    if (publication.kind == TrackType.AUDIO) {
+      // Screenshare audio is deliberately still `audio`: it is routed by
+      // `isScreenShareAudio`, and reporting it as `screenshare` would make the
+      // receive-quality policy treat it as a video tile.
+      return VoipStreamType.audio;
+    }
+
+    if (publication.isScreenShare ||
+        publication.source == TrackSource.screenShareVideo ||
+        publication.name == 'screenshare') {
+      return VoipStreamType.screenshare;
+    }
+
+    return VoipStreamType.video;
+  }
+
+  /// Whether the *sender* has muted this media.
+  ///
+  /// Reads the track rather than the publication on purpose, and only for
+  /// outgoing media is that the whole story. For an incoming publication the
+  /// authoritative bit is `publication.muted`: the SDK writes it from the
+  /// server's TrackInfo on every metadata update, whereas `track.muted` is
+  /// only reachable once a media sink has attached and is null-defaulted to
+  /// `false` before that. So a remote participant who is muted before we
+  /// subscribe reported "unmuted" here.
+  ///
+  /// Incoming is therefore the UNION of the two, not a fallback to the track:
+  /// muted if either says muted. That distinction matters in exactly one
+  /// state - publication unmuted, track muted - where a fallback would answer
+  /// "unmuted" and the union answers "muted". The union is the safer answer
+  /// for an incoming stream, because the track's mute is what actually
+  /// silences local playback, and "we think they are talking while nothing is
+  /// audible" is the failure this getter exists to stop. Outgoing behaviour is
+  /// unchanged (a local publication mirrors its track through
+  /// `mute()`/`unmute()`).
+  ///
+  /// The one case this does NOT fix is the local publication/track desync in
+  /// P0-4, which is the local-publication lane's slice: there the *track* is
+  /// muted and the *publication* is not, and the fix is to stop them diverging
+  /// rather than to pick a winner here.
+  @override
+  bool get isMuted {
+    if (direction == VoipStreamDirection.incoming) {
+      return publication.muted || (publication.track?.muted ?? false);
+    }
+    return publication.track?.muted ?? false;
+  }
+}
